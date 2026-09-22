@@ -30,10 +30,12 @@ Faz 4'e bırakıldığı için acil değil. Sırada **Faz 1** var.
 
 - [ ] **Oturumu kapatıp aç** — `dialout` üyeliği ancak o zaman geçerli olur
 - [ ] Ollama kurulumu (model seçimi Faz 4'te)
-- [ ] Parça siparişi (~511 TL, bkz. `docs/malzeme-listesi.md`): 2× SN65HVD230
-      (3,3 V), CP2102 USB-TTL (6 pinli), M-F + F-F jumper, breadboard, 2× 120 Ω
-      — artı **micro-USB data kablosu** (en öncelikli kalem)
-      — **mantık analizörü ertelendi, bkz. K-009**
+- [ ] **Parça siparişi: Robiz.net'ten tek sipariş, 656,16 TL** — tam liste ve
+      gerekçeleri `docs/malzeme-listesi.md`'de. 2× SN65HVD230, CP2102 USB-TTL,
+      micro-USB **data** kablosu, M-F + F-F + M-M jumper, MB-102 breadboard.
+      Hepsi stokta doğrulandı (2026-09-22).
+      — 120 Ω direnç siparişe dahil değil: modüller gelince üzerinde var mı bakılacak
+      — mantık analizörü ertelendi (K-009)
 - [ ] **Faz 1 başlangıcı:** `docs/RULES.md` eşik değerleri, `docs/protocol.md`
       mesaj çerçevesi, `shared/protocol/messages.yaml` + kod üreticisi
 
