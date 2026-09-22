@@ -4,47 +4,62 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-09-22
-**Bulunduğumuz faz:** Faz 0 — Kurulum
+**Bulunduğumuz faz:** Faz 0 — Kurulum (neredeyse bitti)
 
 ---
 
 ## Şu an ne yapılıyor
 
-Faz 0 (kurulum) tamamlanıyor. Proje iskeleti kuruldu, eksik araçların kurulumu sürüyor.
+Faz 0 tamamlandı sayılır. Kalan tek yazılım kalemi Ollama; o da model seçimi
+Faz 4'e bırakıldığı için acil değil. Sırada **Faz 1** var.
 
 ## Bitenler
 
-- [x] Disk temizliği: 4.3 GB → 11 GB boş alan
-- [x] Proje klasör yapısı kuruldu (`docs/`, `shared/`, `firmware/`, `ros2_ws/`, `analysis/`)
-- [x] Ubuntu 22.04.5 LTS
-- [x] ROS 2 Humble (önceden kuruluydu)
-- [x] Nav2 (30 paket, önceden kuruluydu)
-- [x] `teleop_twist_keyboard` (önceden kuruluydu)
+- [x] Disk temizliği: 4.3 GB → 11 GB (kurulumlar sonrası 6.4 GB boş)
+- [x] Proje klasör yapısı + git deposu + ilk commit
+- [x] Ubuntu 22.04.5 LTS · ROS 2 Humble · Nav2 (30 paket) · teleop_twist_keyboard
 - [x] Git, VS Code, Claude Code
+- [x] `minicom`, `python3-serial`, `pulseview`, `sigrok-firmware-fx2lafw`, `unzip`
+- [x] RTAB-Map (`ros-humble-rtabmap-ros`, 14 paket)
+- [x] STM32CubeIDE 2.2.0 → `/opt/st/stm32cubeide_2.2.0`
+- [x] ST-LINK udev kuralları kuruldu (49-stlinkv1/v2/v2-1/v3.rules)
+- [x] `dialout` grubuna eklendi (sistem kaydında var)
+- [x] GitHub'da `bitirme-ika-otonom` özel deposu açıldı
 
-## Sırada (Faz 0 kalanı)
+## Sırada
 
-- [ ] `dialout` grubuna ekleme — seri porta şifresiz erişim için (oturum kapatıp açmak gerekir)
-- [ ] `minicom`, `python3-serial`, `pulseview`, `sigrok-firmware-fx2lafw`
-- [ ] RTAB-Map (`ros-humble-rtabmap-ros`)
-- [ ] STM32CubeIDE — st.com'dan elle indirilecek (myST hesabı gerekir)
-- [ ] Ollama — kurulacak, model seçimi Faz 4'e bırakıldı
-- [ ] GitHub'da `bitirme-ika-bekci` özel deposu açıp bağlamak
-- [ ] Parça siparişi: 2× SN65HVD230, 1× USB-TTL, 1× mantık analizörü, jumper, breadboard
+- [ ] **Oturumu kapatıp aç** — `dialout` üyeliği ancak o zaman geçerli olur
+- [ ] Ollama kurulumu (model seçimi Faz 4'te)
+- [ ] Parça siparişi: 2× SN65HVD230 (3,3 V), USB-TTL (CP2102/CH340),
+      8 kanal mantık analizörü, jumper seti (erkek-dişi + dişi-dişi), breadboard
+- [ ] **Faz 1 başlangıcı:** `docs/RULES.md` eşik değerleri, `docs/protocol.md`
+      mesaj çerçevesi, `shared/protocol/messages.yaml` + kod üreticisi
+
+## Doğrulanmış testler
+
+- [x] CubeIDE kuruldu; **LED testi (plan 3.6) henüz yapılmadı** — kart takılıp
+      LD2 yanıp sönmesi görülmeli. Oturum kapatma sonrası ilk iş bu olabilir.
 
 ## Açık sorular / kararsız konular
 
 | Konu | Durum | Ne zaman karar verilecek |
 |---|---|---|
-| Gazebo: Fortress + TurtleBot 4 mü, mevcut Harmonic'te kendi modelimiz mi | **Açık** | Faz 3 başında |
+| Gazebo: Fortress + TurtleBot 4 mü, mevcut Harmonic'te kendi modelimiz mi | **Açık** (bkz. K-008) | Faz 3 başında |
 | LLM model seçimi (araç çağırma şart) | **Açık** | Faz 4 başında |
 | Senaryo başına tekrar sayısı (plan 20 öneriyor) | **Açık** | Faz 1'de hocayla |
 
 ## Bilinen engeller
 
-- **NVIDIA sürücüsü kurulu değil.** Kartta RTX 3050 Mobile var (~4 GB VRAM) ama sistem Intel iGPU kullanıyor, `nvidia-smi` yok. Faz 4'te yerel LLM çalıştırmak için sürücü kurulmalı; kurulmazsa model CPU'da çok yavaş kalır ve API'ye geçmek gerekebilir.
-- **Gazebo sürüm çakışması.** Sistemde Harmonic (gz-sim8) var; TurtleBot 4'ün Humble simülatörü Fortress'e bağımlı. Yan yana kurulabilirler ama `ign`/`gz` komutları ve ortam değişkenleri karışabilir.
-- **Disk.** 11 GB boş. STM32CubeIDE (~2.5 GB) + Fortress/TurtleBot4 (~2 GB) + Ollama modeli (~4 GB) sonrası rahatlık payı azalacak.
+- **Disk dar: 6.4 GB boş.** Gazebo Fortress + TurtleBot 4 (~2 GB) ve Ollama modeli
+  (~4 GB) ikisi birden sığmaz. Faz 3 ve Faz 4'ten önce yeniden yer açmak gerekecek.
+  Adaylar: `~/.config/Cursor` + `~/.cursor` (1.85 GB), `~/.antigravity-ide` (141 MB),
+  `~/.cache/ms-playwright-go` (128 MB).
+- **NVIDIA sürücüsü kurulu değil.** Kartta RTX 3050 Mobile var (~4 GB VRAM) ama sistem
+  Intel iGPU kullanıyor, `nvidia-smi` yok. Faz 4'te yerel LLM için sürücü kurulmalı;
+  kurulmazsa model CPU'da çok yavaş kalır ve API'ye geçmek gerekebilir.
+- **Gazebo sürüm çakışması.** Sistemde Harmonic (gz-sim8) var; TurtleBot 4'ün Humble
+  simülatörü Fortress'e bağımlı. Yan yana kurulabilirler ama `ign`/`gz` komutları ve
+  ortam değişkenleri karışabilir.
 
 ## Nerede takıldım
 
