@@ -59,10 +59,25 @@ CAN modüllerinde sonlandırma direnci yoksa şart. Birkaç lira, almakta fayda 
 olmadan hat çoğu zaman hiç çalışmaz ve sebebini bulmak günler alır.
 Direnc.net ya da herhangi bir elektronik mağazasında bulunur.
 
-## 6. Micro-USB veri kablosu  — KONTROL ET
+## 6. Micro-USB VERİ kablosu ×1  — ZORUNLU
 
-NUCLEO-G474RE micro-USB kullanıyor. **Sadece şarj eden kablo kartı tanıtmaz.**
-Kartla birlikte kablo geldiyse yeni almaya gerek yok.
+**Doğrulandı (2026-09-22):** Kart **NUCLEO-G474RE, MB1367/C** revizyonu ve
+CN1 konektörü **micro-USB**. Mini değil.
+
+Elde bulunan JBL bluetooth hoparlör kablosu denendi: karta besleme gidiyor
+(LD3 kırmızı güç LED'i yanıyor) ama `lsusb` çıktısında ST cihazı görünmüyor —
+kabloda **veri telleri yok**, yalnızca güç telleri var. Kullanılamaz.
+
+Adında **"data"** geçen model alınmalı; "güç aktarım kablosu" diye geçenler
+çoğunlukla yalnızca besleme taşır.
+
+| Satıcı | Ürün | Fiyat | Stok |
+|---|---|---|---|
+| **Robotistan** | Micro USB 15cm Data Kablosu - Siyah | 21,41 TL | ✅ Stokta |
+| Robotistan | Mikro USB Kablo 1.5 m (masada daha rahat) | 74,33 TL | ✅ Stokta |
+
+**Bu kablo gelmeden Faz 0'ın LED testi (plan 3.6) ve Faz 2'nin tamamı yapılamaz.**
+Siparişte en öncelikli kalem budur.
 
 ---
 
@@ -76,7 +91,8 @@ Kartla birlikte kablo geldiyse yeni almaya gerek yok.
 | USB-TTL (Robotistan) | 136 TL |
 | Jumper ×2 + breadboard (Robotistan) | 135 TL |
 | 120 Ω direnç ×2 | ~10 TL |
-| **Toplam** | **~511 TL** |
+| Micro-USB **data** kablosu (Robotistan) | 21 TL |
+| **Toplam** | **~532 TL** |
 
 ### Ertelenen
 

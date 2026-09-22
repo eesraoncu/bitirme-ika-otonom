@@ -32,14 +32,19 @@ Faz 4'e bırakıldığı için acil değil. Sırada **Faz 1** var.
 - [ ] Ollama kurulumu (model seçimi Faz 4'te)
 - [ ] Parça siparişi (~511 TL, bkz. `docs/malzeme-listesi.md`): 2× SN65HVD230
       (3,3 V), CP2102 USB-TTL (6 pinli), M-F + F-F jumper, breadboard, 2× 120 Ω
+      — artı **micro-USB data kablosu** (en öncelikli kalem)
       — **mantık analizörü ertelendi, bkz. K-009**
 - [ ] **Faz 1 başlangıcı:** `docs/RULES.md` eşik değerleri, `docs/protocol.md`
       mesaj çerçevesi, `shared/protocol/messages.yaml` + kod üreticisi
 
 ## Doğrulanmış testler
 
-- [x] CubeIDE kuruldu; **LED testi (plan 3.6) henüz yapılmadı** — kart takılıp
-      LD2 yanıp sönmesi görülmeli. Oturum kapatma sonrası ilk iş bu olabilir.
+- [x] CubeIDE kuruldu
+- [x] Kart kimliği doğrulandı: **NUCLEO-G474RE, MB1367/C**, CN1 = **micro-USB**
+- [ ] **LED testi (plan 3.6) yapılamadı — veri kablosu yok.** Eldeki JBL
+      hoparlör kablosu denendi: karta besleme gidiyor (LD3 yanıyor) ama
+      `lsusb`'de ST cihazı yok → kabloda veri teli yok. Micro-USB **data**
+      kablosu sipariş listesine eklendi, en öncelikli kalem.
 
 ## Açık sorular / kararsız konular
 
