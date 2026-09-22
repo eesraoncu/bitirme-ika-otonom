@@ -1,0 +1,40 @@
+# --- GİZLİ: asla depoya girmez (bkz. docs/DECISIONS.md K-007) ---
+secrets/
+*.key
+hmac_key*
+.env
+
+# --- ROS 2 / colcon ---
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# --- shared/protocol'den otomatik üretilenler (kaynak: messages.yaml) ---
+shared/protocol/generated/
+
+# --- STM32CubeIDE ---
+firmware/Debug/
+firmware/Release/
+firmware/.settings/
+firmware/*.launch
+
+# --- Deney çıktıları (büyük; sonuç özetleri analysis/ içinde tutulur) ---
+experiments/runs/
+*.bag
+*.db3
+*.pgm
+
+# --- Haritalar (büyük ikili dosyalar; hangi haritanın kullanıldığı DECISIONS'ta yazar) ---
+*.rtabmap
+
+# --- Editör / sistem ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
