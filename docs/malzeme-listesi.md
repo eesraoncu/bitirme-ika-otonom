@@ -28,10 +28,14 @@ Araç kanalı için. **3,3 V seviyesi seçilebilmeli.**
 
 6 pinli model 3,3 V / 5 V jumper'ı olduğu için seçildi. 4 pinli modellerde bu jumper yok.
 
-## 3. Mantık analizörü ×1  — ÖNERİLİR (S1 ölçümü için)
+## 3. Mantık analizörü — İLK SİPARİŞE DAHİL DEĞİL (bkz. K-009)
 
-Kart üzerindeki karar süresini (mikrosaniye) ölçmenin tek yolu.
-**CY7C68013A / FX2LP çipli olmalı** — sisteme kurulu `sigrok-firmware-fx2lafw` ve PulseView bunu tanır.
+Karar süresi Faz 2.6'da **DWT çevrim sayacıyla** ölçülecek (170 MHz'de 5,9 ns
+çözünürlük — 24 MHz analizörden ~7 kat hassas). Analizör şu iki durumda alınır:
+Faz 2.4'te CAN hattı çözülemezse, ya da Faz 5 öncesi bağımsız doğrulama için.
+
+**Alınırsa CY7C68013A / FX2LP çipli olmalı** — kurulu `sigrok-firmware-fx2lafw`
+ve PulseView yalnızca bunları tanır.
 
 | Satıcı | Ürün | Fiyat | Stok |
 |---|---|---|---|
@@ -64,21 +68,26 @@ Kartla birlikte kablo geldiyse yeni almaya gerek yok.
 
 ## Tahmini maliyet
 
+### İlk sipariş (verilecek)
+
 | Kalem | Tutar |
 |---|---|
 | 2× CAN modülü (Robiz) | 230 TL |
 | USB-TTL (Robotistan) | 136 TL |
 | Jumper ×2 + breadboard (Robotistan) | 135 TL |
 | 120 Ω direnç ×2 | ~10 TL |
-| **Analizör hariç ara toplam** | **~511 TL** |
-| Mantık analizörü | ~420–520 TL |
-| **Toplam** | **~930–1030 TL** |
+| **Toplam** | **~511 TL** |
 
-Öneride yazılan "~250 TL" tahmini yalnızca CAN modüllerini kapsıyordu; kablolar,
-dönüştürücü ve analizör hesaba katılınca rakam bu seviyeye çıkıyor.
+### Ertelenen
+
+| Kalem | Tutar | Ne zaman |
+|---|---|---|
+| Mantık analizörü | ~420–520 TL | K-009'daki tetikleyicilerden biri olursa |
+
+Öneride yazılan "~250 TL" tahmini yalnızca CAN modüllerini kapsıyordu; kablolar ve
+dönüştürücü hesaba katılınca ilk sipariş ~511 TL'ye çıkıyor.
 
 ## Sipariş notu
 
-Üç ayrı satıcı üç ayrı kargo demek. Hepsi tek yerden alınamıyor çünkü CAN modülü
-Robotistan'da yok. En az kargo için: CAN modülleri Robiz'den, kalan her şey
-Robotistan'dan, analizör Amazon'dan.
+CAN modülü Robotistan'da olmadığı için tek satıcıdan alınamıyor.
+En az kargo: **CAN modülleri Robiz'den, kalan her şey Robotistan'dan** → 2 kargo.

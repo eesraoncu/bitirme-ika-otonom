@@ -30,8 +30,9 @@ Faz 4'e bırakıldığı için acil değil. Sırada **Faz 1** var.
 
 - [ ] **Oturumu kapatıp aç** — `dialout` üyeliği ancak o zaman geçerli olur
 - [ ] Ollama kurulumu (model seçimi Faz 4'te)
-- [ ] Parça siparişi: 2× SN65HVD230 (3,3 V), USB-TTL (CP2102/CH340),
-      8 kanal mantık analizörü, jumper seti (erkek-dişi + dişi-dişi), breadboard
+- [ ] Parça siparişi (~511 TL, bkz. `docs/malzeme-listesi.md`): 2× SN65HVD230
+      (3,3 V), CP2102 USB-TTL (6 pinli), M-F + F-F jumper, breadboard, 2× 120 Ω
+      — **mantık analizörü ertelendi, bkz. K-009**
 - [ ] **Faz 1 başlangıcı:** `docs/RULES.md` eşik değerleri, `docs/protocol.md`
       mesaj çerçevesi, `shared/protocol/messages.yaml` + kod üreticisi
 

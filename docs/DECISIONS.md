@@ -99,3 +99,32 @@ Faz 1 ve Faz 2 simülasyona ihtiyaç duymadığı için karar Faz 3 başına bı
   hızlandırır, ~2 GB disk, Harmonic'le yan yana durur.
 - *Harmonic'te kalıp kendi modelimiz:* disk tasarrufu, ama İKA modelini, kamerayı
   ve lidarı elle tanımlamak Faz 3'e 1–2 hafta ekler.
+
+---
+
+## K-009 · Mantık analizörü ilk siparişe dahil edilmiyor
+**Tarih:** 2026-09-22 · **Durum:** Yürürlükte
+
+Karar süresi ölçümü Faz 2.6'da **DWT çevrim sayacıyla** yapılır. Mantık analizörü
+ilk siparişe girmez; aşağıdaki tetikleyicilerden biri olursa alınır.
+
+**Neden:** Planın Faz 2.6 adımı zaten iki ölçüm yöntemi öngörüyor (GPIO pini +
+analizör, ve DWT çevrim sayacı). DWT, 170 MHz sistem saatinde **5,9 ns** çözünürlük
+verir — 24 MHz'lik analizörün 41,7 ns'sinden yaklaşık 7 kat hassas. S1'in ihtiyaç
+duyduğu "kart üzerinde karar süresi" sayısı DWT ile tek başına elde edilebiliyor.
+Ayrıca ucuz 24 MHz model Robotistan ve Direnç'te tükenmiş durumda.
+
+**Ne kaybediliyor:** (1) ölçümün bağımsız bir cihazla doğrulanması — DWT yazılımın
+kendini ölçmesidir; (2) CAN hattı çalışmazsa telde ne olduğunu görebilme;
+(3) UART → karar → CAN zincirinin tek zaman çizgisinde izlenmesi.
+
+**Ne zaman alınır (ikisinden biri olursa):**
+- Faz 2.4'te CAN hattı çalışmaz ve üç standart şüpheli (sonlandırma direnci,
+  TX/RX ters bağlantı, bit hızı uyuşmazlığı) elendiği hâlde sebep bulunamazsa.
+- Faz 5'e (hafta 11) girmeden önce, ölçümü bağımsız doğrulamak için.
+
+**Alınırsa şart:** CY7C68013A / FX2LP çipli olmalı; sisteme kurulu
+`sigrok-firmware-fx2lafw` ve PulseView yalnızca bunları tanır.
+
+**Not:** GPIO ölçüm pini (`firmware/app/timing/`) yine de kodlanır. Analizör
+sonradan alınırsa ek iş çıkmasın diye pin baştan hazır bırakılır.
