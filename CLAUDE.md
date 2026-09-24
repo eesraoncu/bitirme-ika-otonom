@@ -26,6 +26,10 @@ Kalıcı bir karar verildiyse `docs/DECISIONS.md`'ye **yeni madde olarak ekle** 
 - **Karta yükleme yapmadan önce onay al.** Flash'a yazma, silme, option byte değiştirme,
   ST-LINK üzerinden reset: hiçbiri Esra'nın açık onayı olmadan yapılmaz. Derlemek ve
   karttan salt okuma (ör. `STM32_Programmer_CLI -c port=SWD` ile kimlik okumak) serbest.
+- **Commit'lerde yalnızca Esra'nın adı.** Commit mesajlarına `Co-Authored-By` ya da
+  başka bir atıf satırı eklenmez, PR açıklamalarına "Generated with ..." satırı konmaz.
+  Yazar ve commit eden: `Esra Öncü <eesraoncu@icloud.com>`. (Esra'nın kararı, 2026-09-24.
+  Geçmişteki bütün commit'lerden de temizlendi.)
 
 ## Dil
 
