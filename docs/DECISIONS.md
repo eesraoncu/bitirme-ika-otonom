@@ -128,3 +128,86 @@ kendini ölçmesidir; (2) CAN hattı çalışmazsa telde ne olduğunu görebilme
 
 **Not:** GPIO ölçüm pini (`firmware/app/timing/`) yine de kodlanır. Analizör
 sonradan alınırsa ek iş çıkmasın diye pin baştan hazır bırakılır.
+
+---
+
+## K-010 · Kurtarma: kart kör sürmez
+**Tarih:** 2026-09-24 · **Durum:** Yürürlükte · **Ayrıntı:** `docs/RULES.md` §5
+
+Kurtarmada kart tek bir soruya bakar: **ajan kanalı canlı mı?**
+- **Canlı:** kayıtlı bir noktayı (başlangıç ya da en yakın güvenli nokta) Nav2'ye hedef
+  olarak gönderir. Nav2 sürer, kart onun her hız komutunu denetlemeye devam eder.
+- **Ölü:** araç kanalından doğrudan sıfır hız gönderir ve bekler.
+
+Kart üç durumlu bir makineyle çalışır (`NORMAL` / `RECOVERY` / `HOLD`). Her zaman
+`HOLD`'da açılır. Kurtarma her zaman `HOLD`'da biter. `NORMAL`'e dönüş yalnızca imzalı
+`SIFIRLA` komutuyla olur.
+
+**Neden:** Nav2'nin hız komutları ajan kanalından geçip karta döner. Kanal ölüyse Nav2
+çalışıyor olsa bile araca ulaşamaz. Kartta planlayıcı, harita ya da engel algılama yok.
+Kendi başına bir noktaya gitmeye kalkarsa düz çizgide kör sürer ve engele çarpabilir.
+Bu kararla araç ya gerçek bir planlayıcı tarafından sürülür ve kart onu denetler, ya da
+durur. Simplex ilkesine de uyar: karmaşık bileşen sürer, basit bileşen karar verir ve
+denetler. "Kart yeni görev üretmez" ilkesi korunur, çünkü kart yalnızca önceden kayıtlı
+noktalardan birini seçer.
+
+**Öneriye göre değişenler:**
+- "Kalıcı kopmada eve dön" kaldırıldı. Kanal ölüyse Nav2'ye ulaşılamaz, eve dönüş kör
+  sürüş olurdu.
+- Tutarlılık ihlali, önerideki haline döndü: **ret + uyarı**, kurtarma değil. Yanlış
+  olan aracın konumu değil, ajanın varsayımı.
+
+**Bedeli:** güvenli nokta listesi, varış toleransı ve üç durumlu makine.
+
+---
+
+## K-011 · "Hızı düşürüp devam et" kapsam dışı
+**Tarih:** 2026-09-24 · **Durum:** Yürürlükte
+
+Önerideki dört kurtarma eyleminden biri çıkarıldı. Kalanlar: yerinde bekle, en yakın
+güvenli noktaya git, başlangıca dön.
+
+**Neden:**
+- **Hiçbir araştırma sorusuna katkı vermiyor.** S1 güvensiz komutların yakalanmasını
+  ölçer, yavaşlamak bir komut yakalamak değildir. S3 ret gerekçesiyle ilgilidir.
+- **S2'de ayırt edici değil.** Nav2'nin aynı işi yapan iki özelliği var: haritadaki
+  bölgelere göre hız düşüren Speed Filter ve engele yaklaşınca yavaşlatan Collision
+  Monitor. B ve D yapılandırmaları bu açıdan farklılaşmaz.
+- **Gerçek maliyeti "iki eşik" değil:** yaklaşma mesafesi, tutarlılık uyarı bandı,
+  yavaşlatma oranı, histerezis (sınırda titremeyi önlemek için), çokgen kenarına uzaklık
+  hesabı ve Faz 5'te ayrı senaryolar.
+- Planın B planı, takvim kayarsa ilk önce kurtarma eylemi sayısını azaltmayı söylüyor.
+  Bu eylem zaten ilk kesilecek adaydı. Kapsam kuralı (K-006) gereği baştan çıkarıldı.
+
+**Tezde:** "Önerilen dört eylemden 'hızı düşürüp devam et', Nav2'nin Speed Filter ve
+Collision Monitor özellikleriyle örtüştüğü ve bekçinin katkısını ayırt etmediği için
+kapsam dışı bırakıldı."
+
+**Karıştırılmaması gereken:** fiziksel limitte **sınıra kırpma** kalıyor. O tek bir
+komuta uygulanır, durum tutmaz ve ek eşik istemez.
+
+---
+
+## K-012 · Eşik değerleri: katmanlı hız limitleri ve orta zaman profili
+**Tarih:** 2026-09-24 · **Durum:** Yürürlükte · **Ayrıntı:** `docs/RULES.md` §1–§3
+
+- **Hız:** bekçi 0,30 m/s ve 1,2 rad/s. Nav2'nin TB4 varsayılanı (0,26 · 1,0) ile
+  platform tavanı (0,46 · 1,9) arasında.
+- **Zaman:** tazelik 200 ms, kalp atışı zaman aşımı 500 ms.
+
+**Neden hız bu aralıkta:** Nav2'nin altında olsaydı normal komutlar sürekli kırpılır ve
+yanlış alarm oranı anlamsızlaşırdı. Platform tavanında olsaydı hiç tetiklenmez ve
+"sınırları zorlayan talimatlar" senaryosu veri üretmezdi.
+
+**Neden orta profil:** 200 ms, 20 Hz'lik akışta 4 periyot eder. Birkaç gecikmiş pakete
+tolerans tanır ama bayat komutu geçirmez. 500 ms kalp atışı, 0,30 m/s'de durma
+kararından önce en fazla 15 cm yol demek. Daha sıkı değerler PC yükü altında yanlış
+alarmı artırır. Daha gevşekleri güvenli moda geçiş süresini kötüleştirir.
+
+**Görev komutunda limit aşımı ret, hız komutunda kırpma.** LLM'in `hiz_siniri(0,4)`
+isteği niyet gösterir. Reddedilirse S1'de yakalandı sayılır ve D'de ajan düzeltebilir.
+Nav2'nin hız komutu bir kontrol döngüsünün çıktısıdır. Kırpmak yeterli, reddetmek aracı
+sarsar.
+
+**Bağımlılık:** Nav2 değerleri TurtleBot 4 varsayılanından alındı. K-008 başka bir
+modele giderse yeniden bakılır.

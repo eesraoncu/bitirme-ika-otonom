@@ -3,15 +3,18 @@
 > Bu dosya her çalışma oturumunun **başında okunur**, **sonunda güncellenir**.
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
-**Son güncelleme:** 2026-09-22
-**Bulunduğumuz faz:** Faz 0 — Kurulum (neredeyse bitti)
+**Son güncelleme:** 2026-09-24
+**Bulunduğumuz faz:** Faz 1 — Literatür, kurallar, mesaj formatı
 
 ---
 
 ## Şu an ne yapılıyor
 
-Faz 0 tamamlandı sayılır. Kalan tek yazılım kalemi Ollama; o da model seçimi
-Faz 4'e bırakıldığı için acil değil. Sırada **Faz 1** var.
+Faz 1'in ilk yarısı bitti: okumalar ve `docs/RULES.md` (eşikler + kurtarma).
+Sırada **mesaj çerçevesi**: `docs/protocol.md` + `shared/protocol/messages.yaml` +
+kod üreticisi.
+
+Faz 0'dan kalan tek iş LED testi. Veri kablosu gelince yapılacak.
 
 ## Bitenler
 
@@ -25,10 +28,14 @@ Faz 4'e bırakıldığı için acil değil. Sırada **Faz 1** var.
 - [x] ST-LINK udev kuralları kuruldu (49-stlinkv1/v2/v2-1/v3.rules)
 - [x] `dialout` grubuna eklendi (sistem kaydında var)
 - [x] GitHub'da `bitirme-ika-otonom` özel deposu açıldı
+- [x] **Faz 1:** okuma listesi tamamlandı
+- [x] **Faz 1:** `docs/RULES.md` yazıldı. Katmanlı hız limitleri, tüm kuralların
+      eşikleri, denetim sırası, kurtarma durum makinesi (K-010, K-011, K-012)
 
 ## Sırada
 
-- [ ] **Oturumu kapatıp aç** — `dialout` üyeliği ancak o zaman geçerli olur
+- [ ] `dialout` doğrulaması: VS Code/Cursor tamamen kapatılıp açıldıktan sonra
+      `groups` çıktısında görünmeli (sistem kaydında var)
 - [ ] Ollama kurulumu (model seçimi Faz 4'te)
 - [ ] **Parça siparişi: Robiz.net'ten tek sipariş, 656,16 TL** — tam liste ve
       gerekçeleri `docs/malzeme-listesi.md`'de. 2× SN65HVD230, CP2102 USB-TTL,
@@ -36,8 +43,12 @@ Faz 4'e bırakıldığı için acil değil. Sırada **Faz 1** var.
       Hepsi stokta doğrulandı (2026-09-22).
       — 120 Ω direnç siparişe dahil değil: modüller gelince üzerinde var mı bakılacak
       — mantık analizörü ertelendi (K-009)
-- [ ] **Faz 1 başlangıcı:** `docs/RULES.md` eşik değerleri, `docs/protocol.md`
-      mesaj çerçevesi, `shared/protocol/messages.yaml` + kod üreticisi
+- [ ] **`docs/RULES.md`'deki "(öneri)" değerlerinin onayı:** ivme, tutarlılık
+      toleransı formülü, kalp atışı periyodu, çokgen boyut sınırları, varış toleransı,
+      ajan deneme üst sınırı
+- [ ] **Faz 1 devamı:** `docs/protocol.md` mesaj çerçevesi + zaman eşitleme + oturum
+      kurulumu, `shared/protocol/messages.yaml`, `tools/` altında C/Python üreticisi
+- [ ] Senaryo başına tekrar sayısını hocayla netleştir
 
 ## Doğrulanmış testler
 
@@ -68,6 +79,13 @@ Faz 4'e bırakıldığı için acil değil. Sırada **Faz 1** var.
 - **Gazebo sürüm çakışması.** Sistemde Harmonic (gz-sim8) var; TurtleBot 4'ün Humble
   simülatörü Fortress'e bağımlı. Yan yana kurulabilirler ama `ign`/`gz` komutları ve
   ortam değişkenleri karışabilir.
+
+- **Kablo çekme testi kartı da kapatıyor.** Plan bağlantı kopmasını "kartın USB
+  kablosunu çek" diye test ediyor. Ama Nucleo varsayılan olarak o kablodan besleniyor
+  (JP5 = 5V_STLK). Kapanan kart kalp atışı kuralını işletemez. **Olası çözüm:** kartı
+  E5V girişinden CP2102'nin 5V pininden beslemek. Böylece ajan kanalı kopunca kart araç
+  kanalının USB'sinden beslenmeye devam eder. **Faz 2'de UM2505 güç şemasından
+  doğrulanacak.**
 
 ## Nerede takıldım
 
