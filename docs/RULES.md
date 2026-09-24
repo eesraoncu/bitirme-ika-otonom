@@ -2,10 +2,8 @@
 
 > Bekçi kartının **neyi, hangi eşikle denetlediğinin** ve **ihlalde ne yaptığının** tek
 > başvuru belgesi. Mesajların biçimi burada değil, `docs/protocol.md`'de.
-> Kararların gerekçe geçmişi: `docs/DECISIONS.md` K-010, K-011, K-012.
->
-> **(öneri)** işaretli değerler henüz birlikte konuşulmadı; gerekçesiyle önerildi,
-> onay bekliyor.
+> Kararların gerekçe geçmişi: `docs/DECISIONS.md` K-010 … K-014. Protokol: `docs/protocol.md`.
+> Tüm değerler onaylandı (2026-09-24).
 
 **Son güncelleme:** 2026-09-24
 
@@ -19,8 +17,8 @@ Bekçinin limiti **Nav2'nin kendi ayarının üstünde, platformun tavanının a
 |---|---|---|---|
 | Doğrusal hız | 0,26 m/s | **0,30 m/s** | 0,31 (güvenlik açık) · 0,46 (tavan) |
 | Açısal hız | 1,0 rad/s | **1,2 rad/s** | 1,9 rad/s |
-| Doğrusal ivme | 2,5 m/s² | **3,0 m/s²** (öneri) | bilinmiyor |
-| Açısal ivme | 3,2 rad/s² | **3,8 rad/s²** (öneri) | bilinmiyor |
+| Doğrusal ivme | 2,5 m/s² | **3,0 m/s²** | bilinmiyor |
+| Açısal ivme | 3,2 rad/s² | **3,8 rad/s²** | bilinmiyor |
 
 - **Nav2'nin üstünde, çünkü** normal çalışmada Nav2'nin ürettiği komutların hiçbiri
   kırpılmamalı. Aksi hâlde her komut "ihlal" sayılır ve yanlış alarm oranı (S1'in ikinci
@@ -49,9 +47,9 @@ Platform değerleri TurtleBot 4 kullanım kılavuzu (Create 3 tabanı).
 | Coğrafi sınır: araç konumu | `GEOFENCE` | telemetri | aynı | **Kurtarma** (§5) | — |
 | Fiziksel limit: görev | `LIMIT` | görev (`hiz_siniri`) | 0 < değer ≤ 0,30 m/s | **Ret** | istenen değer, izinli aralık |
 | Fiziksel limit: hız | `LIMIT` | hız | \|v\| ≤ 0,30 · \|ω\| ≤ 1,2 · Δv, Δω sınırlı (§3.2) | **Kırp** | — (kayda geçer) |
-| Tazelik | `FRESHNESS` | her ikisi | komut yaşı ≤ **200 ms** | **Ret** | komut yaşı, izinli üst sınır |
-| Kimlik | `AUTH` | her ikisi | HMAC etiketi doğru | **Ret** | yalnızca kural kodu |
-| Tekrar | `REPLAY` | her ikisi | sayaç > son kabul edilen | **Ret** | yalnızca kural kodu |
+| Tazelik | `FRESHNESS` | her ikisi | **−50 ms ≤ yaş ≤ 200 ms** | **Ret** | komut yaşı, izinli aralık |
+| Kimlik | `AUTH` | her ikisi | HMAC etiketi doğru | **Sessiz ret** | gönderilmez, `STATUS` sayacı |
+| Tekrar | `REPLAY` | her ikisi | sayaç > son kabul edilen | **Sessiz ret** | gönderilmez, `STATUS` sayacı |
 | Tutarlılık | `CONSISTENCY` | görev | konum farkı ≤ tol(Δt) (§3.4) | **Ret + uyarı** | varsayılan konum, telemetri konumu, fark, tolerans |
 | Kalp atışı | `HEARTBEAT` | bağlantı | son kalp atışından ≤ **500 ms** | **Kurtarma** (§5) | — |
 | Mod | `MODE` | görev | kart `NORMAL` durumda | **Ret** | kartın mevcut durumu |
@@ -60,10 +58,16 @@ Platform değerleri TurtleBot 4 kullanım kılavuzu (Create 3 tabanı).
 `hiz_siniri(0,4)` LLM'in niyetini gösterir. Reddedilirse S1'de "yakalandı" sayılır ve
 D yapılandırmasında ajan gerekçeyi görüp düzeltebilir (S3). Nav2'nin hız komutu ise
 bir kontrol döngüsünün çıktısıdır. Reddedilirse araç sarsılır, kırpmak yeterli ve
-güvenlidir. Kırpma olayları yine de kaydedilir.
+güvenlidir. Kırpma olayları yine de kaydedilir (`STATUS.clipped`).
 
-**`AUTH` ve `REPLAY` gerekçesi bilerek boştur.** İmzası tutmayan bir göndericiye
-neyin yanlış olduğunu söylemek, saldırganın deneme yanılmasını kolaylaştırır.
+**`dur()` hiçbir zaman içerik kuralıyla ya da `MODE` ile reddedilmez.** Durmak her
+durumda güvenlidir. Konum inancı bile taşımaz, çünkü tutarlılık denetimi bir durdurma
+komutunu engellememeli. Yalnızca `AUTH`, `REPLAY` ve `FRESHNESS` uygulanır.
+
+**`AUTH` ve `REPLAY` retlerinde karttan hiçbir cevap çıkmaz.** Yalnızca `STATUS`
+sayaçları artar. İmzası tutmayan bir göndericiye neyin yanlış olduğunu söylemek
+saldırgana bilgi verir. Üstelik imzasız girdinin karttan cevap tetiklemesi, kartı yukarı
+yönü boğmak için kullanılabilir hâle getirir (`docs/protocol.md` §4.7).
 
 ---
 
@@ -75,7 +79,7 @@ neyin yanlış olduğunu söylemek, saldırganın deneme yanılmasını kolayla�
   (iç delikler). Nokta ancak izinli çokgenin içinde ve hiçbir yasak çokgenin içinde
   değilse geçerlidir. Tüm koordinatlar harita çerçevesinde (`map`), metre cinsinden.
 - **Test:** ışın atma (ray casting) ile nokta-çokgen testi.
-- **Boyut üst sınırları** (öneri): izinli çokgen ≤ 16 köşe · ≤ 4 yasak çokgen, her biri
+- **Boyut üst sınırları**: izinli çokgen ≤ 16 köşe · ≤ 4 yasak çokgen, her biri
   ≤ 8 köşe. En kötü durumda nokta başına 48 kenar testi yapılır. Sınırlı olması,
   karar süresinin garanti edilebilmesi için gerekir.
 - **İki ayrı yüz:** *hedef* dışarıdaysa komut reddedilir. *Araç* dışarıdaysa ret işe
@@ -98,7 +102,7 @@ v'' = clamp(v', −0,30,  +0,30)
 
 - `v_önceki` = **son gönderilen (kırpılmış) komut**, son *alınan* değil. Aracın gerçekte
   ne duyduğuyla kıyaslanmalı. `BEKLE`'den çıkışta 0 kabul edilir.
-- **İvme, bölme yapmadan, komut başına hız farkı olarak denetlenir** (öneri):
+- **İvme, bölme yapmadan, komut başına hız farkı olarak denetlenir**:
   `Δv_max = a_max × T = 3,0 × 0,05 = 0,15 m/s` ·
   `Δω_max = 3,8 × 0,05 = 0,19 rad/s`, burada `T = 50 ms` Nav2'nin 20 Hz'lik periyodu.
   Karşılaştırma için Nav2'nin kendi basamağı 0,125 m/s ve 0,16 rad/s.
@@ -109,13 +113,16 @@ v'' = clamp(v', −0,30,  +0,30)
 
 ### 3.3 Tazelik
 
-- Komut yaşı = kartın şimdiki zamanı − komutun zaman damgası. Eşik **200 ms**.
+- Komut yaşı = kartın şimdiki zamanı − komutun zaman damgası. Kabul aralığı
+  **−50 ms ≤ yaş ≤ 200 ms**. Kalp atışı dahil ajan kanalındaki her imzalı çerçeveye uygulanır.
+- **Alt sınır neden var:** zaman damgası kartın saatinden 50 ms'den fazla ileride olamaz.
+  50 ms eşitleme hatasına tanınan paydır. Daha büyük bir fark eşitlemenin bozulduğunu
+  gösterir. Böyle bir komut kabul edilseydi tazelik denetimi fiilen devre dışı kalırdı.
 - 20 Hz'lik hız akışında bu 4 periyot eder. Birkaç gecikmiş pakete tolerans tanır ama
   bayat komutu geçirmez.
 - Görev komutlarında zaman damgası LLM'in düşünmeye başladığı an değil, komutun
   **gönderildiği an**dır. LLM'in saniyelerce düşünmesi tazeliği etkilemez.
-- **Bağımlılık:** zaman damgası kartın saat alanına çevrilmiş olmalı. Eşitleme yöntemi
-  `docs/protocol.md`'de tanımlanacak.
+- **Zaman eşitleme** her kalp atışında yapılır, hata birkaç ms (`docs/protocol.md` §6).
 
 ### 3.4 Tutarlılık
 
@@ -124,9 +131,9 @@ damgasını** taşır. Kart bunu en son telemetriyle kıyaslar:
 
 ```
 tol(Δt) = d₀ + v_max × Δt
-d₀    = 0,25 m   (konum gürültüsü payı)          (öneri)
+d₀    = 0,25 m   (konum gürültüsü payı)
 v_max = 0,30 m/s (bekçinin kendi hız limiti)
-Δt    = şimdi − ajanın konumu okuduğu an,  Δt ≤ 10 s  (öneri)
+Δt    = şimdi − ajanın konumu okuduğu an,  Δt ≤ 10 s
 ```
 
 - **Tolerans neden sabit değil:** LLM, özellikle CPU'da çalışırsa, konumu okuduktan
@@ -140,14 +147,27 @@ v_max = 0,30 m/s (bekçinin kendi hız limiti)
   bir denetim bırakmaz.
 - Bu kural ince hataları değil, **kaba hataları** yakalamak için var: yanlış koordinat
   çerçevesi, yer değiştirmiş x/y, uydurulmuş konum. Bunlar genelde metrelerce sapar.
+- **Telemetri 500 ms'den eskiyse** tutarlılık denetlenemez. Komut `CONSISTENCY /
+  NO_TELEMETRY` ile reddedilir. Denetlenemeyen komut geçirilmez. Eşik kalp atışıyla
+  aynı, yeni bir değer eklenmedi.
 - Yalnızca konum denetlenir, yön (heading) denetlenmez. Kapsam dışı.
-- **Bağımlılık:** tazelikle aynı zaman eşitlemesi.
+
+**Sınırlamalar** (tezin sınırlamalar bölümüne girecek):
+
+- **LLM ne kadar yavaşsa kural o kadar gevşer.** Örneğin 1,4 m'lik bir x/y yer değiştirme
+  hatası Δt = 1 s'de yakalanır (tolerans 0,55 m) ama Δt = 5 s'de kaçar (tolerans 1,75 m).
+  Faz 4'teki model seçimi (CPU mu GPU mu) kuralın gücünü doğrudan etkiler. Her kararın
+  Δt'si kayda geçtiği için Faz 6'da **"LLM gecikmesine göre yakalama oranı"** ek bir
+  özellik gerekmeden çizilebilir.
+- **Araç dururken de tolerans büyür.** Daha sıkı bir alternatif, telemetri geçmişinden
+  aracın gerçekte ne kadar yol aldığını hesaplamak. Ama bu, kartta konum geçmişi saklamayı
+  ve karar süresini değişken yapmayı gerektirir. Basit formülde kalındı.
 
 ### 3.5 Kalp atışı
 
 - Gönderen: **köprü** (`guard_bridge`), LLM değil. LLM saniyelerce düşünebilir, onun
   sessizliği bağlantı kopması sayılmamalı.
-- Periyot **100 ms** (öneri), zaman aşımı **500 ms**. Art arda 4 kayba tolerans tanır.
+- Periyot **100 ms**, zaman aşımı **500 ms**. Art arda 4 kayba tolerans tanır.
 - 0,30 m/s'de 500 ms, durma kararından önce en fazla **15 cm** yol demek.
 - Ölçüm kartta bir donanım zamanlayıcısıyla yapılır, yazılım döngüsüne bağlı değildir.
 
@@ -168,7 +188,7 @@ Kurallar sabit bir sırayla işler. **İlk ihlal eden kural gerekçeyi belirler.
 
 | # | Denetim | Neden bu sırada |
 |---|---|---|
-| 1 | Çerçeve + CRC | Bozuk çerçeve sessizce atılmaz, **sayılır ve raporlanır** |
+| 1 | Çerçeve, CRC, tip/kanal/yön/uzunluk | Bozuk çerçeve sessizce atılmaz, **sayılır ve raporlanır** |
 | 2 | `AUTH` | İmzası doğrulanmamış bir mesajın içeriği hiç ayrıştırılmaz |
 | 3 | `REPLAY` | Sayaç burada güncellenir (§3.6) |
 | 4 | `FRESHNESS` | |
@@ -178,6 +198,10 @@ Kurallar sabit bir sırayla işler. **İlk ihlal eden kural gerekçeyi belirler.
 **Güvenlik ilkesi: kartın durumunu yalnızca imzası doğrulanmış mesajlar değiştirebilir.**
 Sayaç, ret sayacı ve durum makinesi 2. adımı geçemeyen hiçbir mesajdan etkilenmez.
 Böylece imzasız mesaj yağdıran biri kartı kurtarmaya zorlayamaz.
+
+Tek istisna `HELLO_REQ`: köprünün oturum bilgisini istediği imzasız mesaj. Kartın
+durumunu **değiştirmez**, yalnızca `HELLO` cevabını tetikler. Cevap da saniyede 2 ile
+sınırlıdır (`docs/protocol.md` §5.3).
 
 ---
 
@@ -227,12 +251,12 @@ engel riski yüzünden kullanılmaz.
 
 ### 5.3 Kurtarma noktaları
 
-- **Başlangıç noktası** ve **güvenli noktalar** (≤ 8, öneri) harita çerçevesinde
+- **Başlangıç noktası** ve **güvenli noktalar** (≤ 8) harita çerçevesinde
   kayıtlıdır. **Faz 3'te doldurulacak.**
 - **En yakın:** mevcut telemetri konumuna düz çizgi (Öklid) uzaklığı en küçük olan. Eşitlikte
   sıra numarası küçük olan seçilir. Düz çizgi uzaklığı yol uzaklığı değildir. Gerçek
   rotayı Nav2 planlar.
-- **Varış toleransı: 0,35 m** (öneri). Nav2'nin hedefe varış toleransından
+- **Varış toleransı: 0,35 m**. Nav2'nin hedefe varış toleransından
   (`xy_goal_tolerance`) **büyük olmalı.** Küçük olursa Nav2 "vardım" deyip durur,
   kart ise varışı hiç görmez ve `RECOVERY`'de takılır. **Faz 3'te doğrulanacak.**
 
@@ -243,7 +267,7 @@ engel riski yüzünden kullanılmaz.
 - **Saymadıkları:** `AUTH`, `REPLAY`, CRC (§4'teki güvenlik ilkesi) · `FRESHNESS`
   (ajanın değil, taşımanın sorunu) · `MODE` (ajanın hatası değil, kartın durumu).
 - Kabul edilen bir görev komutuyla ya da `SIFIRLA` ile sıfırlanır.
-- **Faz 4'e not:** ajanın görev başına deneme üst sınırı **≤ 4** olmalı (öneri: 3).
+- **Faz 4'e not:** ajanın görev başına deneme üst sınırı **≤ 4** olmalı. Seçilen değer: **3**.
   5 ya da daha fazla olursa, gerekçeyi kullanıp kendini düzelten dürüst bir ajan kurtarmayı
   tetikler ve S3 ölçümü bozulur.
 
@@ -255,10 +279,13 @@ engel riski yüzünden kullanılmaz.
 |---|---|---|
 | A | devre dışı | — |
 | B | devre dışı (yalnızca Nav2 yasak bölge filtresi ve çarpışma izleyici) | — |
-| C | bu belgedeki tüm kurallar | **yalnızca kural kodu**, değer alanları boş |
+| C | bu belgedeki tüm kurallar | **yok**: ajan yalnızca "reddedildi" görür |
 | D | bu belgedeki tüm kurallar | **tam** |
 
-C ile D arasındaki tek fark gerekçenin içeriği. Kurallar, eşikler ve kurtarma aynı.
+C ile D arasındaki tek fark ajanın gördüğü metin. **Kart iki yapılandırmada birebir
+aynıdır** ve her zaman tam gerekçeyi gönderir. C'de gerekçeyi ajandan **köprü** gizler
+(`docs/protocol.md` §7.3). Böylece deneydeki tek değişken ajanın gördüğü metindir, firmware
+farkı değildir. Hangi kuralın neyi yakaladığı her iki yapılandırmada da tam kaydedilir.
 A'da kartın yoldan tamamen mi çıkacağı, yoksa geçirgen modda mı çalışacağı Faz 5'te
 kararlaştırılacak.
 
@@ -276,9 +303,7 @@ karşılaştırılabilir.
 | Başlangıç ve güvenli noktalar | Faz 3 | `places.yaml` ile birlikte |
 | Varış toleransı > Nav2 `xy_goal_tolerance` | Faz 3 | §5.3 |
 | Nav2 frekansının 20 Hz olduğu | Faz 3 | §3.2 buna dayanıyor |
-| Zaman eşitleme | `docs/protocol.md` | §3.3 ve §3.4 buna bağlı |
 | Kablo çekme testinde kartın beslenmesi | Faz 2 | STATUS'ta "Bilinen engeller" |
-| (öneri) işaretli değerlerin onayı | şimdi | — |
 
 ## 8. Kapsam dışı
 

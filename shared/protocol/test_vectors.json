@@ -1,0 +1,430 @@
+{
+  "doc": "Faz 2'deki C çerçeveleyicisi bu baytları birebir üretmeli ve bad_frames'i belirtilen türle reddetmeli. Anahtar YALNIZCA TEST içindir.",
+  "schema_hash": "0xB12F26D8",
+  "test_key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "session_id": 305441741,
+  "crc16_ccitt_false": [
+    {
+      "input_hex": "313233343536373839",
+      "crc": "0x29B1"
+    }
+  ],
+  "cobs": [
+    {
+      "decoded_hex": "",
+      "encoded_hex": "01"
+    },
+    {
+      "decoded_hex": "00",
+      "encoded_hex": "0101"
+    },
+    {
+      "decoded_hex": "0000",
+      "encoded_hex": "010101"
+    },
+    {
+      "decoded_hex": "11220033",
+      "encoded_hex": "0311220233"
+    },
+    {
+      "decoded_hex": "11223344",
+      "encoded_hex": "0511223344"
+    },
+    {
+      "decoded_hex": "11000000",
+      "encoded_hex": "0211010101"
+    },
+    {
+      "decoded_hex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfe",
+      "encoded_hex": "ff0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfe"
+    },
+    {
+      "decoded_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfe",
+      "encoded_hex": "01ff0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfe"
+    },
+    {
+      "decoded_hex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+      "encoded_hex": "ff0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfe02ff"
+    }
+  ],
+  "messages": [
+    {
+      "name": "HELLO_REQ",
+      "id": 1,
+      "fields": {},
+      "payload_hex": ""
+    },
+    {
+      "name": "HELLO",
+      "id": 129,
+      "fields": {
+        "session_id": 2309737967,
+        "last_rx_seq": 2309737966,
+        "schema_hash": 2309737965,
+        "state": 2
+      },
+      "payload_hex": "efcdab89eecdab89edcdab8902"
+    },
+    {
+      "name": "HEARTBEAT",
+      "id": 2,
+      "fields": {
+        "echo_pc_ms": 2309737967
+      },
+      "payload_hex": "efcdab89"
+    },
+    {
+      "name": "HEARTBEAT_ACK",
+      "id": 130,
+      "fields": {
+        "echo_pc_ms": 2309737967,
+        "state": 2,
+        "reject_streak": 51
+      },
+      "payload_hex": "efcdab890233"
+    },
+    {
+      "name": "STATUS",
+      "id": 131,
+      "fields": {
+        "state": 2,
+        "reject_streak": 34,
+        "frames_ok": 4662,
+        "err_framing": 4663,
+        "err_crc": 4664,
+        "err_type": 4665,
+        "err_auth": 4666,
+        "err_replay": 4667,
+        "err_fresh": 4668,
+        "clipped": 4669,
+        "telemetry_age_ms": 4670
+      },
+      "payload_hex": "022236123712381239123a123b123c123d123e12"
+    },
+    {
+      "name": "VELOCITY_CMD",
+      "id": 16,
+      "fields": {
+        "v_mm_s": -1000,
+        "w_mrad_s": 1001
+      },
+      "payload_hex": "18fce903"
+    },
+    {
+      "name": "GOTO_CMD",
+      "id": 32,
+      "fields": {
+        "goal_x_cm": -1000,
+        "goal_y_cm": 1001,
+        "goal_yaw_mrad": -1002,
+        "belief_x_cm": 1003,
+        "belief_y_cm": -1004,
+        "belief_ts_ms": 2309737962
+      },
+      "payload_hex": "18fce90316fceb0314fceacdab89"
+    },
+    {
+      "name": "WAIT_CMD",
+      "id": 33,
+      "fields": {
+        "duration_s": 4660,
+        "belief_x_cm": 1001,
+        "belief_y_cm": -1002,
+        "belief_ts_ms": 2309737964
+      },
+      "payload_hex": "3412e90316fceccdab89"
+    },
+    {
+      "name": "SPEED_LIMIT_CMD",
+      "id": 34,
+      "fields": {
+        "limit_mm_s": 4660,
+        "belief_x_cm": 1001,
+        "belief_y_cm": -1002,
+        "belief_ts_ms": 2309737964
+      },
+      "payload_hex": "3412e90316fceccdab89"
+    },
+    {
+      "name": "STOP_CMD",
+      "id": 35,
+      "fields": {},
+      "payload_hex": ""
+    },
+    {
+      "name": "RESET_CMD",
+      "id": 48,
+      "fields": {},
+      "payload_hex": ""
+    },
+    {
+      "name": "VERDICT",
+      "id": 144,
+      "fields": {
+        "ref_seq": 2309737967,
+        "result": 1,
+        "rule": 7,
+        "reason": 53,
+        "value": -100004,
+        "lo": 100005,
+        "hi": -100006,
+        "hint_x_cm": 1007,
+        "hint_y_cm": -1008
+      },
+      "payload_hex": "efcdab890107355c79feffa58601005a79feffef0310fc"
+    },
+    {
+      "name": "TELEMETRY",
+      "id": 64,
+      "fields": {
+        "x_cm": -1000,
+        "y_cm": 1001,
+        "yaw_mrad": -1002
+      },
+      "payload_hex": "18fce90316fc"
+    },
+    {
+      "name": "HALT",
+      "id": 163,
+      "fields": {
+        "duration_s": 4660
+      },
+      "payload_hex": "3412"
+    },
+    {
+      "name": "DRIVE",
+      "id": 160,
+      "fields": {
+        "v_mm_s": -1000,
+        "w_mrad_s": 1001
+      },
+      "payload_hex": "18fce903"
+    },
+    {
+      "name": "GOAL",
+      "id": 161,
+      "fields": {
+        "x_cm": -1000,
+        "y_cm": 1001,
+        "yaw_mrad": -1002,
+        "source": 2
+      },
+      "payload_hex": "18fce90316fc02"
+    },
+    {
+      "name": "SPEED_LIMIT_SET",
+      "id": 162,
+      "fields": {
+        "limit_mm_s": 4660
+      },
+      "payload_hex": "3412"
+    }
+  ],
+  "frames": [
+    {
+      "name": "HELLO_REQ",
+      "seq": 1000,
+      "ts_ms": 50000,
+      "payload_hex": "",
+      "raw_hex": "01e803000050c30000000000000000000076b8",
+      "wire_hex": "0401e803010350c30101010101010101010376b800"
+    },
+    {
+      "name": "HELLO",
+      "seq": 1001,
+      "ts_ms": 50010,
+      "payload_hex": "efcdab89eecdab89edcdab8902",
+      "raw_hex": "81e90300005ac30000efcdab89eecdab89edcdab8902eb0f6d5e9a41c417edc2",
+      "wire_hex": "0481e90301035ac30118efcdab89eecdab89edcdab8902eb0f6d5e9a41c417edc200"
+    },
+    {
+      "name": "HEARTBEAT",
+      "seq": 1002,
+      "ts_ms": 50020,
+      "payload_hex": "efcdab89",
+      "raw_hex": "02ea03000064c30000efcdab89c37c277f04c20dc1eae4",
+      "wire_hex": "0402ea03010364c3010fefcdab89c37c277f04c20dc1eae400"
+    },
+    {
+      "name": "HEARTBEAT_ACK",
+      "seq": 1003,
+      "ts_ms": 50030,
+      "payload_hex": "efcdab890233",
+      "raw_hex": "82eb0300006ec30000efcdab89023365f50c50afba1165bd2c",
+      "wire_hex": "0482eb0301036ec30111efcdab89023365f50c50afba1165bd2c00"
+    },
+    {
+      "name": "STATUS",
+      "seq": 1004,
+      "ts_ms": 50040,
+      "payload_hex": "022236123712381239123a123b123c123d123e12",
+      "raw_hex": "83ec03000078c30000022236123712381239123a123b123c123d123e12a62a39d8856e09e66eae",
+      "wire_hex": "0483ec03010378c3011f022236123712381239123a123b123c123d123e12a62a39d8856e09e66eae00"
+    },
+    {
+      "name": "VELOCITY_CMD",
+      "seq": 1005,
+      "ts_ms": 50050,
+      "payload_hex": "18fce903",
+      "raw_hex": "10ed03000082c3000018fce903c190e063428495d2ddcf",
+      "wire_hex": "0410ed03010382c3010f18fce903c190e063428495d2ddcf00"
+    },
+    {
+      "name": "GOTO_CMD",
+      "seq": 1006,
+      "ts_ms": 50060,
+      "payload_hex": "18fce90316fceb0314fceacdab89",
+      "raw_hex": "20ee0300008cc3000018fce90316fceb0314fceacdab89647a088a6a27521d8633",
+      "wire_hex": "0420ee0301038cc3011918fce90316fceb0314fceacdab89647a088a6a27521d863300"
+    },
+    {
+      "name": "WAIT_CMD",
+      "seq": 1007,
+      "ts_ms": 50070,
+      "payload_hex": "3412e90316fceccdab89",
+      "raw_hex": "21ef03000096c300003412e90316fceccdab894d5e6dacab95776f864e",
+      "wire_hex": "0421ef03010396c301153412e90316fceccdab894d5e6dacab95776f864e00"
+    },
+    {
+      "name": "SPEED_LIMIT_CMD",
+      "seq": 1008,
+      "ts_ms": 50080,
+      "payload_hex": "3412e90316fceccdab89",
+      "raw_hex": "22f0030000a0c300003412e90316fceccdab89a2c381409324dfee9161",
+      "wire_hex": "0422f0030103a0c301153412e90316fceccdab89a2c381409324dfee916100"
+    },
+    {
+      "name": "STOP_CMD",
+      "seq": 1009,
+      "ts_ms": 50090,
+      "payload_hex": "",
+      "raw_hex": "23f1030000aac3000023e860a63858da81e2a9",
+      "wire_hex": "0423f1030103aac3010b23e860a63858da81e2a900"
+    },
+    {
+      "name": "RESET_CMD",
+      "seq": 1010,
+      "ts_ms": 50100,
+      "payload_hex": "",
+      "raw_hex": "30f2030000b4c3000060f1c334227acc440b9d",
+      "wire_hex": "0430f2030103b4c3010b60f1c334227acc440b9d00"
+    },
+    {
+      "name": "VERDICT",
+      "seq": 1011,
+      "ts_ms": 50110,
+      "payload_hex": "efcdab890107355c79feffa58601005a79feffef0310fc",
+      "raw_hex": "90f3030000bec30000efcdab890107355c79feffa58601005a79feffef0310fcd18fd5b030e02c5baa03",
+      "wire_hex": "0490f3030103bec3010fefcdab890107355c79feffa58601135a79feffef0310fcd18fd5b030e02c5baa0300"
+    },
+    {
+      "name": "TELEMETRY",
+      "seq": 1012,
+      "ts_ms": 50120,
+      "payload_hex": "18fce90316fc",
+      "raw_hex": "40f4030000c8c3000018fce90316fc94440b6fd61e75b89680",
+      "wire_hex": "0440f4030103c8c3011118fce90316fc94440b6fd61e75b8968000"
+    },
+    {
+      "name": "HALT",
+      "seq": 1013,
+      "ts_ms": 50130,
+      "payload_hex": "3412",
+      "raw_hex": "a3f5030000d2c300003412c5bad830f9047ecd9494",
+      "wire_hex": "04a3f5030103d2c3010d3412c5bad830f9047ecd949400"
+    },
+    {
+      "name": "DRIVE",
+      "seq": 1014,
+      "ts_ms": 50140,
+      "payload_hex": "18fce903",
+      "raw_hex": "a0f6030000dcc3000018fce903d99377ca1eae15ab5d7c",
+      "wire_hex": "04a0f6030103dcc3010f18fce903d99377ca1eae15ab5d7c00"
+    },
+    {
+      "name": "GOAL",
+      "seq": 1015,
+      "ts_ms": 50150,
+      "payload_hex": "18fce90316fc02",
+      "raw_hex": "a1f7030000e6c3000018fce90316fc0293e177fce021523cf47a",
+      "wire_hex": "04a1f7030103e6c3011218fce90316fc0293e177fce021523cf47a00"
+    },
+    {
+      "name": "SPEED_LIMIT_SET",
+      "seq": 1016,
+      "ts_ms": 50160,
+      "payload_hex": "3412",
+      "raw_hex": "a2f8030000f0c300003412ce83b228c4a549c3f349",
+      "wire_hex": "04a2f8030103f0c3010d3412ce83b228c4a549c3f34900"
+    }
+  ],
+  "bad_frames": [
+    {
+      "desc": "Yükte bir bit değişti, CRC düzeltilmedi",
+      "wire_hex": "031001010103e8030102fb0d0cfe061a857a510aaa4e7f1800",
+      "receive_channel": "agent",
+      "receive_dir": "pc_to_board",
+      "session_id": 305441741,
+      "expect": "crc"
+    },
+    {
+      "desc": "Yükte bir bit değişti, CRC yeniden hesaplandı (etiket tutmaz)",
+      "wire_hex": "031001010103e8030102fb0d0cfe061a857a510aaa4e0a1b00",
+      "receive_channel": "agent",
+      "receive_dir": "pc_to_board",
+      "session_id": 305441741,
+      "expect": "auth"
+    },
+    {
+      "desc": "Başka bir oturumun geçerli çerçevesi",
+      "wire_hex": "031001010103e8030102fa0d0cfe061a857a510aaa4e7f1800",
+      "receive_channel": "agent",
+      "receive_dir": "pc_to_board",
+      "session_id": 305441740,
+      "expect": "auth"
+    },
+    {
+      "desc": "TELEMETRY ajan kanalından geldi (araç kanalına ait)",
+      "wire_hex": "0440f4030103c8c3011118fce90316fc94440b6fd61e75b8968000",
+      "receive_channel": "agent",
+      "receive_dir": "pc_to_board",
+      "session_id": 305441741,
+      "expect": "type"
+    },
+    {
+      "desc": "VELOCITY_CMD yükü 3 bayt (4 olmalı)",
+      "wire_hex": "031001010103e8030102fa0c0cdaf86a34cab8d5c2db5700",
+      "receive_channel": "agent",
+      "receive_dir": "pc_to_board",
+      "session_id": 305441741,
+      "expect": "type"
+    },
+    {
+      "desc": "Bilinmeyen tip 0x7E",
+      "wire_hex": "037e01010103e803010b76a174fdb750147268d500",
+      "receive_channel": "agent",
+      "receive_dir": "pc_to_board",
+      "session_id": 305441741,
+      "expect": "type"
+    },
+    {
+      "desc": "COBS kodu çerçeve sonunun ötesini gösteriyor",
+      "wire_hex": "0511223300",
+      "receive_channel": "agent",
+      "receive_dir": "pc_to_board",
+      "session_id": 305441741,
+      "expect": "framing"
+    }
+  ],
+  "example": {
+    "name": "VELOCITY_CMD",
+    "fields": {
+      "v_mm_s": 250,
+      "w_mrad_s": -500
+    },
+    "seq": 1,
+    "ts_ms": 1000,
+    "raw_hex": "1001000000e8030000fa000cfe061a857a510aaa4e7f18",
+    "wire_hex": "031001010103e8030102fa0d0cfe061a857a510aaa4e7f1800"
+  }
+}

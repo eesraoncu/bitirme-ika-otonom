@@ -211,3 +211,68 @@ sarsar.
 
 **Bağımlılık:** Nav2 değerleri TurtleBot 4 varsayılanından alındı. K-008 başka bir
 modele giderse yeniden bakılır.
+
+---
+
+## K-013 · Önerilen eşikler onaylandı. C/D farkı köprüye taşındı
+**Tarih:** 2026-09-24 · **Durum:** Yürürlükte · **Ayrıntı:** `docs/RULES.md`
+
+**Onaylanan değerler:**
+
+| Değer | Karar | Gerekçe |
+|---|---|---|
+| İvme | 3,0 m/s² · 3,8 rad/s² | Nav2'nin ~%20 üstü, hızlarla aynı ilke |
+| İvme denetimi | komut başına Δv ≤ 0,15 m/s, Δω ≤ 0,19 rad/s | Bölme yok, zaman titremesinden etkilenmez |
+| Tutarlılık | **tol = 0,25 m + 0,30 m/s × Δt**, Δt ≤ 10 s | Fiziksel üst sınırdan türetildi (aşağıda) |
+| Kalp atışı periyodu | 100 ms | 500 ms zaman aşımına 4 kayıp payı |
+| Çokgen sınırları | izinli ≤ 16 köşe, ≤ 4 yasak × 8 köşe | Karar süresi sınırlı kalsın |
+| Güvenli nokta | ≤ 8 | Aynı sebep |
+| Varış toleransı | 0,35 m | Nav2'ninkinden büyük olmalı |
+| Ajan deneme sınırı | 3 (Faz 4) | 5 ret sınırının altında kalmalı |
+
+**Tutarlılık formülünün gerekçesi:** sabit tolerans, ya yavaş düşünen dürüst ajanı
+reddeder (dar tutulursa) ya da hızlı ama yanılan ajanı kaçırır (geniş tutulursa). Bekçi
+hızı 0,30 m/s'de kestiği için araç Δt sürede en fazla 0,30 × Δt yol alabilir. Tolerans bu
+fiziksel üst sınırdan türetildi. Kural, kartın kendi uyguladığı başka bir kurala dayanıyor.
+**Bilinen sınırlaması:** LLM yavaşladıkça tolerans genişler, küçük hatalar kaçabilir.
+Kural kaba hataları (çerçeve karışıklığı, uydurma konum) yakalamak için tasarlandı.
+
+**C/D değişikliği:** RULES.md'nin ilk hâlinde C yapılandırmasında kart "yalnızca kural
+kodunu" gönderecekti. Değiştirildi:
+- **C'de ajan hiçbir gerekçe görmez**, yalnızca "reddedildi" görür. Kural kodu bile
+  gerekçedir ("GEOFENCE" demek ajana çok şey söyler). C'yi yarım geri bildirimli bir koşula
+  dönüştürür ve S3'ü bulanıklaştırırdı.
+- **Fark kartta değil köprüde uygulanır.** Kart iki yapılandırmada birebir aynı. Deneyin
+  tek değişkeni ajanın gördüğü metin olur, "fark firmware'den mi geldi?" sorusu doğmaz.
+  S1 kayıtları C'de de tam gerekçeli.
+
+---
+
+## K-014 · Protokolün temel tasarım kararları
+**Tarih:** 2026-09-24 · **Durum:** Yürürlükte · **Ayrıntı:** `docs/protocol.md`
+
+| Karar | Gerekçe |
+|---|---|
+| **Başlangıç baytı yerine COBS** (0x00 ayraç) | Başlangıç baytı yükte de geçebilir, bozuk uzunluk alanı sonraki çerçeveleri yutar. Bu da planın istediği "bozuk çerçeve sayımını" yanlış çıkarırdı. COBS senkronu tek baytta geri kazanır, maliyeti 1 bayt. |
+| **Hattaki her sayı tamsayı**, kayan nokta yok | `NaN > 0,30` yanlış döner. NaN taşıyan hız komutu limit denetiminden sessizce geçerdi. |
+| **Hem CRC hem HMAC**, ayrı sayaçlar | Gürültü (hat kalitesi) ile saldırıyı (S1'de yakalanan) ayırt etmek için. |
+| **8 baytlık (64 bit) etiket** | 115200 baud'da kaba kuvvet ~1,3 milyar yıl. Tam etiket hız komutunu iki katına çıkarırdı. |
+| **Oturum kimliği imzaya girer**, hatta gönderilmez | Kart yeniden başlayınca sayaç sıfırlanır. Eski oturumun çerçeveleri AUTH ile düşer. Flash'a sayaç yazmaya gerek kalmaz. |
+| **Şema özeti HELLO'da** | Kart ile köprü farklı `messages.yaml`'dan derlenmişse ilk bağlantıda açıkça ortaya çıkar. K-003'ün çalışma zamanı denetimi. |
+| **Porta göre güven** | `TELEMETRY` yalnızca araç kanalından kabul edilir. Ajan tarafı telemetri uyduramaz, kriptografiye gerek kalmaz. |
+| **Yön, kimliğin üst bitinde** | Karta geri yansıtılan kendi çerçevesi tek bit testiyle düşer. |
+| **Zaman eşitleme her kalp atışında** | Kart saati saatte 0,2 s (HSE) ile 36 s (HSI) arası kayar. Tek seferlik eşitleme yetmez. Hata ≤ RTT/2, yani birkaç ms. |
+| **İmzasız girdiye sessiz ret** | Kart AUTH/REPLAY/CRC retlerinde cevap vermez, yalnızca sayaç tutar. Saldırgana bilgi sızmaz, kart yukarı yönü boğmak için kullanılamaz. |
+| **Uzunluk alanı yok**, tipe göre tam eşitlik | Bozulabilecek bir alan daha az. |
+| **CAN kimlikleri öncelik sırasında**, HALT en küçük | CAN tahkiminde küçük kimlik kazanır. Durdurma komutu hiçbir mesajın arkasında beklemez. |
+| **`dur()` içerik kuralı ve MODE'dan muaf** | Durmak her durumda güvenlidir. Hiçbir denetim bir durdurma komutunu engellememeli. |
+
+**Planla karşılaştırma:** plan "başlangıç baytı, mesaj tipi, sayaç, zaman damgası, yük,
+HMAC etiketi, CRC" diyordu. Başlangıç baytı dışındaki her alan aynen var. Başlangıç
+baytının amacı (çerçeve sınırı) COBS ayracıyla, daha güvenilir biçimde karşılandı.
+
+**Tehdit modeli notu (tezde açıkça yazılmalı):** HMAC, LLM'in hatalı ya da kötü niyetli
+komutlarını **yakalamaz**. O komutlar meşru boru hattından geçer ve imzalanır. Onları içerik
+kuralları yakalar. HMAC kanala dışarıdan enjeksiyonu ve tekrarı yakalar. PC anahtarla birlikte
+tamamen ele geçirilse bile içerik kuralları, limitler ve kalp atışı çalışmaya devam eder.
+HMAC bir katmandır, güvenliğin temeli bağımsız denetleyicidir.

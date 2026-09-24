@@ -4,17 +4,21 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-09-24
-**Bulunduğumuz faz:** Faz 1 — Literatür, kurallar, mesaj formatı
+**Bulunduğumuz faz:** Faz 1 tamamlandı → sırada Faz 2 (STM32 tarafı)
 
 ---
 
 ## Şu an ne yapılıyor
 
-Faz 1'in ilk yarısı bitti: okumalar ve `docs/RULES.md` (eşikler + kurtarma).
-Sırada **mesaj çerçevesi**: `docs/protocol.md` + `shared/protocol/messages.yaml` +
-kod üreticisi.
+**Faz 1 bitti.** Planın koşulu sağlandı: `docs/RULES.md` ve `docs/protocol.md` tamam,
+`messages.yaml`'dan C başlığı ve Python modülü üretilebiliyor. Üretilen C ile Python'un
+aynı baytları ürettiği testle kanıtlandı (80 test, `python3 -m pytest shared/protocol/tests`).
+Faz 1'den açık kalan tek konu senaryo tekrar sayısı. Hocayla konuşulacak.
 
-Faz 0'dan kalan tek iş LED testi. Veri kablosu gelince yapılacak.
+**Faz 2'nin kartsız yapılabilecek kısmı** (kablo gelmeden başlanabilir):
+- CubeMX projesi ve 170 MHz saat ayarı (HSE ile, `protocol.md` §6.1). Derleme kartsız yapılır.
+- C çerçeveleyici (COBS, CRC-16, HMAC-SHA256). Bilgisayarda gcc ile
+  `test_vectors.json`'a karşı test edilebilir. Karta yüklemeden önce doğrulanmış olur.
 
 ## Bitenler
 
@@ -29,8 +33,12 @@ Faz 0'dan kalan tek iş LED testi. Veri kablosu gelince yapılacak.
 - [x] `dialout` grubuna eklendi (sistem kaydında var)
 - [x] GitHub'da `bitirme-ika-otonom` özel deposu açıldı
 - [x] **Faz 1:** okuma listesi tamamlandı
-- [x] **Faz 1:** `docs/RULES.md` yazıldı. Katmanlı hız limitleri, tüm kuralların
-      eşikleri, denetim sırası, kurtarma durum makinesi (K-010, K-011, K-012)
+- [x] **Faz 1:** `docs/RULES.md`: katmanlı hız limitleri, eşikler, denetim sırası,
+      kurtarma durum makinesi. Tüm değerler onaylandı (K-010 … K-013)
+- [x] **Faz 1:** `docs/protocol.md`: tehdit modeli, çerçeve (COBS + CRC + HMAC), oturum,
+      zaman eşitleme, VERDICT biçimi, CAN eşlemesi (K-014)
+- [x] **Faz 1:** `shared/protocol/messages.yaml` (17 mesaj), `tools/gen_protocol.py`,
+      referans çerçeveleyici `frame.py`, `test_vectors.json`, 80 test
 
 ## Sırada
 
@@ -43,12 +51,11 @@ Faz 0'dan kalan tek iş LED testi. Veri kablosu gelince yapılacak.
       Hepsi stokta doğrulandı (2026-09-22).
       — 120 Ω direnç siparişe dahil değil: modüller gelince üzerinde var mı bakılacak
       — mantık analizörü ertelendi (K-009)
-- [ ] **`docs/RULES.md`'deki "(öneri)" değerlerinin onayı:** ivme, tutarlılık
-      toleransı formülü, kalp atışı periyodu, çokgen boyut sınırları, varış toleransı,
-      ajan deneme üst sınırı
-- [ ] **Faz 1 devamı:** `docs/protocol.md` mesaj çerçevesi + zaman eşitleme + oturum
-      kurulumu, `shared/protocol/messages.yaml`, `tools/` altında C/Python üreticisi
-- [ ] Senaryo başına tekrar sayısını hocayla netleştir
+- [ ] Senaryo başına tekrar sayısını hocayla netleştir (Faz 1'den kalan tek konu)
+- [ ] **Faz 2.1:** CubeMX projesi (`firmware/`), 170 MHz, **HSE** saat kaynağı
+- [ ] **Faz 2.6'nın kartsız kısmı:** `firmware/app/protocol/` altında C çerçeveleyici.
+      `test_vectors.json`'a karşı gcc ile test. Etiket sabit zamanlı karşılaştırılmalı
+- [ ] HMAC anahtarını üret: `secrets/hmac_key.bin` (32 bayt, depoya girmez)
 
 ## Doğrulanmış testler
 
@@ -79,7 +86,6 @@ Faz 0'dan kalan tek iş LED testi. Veri kablosu gelince yapılacak.
 - **Gazebo sürüm çakışması.** Sistemde Harmonic (gz-sim8) var; TurtleBot 4'ün Humble
   simülatörü Fortress'e bağımlı. Yan yana kurulabilirler ama `ign`/`gz` komutları ve
   ortam değişkenleri karışabilir.
-
 - **Kablo çekme testi kartı da kapatıyor.** Plan bağlantı kopmasını "kartın USB
   kablosunu çek" diye test ediyor. Ama Nucleo varsayılan olarak o kablodan besleniyor
   (JP5 = 5V_STLK). Kapanan kart kalp atışı kuralını işletemez. **Olası çözüm:** kartı

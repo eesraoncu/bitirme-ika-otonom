@@ -15,8 +15,9 @@ __pycache__/
 .venv/
 venv/
 
-# --- shared/protocol'den otomatik üretilenler (kaynak: messages.yaml) ---
-shared/protocol/generated/
+# --- shared/protocol altındaki üretilmiş dosyalar BİLEREK commit edilir ---
+# (CubeIDE üreticiyi çalıştırmaz). Güncelliği: python3 tools/gen_protocol.py --check
+.pytest_cache/
 
 # --- STM32CubeIDE ---
 firmware/Debug/

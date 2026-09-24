@@ -1,0 +1,315 @@
+# =============================================================================
+#  Bekçi kartı haberleşme protokolü: TEK KAYNAK (K-003)
+# =============================================================================
+#
+#  Bu dosya, kart (C) ile bilgisayar (Python) arasındaki tüm mesajların tek
+#  tanımıdır. İki taraftaki kod bu dosyadan üretilir:
+#
+#      python3 tools/gen_protocol.py          # üret
+#      python3 tools/gen_protocol.py --check  # güncel mi? (commit öncesi)
+#
+#  Üretilen dosyalar ELLE DÜZENLENMEZ:
+#      shared/protocol/c/proto_msgs.h
+#      shared/protocol/python/ika_protocol/messages.py
+#      shared/protocol/test_vectors.json
+#
+#  Tasarımın gerekçeleri: docs/protocol.md · Kurallar: docs/RULES.md
+#
+#  Birimler bilerek tamsayıdır. Kayan nokta yoktur (docs/protocol.md §3):
+#      konum    cm      int16   (±327,67 m)
+#      açı      mrad    int16   (±32,767 rad, [-π, π] aralığına normalize)
+#      hız      mm/s    int16   · açısal hız mrad/s int16
+#      zaman    ms      uint32  (kartın saat alanı, 49,7 günde bir taşar)
+#  Bayt sırası: little-endian.
+# =============================================================================
+
+schema:
+  name: ika_guard_protocol
+  version: 1
+
+# -----------------------------------------------------------------------------
+#  Çerçeve (docs/protocol.md §4)
+# -----------------------------------------------------------------------------
+frame:
+  encoding: cobs          # Consistent Overhead Byte Stuffing
+  delimiter: 0x00         # her çerçeve bu baytla biter
+  header:                 # sabit başlık, her mesajda aynı
+    - {name: type,  type: u8,  doc: "Mesaj kimliği (aşağıdaki id)"}
+    - {name: seq,   type: u32, doc: "Gönderenin kesin artan sayacı (tekrar kuralı)"}
+    - {name: ts_ms, type: u32, doc: "Gönderim anı, KARTIN saat alanında"}
+  tag_bytes: 8            # HMAC-SHA256 çıktısının ilk 8 baytı (64 bit)
+  crc: crc16_ccitt_false  # poly 0x1021, init 0xFFFF, yansıtmasız, xorout 0
+  max_wire_bytes: 64      # alıcı tamponu. Daha uzun çerçeve = bozuk çerçeve
+
+# -----------------------------------------------------------------------------
+#  Numaralandırmalar
+# -----------------------------------------------------------------------------
+enums:
+  BoardState:
+    doc: "Kartın durum makinesi (docs/RULES.md §5.2)"
+    values: {NORMAL: 0, RECOVERY: 1, HOLD: 2}
+
+  Result:
+    values: {ACCEPTED: 0, REJECTED: 1}
+
+  Rule:
+    doc: "Karara yol açan kural (docs/RULES.md §2)"
+    values:
+      NONE: 0
+      FRESHNESS: 3
+      MODE: 4
+      GEOFENCE: 5
+      LIMIT: 6
+      CONSISTENCY: 7
+      # AUTH ve REPLAY bilerek yok: bu retler için VERDICT gönderilmez,
+      # yalnızca STATUS sayaçlarında görünür (docs/protocol.md §6).
+
+  Reason:
+    doc: "Kuralın alt nedeni. value/lo/hi/hint alanlarının anlamını belirler."
+    values:
+      NONE: 0
+      # FRESHNESS
+      TOO_OLD: 10             # value = yaş (ms), hi = 200
+      FROM_FUTURE: 11         # value = yaş (ms, negatif), lo = -50
+      # MODE
+      IN_RECOVERY: 20
+      IN_HOLD: 21
+      NOT_IN_HOLD: 22         # SIFIRLA yalnızca HOLD'da geçerli
+      # GEOFENCE
+      GOAL_OUTSIDE_ALLOWED: 30  # hint = en yakın kayıtlı güvenli nokta
+      GOAL_IN_FORBIDDEN: 31     # hint = en yakın kayıtlı güvenli nokta
+      # LIMIT
+      ABOVE_MAX: 40           # value = istenen (mm/s), lo = 1, hi = 300
+      NOT_POSITIVE: 41        # value = istenen (mm/s), lo = 1, hi = 300
+      # CONSISTENCY
+      TOO_FAR: 50             # value = fark (cm), hi = tolerans (cm), hint = telemetri konumu
+      BELIEF_TOO_OLD: 51      # value = Δt (ms), hi = 10000
+      BELIEF_FROM_FUTURE: 52  # value = Δt (ms, negatif), lo = -50
+      NO_TELEMETRY: 53        # value = telemetri yaşı (ms), hi = 500
+
+  GoalSource:
+    doc: "Nav2'ye giden hedefin kaynağı (kayıt ve analiz için)"
+    values: {AGENT: 0, RECOVERY_HOME: 1, RECOVERY_SAFE: 2}
+
+# -----------------------------------------------------------------------------
+#  Ortak alan grupları: bir kavram tek yerde
+# -----------------------------------------------------------------------------
+field_groups:
+  belief:
+    doc: "Ajanın varsaydığı araç konumu ve onu okuduğu an (docs/RULES.md §3.4)"
+    fields:
+      - {name: belief_x_cm,  type: i16, unit: cm}
+      - {name: belief_y_cm,  type: i16, unit: cm}
+      - {name: belief_ts_ms, type: u32, unit: ms, doc: "Konumun okunduğu an, kartın saat alanında"}
+
+# -----------------------------------------------------------------------------
+#  Mesajlar
+#
+#  channel: agent | vehicle | both   → kart bu mesajı yalnızca bu porttan kabul eder
+#  dir:     pc_to_board | board_to_pc
+#  auth:    false yalnızca HELLO_REQ için (durum değiştirmez)
+#  can_id:  CAN hattından geçen mesajlar. Klasik CAN, yük ≤ 8 bayt.
+#           Küçük kimlik = yüksek öncelik (tahkim), bu yüzden HALT en küçük.
+# -----------------------------------------------------------------------------
+messages:
+
+  # ---------------- Oturum ve bağlantı --------------------------------------
+
+  - name: HELLO_REQ
+    id: 0x01
+    channel: both
+    dir: pc_to_board
+    auth: false
+    doc: >
+      Köprü, oturum bilgisini ister. Kart HELLO ile cevap verir (en fazla
+      saniyede 2 kez). İmzasızdır çünkü köprü oturum kimliğini henüz
+      bilmiyor olabilir. Kartın durumunu değiştirmez.
+    fields: []
+
+  - name: HELLO
+    id: 0x81
+    channel: both
+    dir: board_to_pc
+    doc: >
+      Kart açılışta (oturum kurulana kadar 500 ms'de bir) ve HELLO_REQ'e
+      cevaben gönderir. Başlıktaki ts_ms kartın o anki saatidir.
+    fields:
+      - {name: session_id,  type: u32, doc: "Açılışta donanım RNG ile üretilir"}
+      - {name: last_rx_seq, type: u32, doc: "Bu kanalda kabul edilen son sayaç. Köprü bir fazlasından devam eder"}
+      - {name: schema_hash, type: u32, doc: "Bu dosyanın özeti. Köprününkiyle eşleşmezse köprü çalışmayı reddeder"}
+      - {name: state,       type: u8,  enum: BoardState}
+
+  - name: HEARTBEAT
+    id: 0x02
+    channel: agent
+    dir: pc_to_board
+    doc: >
+      Köprü 100 ms'de bir gönderir. Aynı zamanda saat eşitleme örneğidir.
+      Zaman aşımı 500 ms (docs/RULES.md §3.5).
+    fields:
+      - {name: echo_pc_ms, type: u32, unit: ms, doc: "Köprünün kendi saati. Kart aynen geri yollar"}
+
+  - name: HEARTBEAT_ACK
+    id: 0x82
+    channel: agent
+    dir: board_to_pc
+    doc: "Her HEARTBEAT'e cevap. Başlıktaki ts_ms, saat eşitlemesi için kartın saatidir."
+    fields:
+      - {name: echo_pc_ms,    type: u32, unit: ms}
+      - {name: state,         type: u8,  enum: BoardState}
+      - {name: reject_streak, type: u8,  doc: "Üst üste içerik reddi sayısı (5'te kurtarma)"}
+
+  - name: STATUS
+    id: 0x83
+    channel: both
+    dir: board_to_pc
+    doc: >
+      Saniyede bir, o kanala ait sayaçlar. Açılıştan beri birikimlidir, uint16
+      olarak taşar. "Bozuk çerçeve sessizce atılmaz, sayılır ve raporlanır."
+    fields:
+      - {name: state,         type: u8,  enum: BoardState}
+      - {name: reject_streak, type: u8}
+      - {name: frames_ok,     type: u16, doc: "Tüm denetimleri geçen çerçeve"}
+      - {name: err_framing,   type: u16, doc: "COBS hatası ya da taşan tampon"}
+      - {name: err_crc,       type: u16}
+      - {name: err_type,      type: u16, doc: "Bilinmeyen tip, yanlış kanal, yanlış yön ya da yanlış uzunluk"}
+      - {name: err_auth,      type: u16}
+      - {name: err_replay,    type: u16}
+      - {name: err_fresh,     type: u16}
+      - {name: clipped,       type: u16, doc: "Kırpılan hız komutu (yalnızca ajan kanalı)"}
+      - {name: telemetry_age_ms, type: u16, unit: ms, doc: "Son telemetriden beri geçen süre, 65535'te doyar"}
+
+  # ---------------- Ajan kanalı: bilgisayar → kart ---------------------------
+
+  - name: VELOCITY_CMD
+    id: 0x10
+    channel: agent
+    dir: pc_to_board
+    doc: "Nav2'nin hız komutu, 20 Hz. İhlalde kırpılır, VERDICT gönderilmez."
+    fields:
+      - {name: v_mm_s,   type: i16, unit: mm/s}
+      - {name: w_mrad_s, type: i16, unit: mrad/s}
+
+  - name: GOTO_CMD
+    id: 0x20
+    channel: agent
+    dir: pc_to_board
+    doc: "Ajan: git(yer). Denetim: GEOFENCE, CONSISTENCY."
+    fields:
+      - {name: goal_x_cm,     type: i16, unit: cm}
+      - {name: goal_y_cm,     type: i16, unit: cm}
+      - {name: goal_yaw_mrad, type: i16, unit: mrad}
+      - {group: belief}
+
+  - name: WAIT_CMD
+    id: 0x21
+    channel: agent
+    dir: pc_to_board
+    doc: "Ajan: bekle(süre). Denetim: CONSISTENCY. Araç tarafına HALT(süre) olarak gider."
+    fields:
+      - {name: duration_s, type: u16, unit: s}
+      - {group: belief}
+
+  - name: SPEED_LIMIT_CMD
+    id: 0x22
+    channel: agent
+    dir: pc_to_board
+    doc: "Ajan: hiz_siniri(değer). Denetim: LIMIT (0 < değer ≤ 300), CONSISTENCY."
+    fields:
+      - {name: limit_mm_s, type: u16, unit: mm/s}
+      - {group: belief}
+
+  - name: STOP_CMD
+    id: 0x23
+    channel: agent
+    dir: pc_to_board
+    doc: >
+      Ajan: dur(). Durmak her zaman güvenlidir: MODE ve içerik kuralları
+      uygulanmaz, konum inancı taşımaz. Yalnızca AUTH, REPLAY, FRESHNESS.
+    fields: []
+
+  - name: RESET_CMD
+    id: 0x30
+    channel: agent
+    dir: pc_to_board
+    doc: "SIFIRLA. Yalnızca HOLD'da ve kalp atışı canlıyken kabul edilir. HOLD → NORMAL."
+    fields: []
+
+  # ---------------- Ajan kanalı: kart → bilgisayar ---------------------------
+
+  - name: VERDICT
+    id: 0x90
+    channel: agent
+    dir: board_to_pc
+    doc: >
+      İmzası doğrulanmış her görev komutu ve RESET_CMD için karar. Kart her
+      yapılandırmada TAM gerekçeyi gönderir. C yapılandırmasında gerekçeyi
+      ajandan köprü gizler (docs/protocol.md §7).
+    fields:
+      - {name: ref_seq,   type: u32, doc: "Karar verilen çerçevenin sayacı"}
+      - {name: result,    type: u8,  enum: Result}
+      - {name: rule,      type: u8,  enum: Rule}
+      - {name: reason,    type: u8,  enum: Reason}
+      - {name: value,     type: i32, doc: "Ölçülen değer. Birimi Reason'a göre"}
+      - {name: lo,        type: i32, doc: "İzinli aralığın alt ucu"}
+      - {name: hi,        type: i32, doc: "İzinli aralığın üst ucu"}
+      - {name: hint_x_cm, type: i16, unit: cm, doc: "İpucu noktası (Reason'a göre)"}
+      - {name: hint_y_cm, type: i16, unit: cm}
+
+  # ---------------- Araç kanalı: bilgisayar → kart ---------------------------
+
+  - name: TELEMETRY
+    id: 0x40
+    channel: vehicle
+    dir: pc_to_board
+    can_id: 0x200
+    doc: >
+      Aracın harita çerçevesindeki konumu, 20 Hz. Yalnızca araç kanalından
+      kabul edilir: ajan tarafı telemetri uyduramaz (docs/protocol.md §2).
+    fields:
+      - {name: x_cm,     type: i16, unit: cm}
+      - {name: y_cm,     type: i16, unit: cm}
+      - {name: yaw_mrad, type: i16, unit: mrad}
+
+  # ---------------- Araç kanalı: kart → bilgisayar ---------------------------
+  #  Bunların hepsi önce CAN'den geçer: FDCAN1 (bekçi) → FDCAN2 (araç)
+
+  - name: HALT
+    id: 0xA3
+    channel: vehicle
+    dir: board_to_pc
+    can_id: 0x100
+    doc: "Nav2 hedefini iptal et ve dur. duration_s = 0 → süresiz (STOP_CMD)."
+    fields:
+      - {name: duration_s, type: u16, unit: s}
+
+  - name: DRIVE
+    id: 0xA0
+    channel: vehicle
+    dir: board_to_pc
+    can_id: 0x110
+    doc: "Onaylı (gerekirse kırpılmış) hız komutu. HOLD'da 20 Hz sıfır hız."
+    fields:
+      - {name: v_mm_s,   type: i16, unit: mm/s}
+      - {name: w_mrad_s, type: i16, unit: mrad/s}
+
+  - name: GOAL
+    id: 0xA1
+    channel: vehicle
+    dir: board_to_pc
+    can_id: 0x120
+    doc: "Onaylı hedef. Köprü Nav2'ye iletir."
+    fields:
+      - {name: x_cm,     type: i16, unit: cm}
+      - {name: y_cm,     type: i16, unit: cm}
+      - {name: yaw_mrad, type: i16, unit: mrad}
+      - {name: source,   type: u8,  enum: GoalSource}
+
+  - name: SPEED_LIMIT_SET
+    id: 0xA2
+    channel: vehicle
+    dir: board_to_pc
+    can_id: 0x130
+    doc: "Onaylı hız sınırı. Köprü Nav2'nin hız sınırı konusuna iletir."
+    fields:
+      - {name: limit_mm_s, type: u16, unit: mm/s}
