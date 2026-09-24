@@ -13,7 +13,7 @@
 **Faz 1 bitti.** Planın koşulu sağlandı: `docs/RULES.md` ve `docs/protocol.md` tamam,
 `messages.yaml`'dan C başlığı ve Python modülü üretilebiliyor. Üretilen C ile Python'un
 aynı baytları ürettiği testle kanıtlandı (80 test, `python3 -m pytest shared/protocol/tests`).
-Faz 1'den açık kalan tek konu senaryo tekrar sayısı. Hocayla konuşulacak.
+Tekrar sayısı da kararlaştırıldı (K-015).
 
 **Faz 2'nin kartsız yapılabilecek kısmı** (kablo gelmeden başlanabilir):
 - CubeMX projesi ve 170 MHz saat ayarı (HSE ile, `protocol.md` §6.1). Derleme kartsız yapılır.
@@ -30,7 +30,7 @@ Faz 1'den açık kalan tek konu senaryo tekrar sayısı. Hocayla konuşulacak.
 - [x] RTAB-Map (`ros-humble-rtabmap-ros`, 14 paket)
 - [x] STM32CubeIDE 2.2.0 → `/opt/st/stm32cubeide_2.2.0`
 - [x] ST-LINK udev kuralları kuruldu (49-stlinkv1/v2/v2-1/v3.rules)
-- [x] `dialout` grubuna eklendi (sistem kaydında var)
+- [x] `dialout` grubuna eklendi ve oturumda doğrulandı (2026-09-24)
 - [x] GitHub'da `bitirme-ika-otonom` özel deposu açıldı
 - [x] **Faz 1:** okuma listesi tamamlandı
 - [x] **Faz 1:** `docs/RULES.md`: katmanlı hız limitleri, eşikler, denetim sırası,
@@ -42,16 +42,13 @@ Faz 1'den açık kalan tek konu senaryo tekrar sayısı. Hocayla konuşulacak.
 
 ## Sırada
 
-- [ ] `dialout` doğrulaması: VS Code/Cursor tamamen kapatılıp açıldıktan sonra
-      `groups` çıktısında görünmeli (sistem kaydında var)
 - [ ] Ollama kurulumu (model seçimi Faz 4'te)
-- [ ] **Parça siparişi: Robiz.net'ten tek sipariş, 656,16 TL** — tam liste ve
+- [x] **Parça siparişi geldi (2026-09-24).** Robiz.net'ten tek sipariş, 656,16 TL — tam liste ve
       gerekçeleri `docs/malzeme-listesi.md`'de. 2× SN65HVD230, CP2102 USB-TTL,
       micro-USB **data** kablosu, M-F + F-F + M-M jumper, MB-102 breadboard.
       Hepsi stokta doğrulandı (2026-09-22).
       — 120 Ω direnç siparişe dahil değil: modüller gelince üzerinde var mı bakılacak
       — mantık analizörü ertelendi (K-009)
-- [ ] Senaryo başına tekrar sayısını hocayla netleştir (Faz 1'den kalan tek konu)
 - [ ] **Faz 2.1:** CubeMX projesi (`firmware/`), 170 MHz, **HSE** saat kaynağı
 - [ ] **Faz 2.6'nın kartsız kısmı:** `firmware/app/protocol/` altında C çerçeveleyici.
       `test_vectors.json`'a karşı gcc ile test. Etiket sabit zamanlı karşılaştırılmalı
@@ -72,7 +69,7 @@ Faz 1'den açık kalan tek konu senaryo tekrar sayısı. Hocayla konuşulacak.
 |---|---|---|
 | Gazebo: Fortress + TurtleBot 4 mü, mevcut Harmonic'te kendi modelimiz mi | **Açık** (bkz. K-008) | Faz 3 başında |
 | LLM model seçimi (araç çağırma şart) | **Açık** | Faz 4 başında |
-| Senaryo başına tekrar sayısı (plan 20 öneriyor) | **Açık** | Faz 1'de hocayla |
+| Senaryo başına tekrar sayısı | ✅ K-015: LLM senaryolarında 20, arızada 10 | — |
 
 ## Bilinen engeller
 

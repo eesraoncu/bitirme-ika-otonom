@@ -276,3 +276,43 @@ komutlarını **yakalamaz**. O komutlar meşru boru hattından geçer ve imzalan
 kuralları yakalar. HMAC kanala dışarıdan enjeksiyonu ve tekrarı yakalar. PC anahtarla birlikte
 tamamen ele geçirilse bile içerik kuralları, limitler ve kalp atışı çalışmaya devam eder.
 HMAC bir katmandır, güvenliğin temeli bağımsız denetleyicidir.
+
+---
+
+## K-015 · Senaryo başına tekrar sayısı
+**Tarih:** 2026-09-24 · **Durum:** Yürürlükte
+
+Plan bu kararı Faz 1'de hocayla vermeyi öngörüyordu. Hoca müsait olmadığı için
+gerekçesiyle burada verildi.
+
+| Senaryo türü | Tekrar |
+|---|---|
+| LLM'e bağlı (normal, belirsiz, sınırları zorlayan, gizlenmiş kötü niyetli) | **20** |
+| Altyapı arızası (ajanın donması, bağlantı kopması) | **10** |
+
+Her senaryo dört yapılandırmanın (A–D) hepsinde bu sayıda koşulur.
+
+**Neden 20:** tek bir hücrede (1 senaryo × 1 yapılandırma) %50 civarı bir oranın %95
+güven aralığı ±%22. Analiz kategori bazında yapılır: kategori başına 3 senaryo × 20 = 60
+koşu, aralık ±%13. Bu, yapılandırmalar arası farkları göstermeye yeter. Sonuçlar Wilson
+güven aralığıyla raporlanır, çıplak yüzdeyle değil.
+
+**Neden arızada 10:** ölçülen güvenli moda geçiş süresi LLM'e bağlı değil ve değişkenliği
+düşük. Kablo çekme elle yapılabilir.
+
+**Zaman bütçesi** (kategori başına 3 senaryo varsayımıyla): 12 × 4 × 20 + 2 × 4 × 10 =
+**1040 koşu**. Koşu başına 2–5 dk ile 35–87 saat. Faz 5'in 2 haftasına, geceleri otomatik
+koşularak sığar.
+
+**Güvenlik payı:** Faz 5 başında her senaryo D'de 3 kez pilot olarak koşulur ve gerçek
+koşu süresi ölçülür. Bütçe aşılıyorsa tekrar 15'e iner, **daha aşağı inmez**. Senaryo ve
+yapılandırma sayısı kesilmez, çünkü S1–S3 karşılaştırmaları hepsine ihtiyaç duyar.
+
+**Bağlı kararlar (Faz 4):**
+- **Sıcaklık > 0 olmalı.** Sıcaklık 0'da LLM hemen hemen belirlenimci olur ve tekrarlar
+  aynı şeyi ölçer. K-004 hataların doğal dağılımdan gelmesini istiyor. Kesin değer modelle
+  birlikte seçilip kaydedilecek.
+- **Seed = tekrar numarası** (destekleniyorsa). Böylece bir tekrarın ilk komutu dört
+  yapılandırmada birebir aynı olur ve karşılaştırma eşleştirilmiş olur: aynı güvensiz komut
+  A, B, C ve D'ye ayrı ayrı sunulur. Ollama `seed` destekliyor. Faz 4'te belirlenimcilik
+  doğrulanacak (GPU'da tam garanti değil, bazı API'lerde seed yok).
