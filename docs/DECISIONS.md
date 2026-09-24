@@ -316,3 +316,24 @@ yapılandırma sayısı kesilmez, çünkü S1–S3 karşılaştırmaları hepsin
   yapılandırmada birebir aynı olur ve karşılaştırma eşleştirilmiş olur: aynı güvensiz komut
   A, B, C ve D'ye ayrı ayrı sunulur. Ollama `seed` destekliyor. Faz 4'te belirlenimcilik
   doğrulanacak (GPU'da tam garanti değil, bazı API'lerde seed yok).
+
+---
+
+## K-016 · Saat kaynağı: HSE kristali, 170 MHz
+**Tarih:** 2026-09-24 · **Durum:** Yürürlükte
+
+Kart, NUCLEO-G474RE üzerindeki 24 MHz kristalden (HSE) PLL ile 170 MHz'de çalışır
+(PLLM /6, ×85, /R /2). CubeMX'in kart için hazır ayarı PLL'i dahili RC osilatörden (HSI)
+beslediği için elle değiştirildi.
+
+**Neden:**
+- **Ölçüm doğruluğu.** DWT ile ölçülen karar süreleri, saatin tam 170 MHz olduğu
+  varsayımıyla mikrosaniyeye çevrilir. HSI'nın ±%1 toleransı, S1'deki her gecikmeye ±%1
+  sistematik hata ekler. Kristalde bu ihmal edilebilir.
+- **Temsil gücü.** Gerçek araçta ayrı kartlardaki CAN düğümleri sıkı saat toleransı ister.
+  Tek kartlı düzenekte (K-002) iki FDCAN aynı saati paylaştığı için HSI ile de çalışırdı,
+  ama HSE ile düzenek gerçeğe daha yakın kalır.
+- **Maliyeti yok.** Kristal kartta hazır.
+
+**Not:** zaman eşitlemesi HSE'yi gerektirmez. Her kalp atışında yenilendiği için kayma
+birikmez (`docs/protocol.md` §6.1).

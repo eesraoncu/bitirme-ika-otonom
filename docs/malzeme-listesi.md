@@ -93,16 +93,20 @@ güç kaynağı modülü. Alınmadı: güç kaynağı modülü gereksiz (CAN mod
 
 ## Siparişe DAHİL DEĞİL
 
-### 120 Ω sonlandırma direnci ×2 — modüller gelince karar verilecek
+### 120 Ω sonlandırma direnci — gerekmiyor, modülde hazır
 
 CAN hattı bir iletim hattıdır; uçları boşta kalırsa sinyal geri yansır ve bitleri bozar.
 Hattın **her iki ucunda** CANH-CANL arasına 120 Ω direnç gerekir (büklümlü çift CAN
 kablosunun karakteristik empedansı budur; ikisi paralel olunca veri yolu 60 Ω görür).
 
-**Ama SN65HVD230 modüllerinin çoğunda bu direnç kart üzerinde hazır gelir** — üzerinde
-"R2" ya da "120R" yazar.
+**SN65HVD230 modüllerinin çoğunda bu direnç kart üzerinde hazır gelir.**
 
-**Yapılacak:** Modüller gelince üzerlerine bak.
+**Kontrol edildi (2026-09-24):** modülün üzerinde `121` kodlu SMD direnç var (120 Ω).
+Ek direnç gerekmiyor. İkinci modül pin başlığı lehimlenirken kontrol edilecek.
+SMD dirençlerin üstünde değer değil üç haneli kod yazar: `121` = 12 × 10¹ = 120 Ω.
+(Bu belgenin önceki hâlinde geçen "R2", baskı devredeki konum adıdır, değer değil.)
+
+**İkinci modül için kural:**
 - Varsa → hiçbir şey alma. Dört sonlandırma olursa veri yolu 30 Ω görür, sinyal
   seviyeleri bozulur ve bu "hiç çalışmama"dan daha sinsi bir hatadır (arada paket kaybı).
 - Yoksa → mahalledeki elektronikçiden al, tanesi birkaç lira, aynı gün elinde olur.
@@ -140,7 +144,7 @@ doğrulama için. **Alınırsa CY7C68013A / FX2LP çipli olmalı** — kurulu
 | | Tutar |
 |---|---|
 | İlk sipariş (Robiz, tek kargo) | **656,16 TL** |
-| 120 Ω direnç (gerekirse, yerel) | ~10 TL |
+| 120 Ω direnç | gerekmiyor, modülde hazır |
 | Mantık analizörü (ertelendi) | ~420–520 TL |
 
 Proje önerisindeki "~250 TL" tahmini yalnızca CAN modüllerini kapsıyordu. Kablolar,

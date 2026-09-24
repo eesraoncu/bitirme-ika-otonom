@@ -4,79 +4,120 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-09-24
-**Bulunduğumuz faz:** Faz 1 tamamlandı → sırada Faz 2 (STM32 tarafı)
+**Bulunduğumuz faz:** Faz 2, STM32 tarafı (2.1 tamam, sırada 2.2)
 
 ---
 
 ## Şu an ne yapılıyor
 
-**Faz 1 bitti.** Planın koşulu sağlandı: `docs/RULES.md` ve `docs/protocol.md` tamam,
-`messages.yaml`'dan C başlığı ve Python modülü üretilebiliyor. Üretilen C ile Python'un
-aynı baytları ürettiği testle kanıtlandı (80 test, `python3 -m pytest shared/protocol/tests`).
-Tekrar sayısı da kararlaştırıldı (K-015).
+**Faz 2.1 bitti.** CubeMX projesi `firmware/` altında, saat HSE kristalinden 170 MHz.
+Uygulama kodu `firmware/app/` altında, `main.c`'ye yalnızca `USER CODE` bölümlerinde
+3 satır eklendi. Karta yüklendi: LD2'nin "nabız" deseniyle yanıp sönmesi, kristalin
+başladığını ve PLL'in 170 MHz'e kilitlendiğini doğruladı.
 
-**Faz 2'nin kartsız yapılabilecek kısmı** (kablo gelmeden başlanabilir):
-- CubeMX projesi ve 170 MHz saat ayarı (HSE ile, `protocol.md` §6.1). Derleme kartsız yapılır.
-- C çerçeveleyici (COBS, CRC-16, HMAC-SHA256). Bilgisayarda gcc ile
-  `test_vectors.json`'a karşı test edilebilir. Karta yüklemeden önce doğrulanmış olur.
+**Sırada Faz 2.2: ajan kanalında yankı testi.** Önce bir karar gerekiyor: ajan kanalının
+UART'ı (LPUART1) şu an CubeMX'in kart destek paketi (BSP, `BSP_COM_Init`) üzerinden
+kuruluyor. Yankı testi için bu yeterli. Ama bekçi ajan kanalını kesmeyle (interrupt) ya da
+DMA ile okumalı. Bunun için LPUART1'i CubeMX'te normal bir çevre birimi olarak kurmak daha
+uygun olabilir. Bu, CubeMX'in ilk kez yeniden çalıştırılması olacak. O sırada `.cproject`'e
+eklenen `app/` yollarının korunup korunmadığına bakılacak (karşılaştırma için CubeMX'in
+dokunulmamış çıktısı: `5d3878e`).
 
 ## Bitenler
 
-- [x] Disk temizliği: 4.3 GB → 11 GB (kurulumlar sonrası 6.4 GB boş)
+- [x] Disk temizliği: 4,3 GB → 11 GB (sonraki kurulumlarla şu an 2,8 GB, bkz. engeller)
 - [x] Proje klasör yapısı + git deposu + ilk commit
 - [x] Ubuntu 22.04.5 LTS · ROS 2 Humble · Nav2 (30 paket) · teleop_twist_keyboard
 - [x] Git, VS Code, Claude Code
 - [x] `minicom`, `python3-serial`, `pulseview`, `sigrok-firmware-fx2lafw`, `unzip`
 - [x] RTAB-Map (`ros-humble-rtabmap-ros`, 14 paket)
 - [x] STM32CubeIDE 2.2.0 → `/opt/st/stm32cubeide_2.2.0`
+- [x] STM32CubeMX 6.18.1 → `~/STM32CubeMX`. **CubeIDE 2.0'dan itibaren CubeMX IDE'nin
+      içinde gelmiyor.** Planın 3.6'daki "File → New → STM32 Project" adımı artık yok.
+      Proje CubeMX'te üretilip CubeIDE'ye aktarılıyor
 - [x] ST-LINK udev kuralları kuruldu (49-stlinkv1/v2/v2-1/v3.rules)
 - [x] `dialout` grubuna eklendi ve oturumda doğrulandı (2026-09-24)
 - [x] GitHub'da `bitirme-ika-otonom` özel deposu açıldı
-- [x] **Faz 1:** okuma listesi tamamlandı
-- [x] **Faz 1:** `docs/RULES.md`: katmanlı hız limitleri, eşikler, denetim sırası,
-      kurtarma durum makinesi. Tüm değerler onaylandı (K-010 … K-013)
-- [x] **Faz 1:** `docs/protocol.md`: tehdit modeli, çerçeve (COBS + CRC + HMAC), oturum,
-      zaman eşitleme, VERDICT biçimi, CAN eşlemesi (K-014)
-- [x] **Faz 1:** `shared/protocol/messages.yaml` (17 mesaj), `tools/gen_protocol.py`,
-      referans çerçeveleyici `frame.py`, `test_vectors.json`, 80 test
+- [x] Parçalar geldi (2026-09-24): Robiz.net, 656,16 TL, liste `docs/malzeme-listesi.md`'de.
+      Mantık analizörü ertelendi (K-009)
+- [x] **Faz 0 tamam:** LED testi (plan 3.6). CubeMX olmadan, terminalden, doğrudan
+      yazmaçlarla yazılıp yüklendi. LD2 500 ms'de bir yanıp söndü
+- [x] **Faz 1 tamam:** okuma listesi · `docs/RULES.md` (K-010 … K-013) ·
+      `docs/protocol.md` (K-014) · `messages.yaml` (17 mesaj), kod üreticisi, `frame.py`,
+      80 test · tekrar sayısı (K-015)
+- [x] **Faz 2.1 tamam:** CubeMX projesi (`5d3878e`, dokunulmamış hâl), `app/` katmanı
+      (`9214910`)
 
 ## Sırada
 
-- [ ] Ollama kurulumu (model seçimi Faz 4'te)
-- [x] **Parça siparişi geldi (2026-09-24).** Robiz.net'ten tek sipariş, 656,16 TL — tam liste ve
-      gerekçeleri `docs/malzeme-listesi.md`'de. 2× SN65HVD230, CP2102 USB-TTL,
-      micro-USB **data** kablosu, M-F + F-F + M-M jumper, MB-102 breadboard.
-      Hepsi stokta doğrulandı (2026-09-22).
-      — 120 Ω direnç siparişe dahil değil: modüller gelince üzerinde var mı bakılacak
-      — mantık analizörü ertelendi (K-009)
-- [ ] **Faz 2.1:** CubeMX projesi (`firmware/`), 170 MHz, **HSE** saat kaynağı
+- [ ] **Faz 2.2:** ajan kanalında yankı testi. Önce LPUART1 kararı (yukarıda)
+- [ ] **Faz 2.3:** FDCAN iç döngü (loopback) testi
+- [ ] **CAN modüllerinin pin başlıklarını lehimle (Faz 2.4'ten önce şart).** Lehimsiz
+      temas kesik kesik olur ve CAN hatası sanılır. Lehim sırasında ikinci modülde de
+      `121` (120 Ω sonlandırma) olup olmadığına bak
 - [ ] **Faz 2.6'nın kartsız kısmı:** `firmware/app/protocol/` altında C çerçeveleyici.
       `test_vectors.json`'a karşı gcc ile test. Etiket sabit zamanlı karşılaştırılmalı
 - [ ] HMAC anahtarını üret: `secrets/hmac_key.bin` (32 bayt, depoya girmez)
+- [ ] Ollama kurulumu (model seçimi Faz 4'te)
 
 ## Doğrulanmış testler
 
-- [x] CubeIDE kuruldu
-- [x] Kart kimliği doğrulandı: **NUCLEO-G474RE, MB1367/C**, CN1 = **micro-USB**
-- [ ] **LED testi (plan 3.6) yapılamadı — veri kablosu yok.** Eldeki JBL
-      hoparlör kablosu denendi: karta besleme gidiyor (LD3 yanıyor) ama
-      `lsusb`'de ST cihazı yok → kabloda veri teli yok. Micro-USB **data**
-      kablosu sipariş listesine eklendi, en öncelikli kalem.
+- [x] Kart: **NUCLEO-G474RE, MB1367/C**, CN1 = micro-USB, **STLINK-V3** (FW V3J9M3),
+      SWD bağlantısı, 3,30 V
+- [x] Seri portlar: ajan kanalı `/dev/ttyACM0`, araç kanalı (CP2102) `/dev/ttyUSB0`,
+      ikisi de açılabiliyor
+- [x] LED testi (plan 3.6). İlk denemede JBL kablosunun veri teli olmadığı anlaşıldı,
+      veri kablosuyla çalıştı
+- [x] Faz 2.1 firmware: 27 kaynak dosya, 0 uyarı, flash 10 720 B. Kartta çalışıyor
+- [x] CAN modülü: üzerinde `121` (120 Ω) sonlandırma direnci görüldü. Ek direnç gerekmiyor
+- [x] Protokol: 80 test, C↔Python bayt eşitliği dahil
+
+## Derleme ve yükleme
+
+Depo kökünden, CubeIDE penceresini açmadan:
+
+```bash
+# Derle. Çalışma alanı depo DIŞINDA. İlk seferde -import de verilir
+/opt/st/stm32cubeide_2.2.0/headless-build.sh -data ~/STM32CubeIDE/ws_headless \
+    -import "$PWD/firmware" -build firmware/Debug
+# Sonraki derlemeler
+/opt/st/stm32cubeide_2.2.0/headless-build.sh -data ~/STM32CubeIDE/ws_headless -build firmware/Debug
+
+# Karta yükle. ONAY GEREKİR (CLAUDE.md)
+"$(find /opt/st/stm32cubeide_2.2.0/plugins -name STM32_Programmer_CLI -type f)" \
+    -c port=SWD -w firmware/Debug/firmware.elf -v -rst
+```
+
+- `-v` yazılanı geri okuyup doğrular, `-rst` kartı yeniden başlatır.
+- **CubeIDE penceresiyle çalışırken** ayrı bir çalışma alanı seç (yine depo dışında).
+  Projeyi **File → Import → Existing Projects into Workspace** ile `firmware/`'dan aktar,
+  **"Copy projects into workspace" işaretini kaldır.**
+- **Seri portların kalıcı adları:** `ttyACM0`/`ttyUSB0` numaraları takma sırasına göre
+  değişebilir. Köprü şunları kullanmalı:
+  - ajan: `/dev/serial/by-id/usb-STMicroelectronics_STLINK-V3_003B00163235511037333439-if02`
+  - araç: `/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0`
 
 ## Açık sorular / kararsız konular
 
 | Konu | Durum | Ne zaman karar verilecek |
 |---|---|---|
+| LPUART1: BSP üzerinden mi, CubeMX'te çevre birimi olarak mı | **Açık** | Faz 2.2 başında |
 | Gazebo: Fortress + TurtleBot 4 mü, mevcut Harmonic'te kendi modelimiz mi | **Açık** (bkz. K-008) | Faz 3 başında |
 | LLM model seçimi (araç çağırma şart) | **Açık** | Faz 4 başında |
 | Senaryo başına tekrar sayısı | ✅ K-015: LLM senaryolarında 20, arızada 10 | — |
 
 ## Bilinen engeller
 
-- **Disk dar: 6.4 GB boş.** Gazebo Fortress + TurtleBot 4 (~2 GB) ve Ollama modeli
-  (~4 GB) ikisi birden sığmaz. Faz 3 ve Faz 4'ten önce yeniden yer açmak gerekecek.
-  Adaylar: `~/.config/Cursor` + `~/.cursor` (1.85 GB), `~/.antigravity-ide` (141 MB),
-  `~/.cache/ms-playwright-go` (128 MB).
+- **Disk çok dar: 2,8 GB boş (%95).** Faz 3 (Gazebo Fortress + TurtleBot 4, ~2 GB) ve
+  Faz 4 (Ollama modeli, ~4 GB) bu hâliyle sığmaz.
+  - Kolay aday: `~/STM32Cube/Repository/*.zip` (364 MB). CubeMX'in indirdiği G4 paket
+    arşivleri, açılmış hâli ayrıca duruyor.
+  - `~/.config/Cursor` + `~/.cursor` (1,85 GB): Cursor kullanıldığı için dokunulmuyor.
+  - **Asıl sebep bölüm düzeni:** disk 477 GB ama Ubuntu bölümü (`nvme0n1p5`) 60 GB.
+    390 GB BitLocker'lı Windows bölümü, 24 GB ASUS kurtarma bölümü. Kalıcı çözüm
+    Windows'tan yer ayırıp Ubuntu'ya yeni bir bölüm eklemek olabilir. **Riskli bir işlem:
+    önce yedek alınmalı, BitLocker askıya alınmalı, küçültme Windows'ta yapılmalı.**
+    Faz 3'ten önce karar verilecek.
 - **NVIDIA sürücüsü kurulu değil.** Kartta RTX 3050 Mobile var (~4 GB VRAM) ama sistem
   Intel iGPU kullanıyor, `nvidia-smi` yok. Faz 4'te yerel LLM için sürücü kurulmalı;
   kurulmazsa model CPU'da çok yavaş kalır ve API'ye geçmek gerekebilir.

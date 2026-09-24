@@ -315,8 +315,14 @@ bilgisayarın saatleri bağımsız çalışır ve birbirinden kayar:
 | Dahili RC osilatör (HSI) | ±%1 | **~36 s** |
 | Harici kristal (HSE) | ~±50 ppm | ~0,2 s |
 
-İkisinde de açılışta bir kez eşitlemek yetmez. 200 ms'lik tazelik eşiği birkaç dakika
-içinde anlamsızlaşır. **Faz 2 notu:** saat ayarında HSE kullanılmalı.
+İkisinde de açılışta bir kez eşitlemek yetmez: 200 ms'lik tazelik eşiği birkaç dakika
+içinde anlamsızlaşır. Bu yüzden eşitleme sürekli yapılır (§6.2). Saniyede 10 örnekle
+kayma iki kaynakta da birikmez, yani **zaman eşitlemesi HSE'yi gerektirmez.**
+
+Kartta yine de HSE kullanılıyor (Faz 2.1), ama sebebi başka: DWT çevrim sayacıyla
+ölçülen karar süreleri, saatin tam 170 MHz olduğu varsayımıyla mikrosaniyeye çevrilir.
+HSI'nın ±%1 toleransı, S1'de raporlanan her gecikmeye ±%1'lik sistematik bir hata
+ekler. Kristalde bu hata ihmal edilebilir.
 
 ### 6.2 Yöntem: her kalp atışı bir eşitleme örneği
 
@@ -502,5 +508,4 @@ tampona sığmayan çerçeve, yanlış yön biti ya da tipine sığmayan enum de
 | Etiketin sabit zamanlı karşılaştırılması (§4.5) | Faz 2.6 |
 | HMAC'in karttaki süresi (DWT ile) | Faz 2.6 |
 | Baud hızının ölçümle kesinleşmesi | Faz 2 |
-| Kartın saat kaynağı: HSE (§6.1) | Faz 2.1 |
 | A yapılandırmasında köprünün kartı nasıl atlayacağı | Faz 5 |
