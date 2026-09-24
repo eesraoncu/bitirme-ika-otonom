@@ -23,6 +23,9 @@ Kalıcı bir karar verildiyse `docs/DECISIONS.md`'ye **yeni madde olarak ekle** 
 - **Sırlar depoya girmez.** HMAC anahtarı `secrets/` altında ve `.gitignore`'da.
 - **Kapsam kuralı.** Yeni bir özellik ancak sonuç tablosuna yeni bir satır ekliyorsa
   eklenir. Fazladan özellik önerme.
+- **Karta yükleme yapmadan önce onay al.** Flash'a yazma, silme, option byte değiştirme,
+  ST-LINK üzerinden reset: hiçbiri Esra'nın açık onayı olmadan yapılmaz. Derlemek ve
+  karttan salt okuma (ör. `STM32_Programmer_CLI -c port=SWD` ile kimlik okumak) serbest.
 
 ## Dil
 
