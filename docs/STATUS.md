@@ -51,7 +51,12 @@ dokunulmamış çıktısı: `5d3878e`).
 ## Sırada
 
 - [ ] **Faz 2.2:** ajan kanalında yankı testi. Önce LPUART1 kararı (yukarıda)
-- [ ] **Faz 2.3:** FDCAN iç döngü (loopback) testi
+- [ ] **Faz 2.3:** FDCAN iç döngü (loopback) testi. FDCAN1'in gönderme tamponu
+      **kuyruk modunda** (`FDCAN_TX_QUEUE_MODE`) kurulmalı, FIFO modunda değil. `HALT`,
+      `DRIVE` ve `GOAL` aynı düğümden (FDCAN1) çıktığı için hatta tahkime girmezler. Aralarındaki
+      sırayı kartın kendi tamponu belirler. Kuyruk modu en küçük kimliği önce gönderir. FIFO modu
+      ise geliş sırasına göre gönderir ve `HALT` bir `DRIVE`'ın arkasında bekleyebilir
+      (`docs/protocol.md` §8)
 - [ ] **CAN modüllerinin pin başlıklarını lehimle (Faz 2.4'ten önce şart).** Lehimsiz
       temas kesik kesik olur ve CAN hatası sanılır. Lehim sırasında ikinci modülde de
       `121` (120 Ω sonlandırma) olup olmadığına bak
@@ -101,7 +106,7 @@ Depo kökünden, CubeIDE penceresini açmadan:
 
 | Konu | Durum | Ne zaman karar verilecek |
 |---|---|---|
-| LPUART1: BSP üzerinden mi, CubeMX'te çevre birimi olarak mı | **Açık** | Faz 2.2 başında |
+| LPUART1: BSP üzerinden mi, CubeMX'te çevre birimi olarak mı | ✅ K-017: CubeMX'te çevre birimi, alma DMA ile | — |
 | Gazebo: Fortress + TurtleBot 4 mü, mevcut Harmonic'te kendi modelimiz mi | **Açık** (bkz. K-008) | Faz 3 başında |
 | LLM model seçimi (araç çağırma şart) | **Açık** | Faz 4 başında |
 | Senaryo başına tekrar sayısı | ✅ K-015: LLM senaryolarında 20, arızada 10 | — |

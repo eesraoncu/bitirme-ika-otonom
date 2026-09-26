@@ -13,6 +13,10 @@ Kalıcı bir karar verildiyse `docs/DECISIONS.md`'ye **yeni madde olarak ekle** 
 
 ## Proje kuralları
 
+- **Önce anlat, onay al, sonra yaz.** Esra'nın haberi ve onayı olmadan tek satır kod
+  yazılmaz, hiçbir dosya (belgeler dahil) değiştirilmez. Sıra: ne yazılacak, neden
+  gerekli, nasıl çalışacak → Esra onaylar → yazılır → nasıl çalıştırılacağı gösterilir.
+  Sebep: projenin asıl amacı Esra'nın öğrenmesi. (Esra'nın kararı, 2026-09-26.)
 - **Mesaj formatı tek yerde.** `shared/protocol/messages.yaml` dışında hiçbir yerde
   mesaj alanı elle tanımlanmaz. C başlığı ve Python modülü buradan üretilir.
 - **Bir kavram tek klasörde.** Bir kuralı değiştirmek tek klasöre bakmayı gerektirmeli.

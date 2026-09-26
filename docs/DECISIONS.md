@@ -337,3 +337,25 @@ beslediği için elle değiştirildi.
 
 **Not:** zaman eşitlemesi HSE'yi gerektirmez. Her kalp atışında yenilendiği için kayma
 birikmez (`docs/protocol.md` §6.1).
+
+---
+
+## K-017 · Ajan kanalı: CubeMX'te LPUART1, alma DMA ile
+**Tarih:** 2026-09-26 · **Durum:** Yürürlükte
+
+Ajan kanalı (LPUART1, ST-LINK sanal seri portu, PA2/PA3) CubeMX'te çevre birimi olarak
+kurulur, BSP'nin VCP bileşeni kapatılır. Ayar 115200 8N1. Baytlar dairesel DMA ile alınır.
+`app_loop()` her turda DMA'nın nereye kadar yazdığına bakar ve yeni baytları işler.
+
+**Neden:**
+- **Bekçi hiç beklememeli.** Yoklamalı okumada kart bayt beklerken kalp atışını, araç
+  kanalını ve CAN'i izleyemez. 115200 baud'da yaklaşık 87 µs'de bir bayt gelir ve zamanında
+  okunmayan bayt kaybolur.
+- **Karar süresi ölçümü temiz kalsın (S1).** Bayt başına kesme saniyede yaklaşık 11 500 kez
+  işlemciyi böler ve DWT ile ölçülen karar süresine gürültü ekler. DMA'da işlemci bayt başına
+  bölünmez.
+- **CubeMX'in yeniden üretimi ilk kez basit bir birimde öğrenilsin.** Faz 2.3'te FDCAN için
+  CubeMX zaten yeniden çalıştırılacak.
+
+**Bedeli:** BSP'nin `printf` yönlendirmesi VCP ile birlikte gider. Ajan kanalı protokole ait
+olduğu için üstüne serbest metin yazılmamalı.
