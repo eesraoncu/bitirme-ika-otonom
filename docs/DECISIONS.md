@@ -359,3 +359,22 @@ kurulur, BSP'nin VCP bileşeni kapatılır. Ayar 115200 8N1. Baytlar dairesel DM
 
 **Bedeli:** BSP'nin `printf` yönlendirmesi VCP ile birlikte gider. Ajan kanalı protokole ait
 olduğu için üstüne serbest metin yazılmamalı.
+
+---
+
+## K-018 · Ajan kanalında gönderme de DMA ile
+**Tarih:** 2026-09-27 · **Durum:** Yürürlükte
+
+K-017 yalnızca almayı DMA'ya bağlamıştı. Gönderme de DMA ile yapılır (DMA1 kanal 2,
+normal mod). LPUART1 kesmesi açıktır: HAL gönderimin bittiğini bu kesmede anlar, hat
+hataları da buradan gelir. Bayt başına kesme yine yoktur.
+
+**Neden:**
+- **Bekçi gönderirken de beklememeli.** DMA olmadan işlemci her bayt için bekler. En uzun
+  çerçeve (44 bayt) yaklaşık 3,8 ms bekleme demek. Gerekçe K-017 ile aynı.
+- **CubeMX zaten açıktı.** Sonraya bırakmak ikinci bir yeniden üretim demekti.
+
+**Bedeli:** gönderilecek veri modülün 64 baytlık tamponuna kopyalanır. Önceki gönderim
+bitmeden yenisi başlatılamaz, çağıran `agent_link_tx_ready()` ile sorar.
+
+**Doğrulama:** yankı testi, 100 KB, 0 fark, 11 422 B/s (hat sınırının %99,1'i).

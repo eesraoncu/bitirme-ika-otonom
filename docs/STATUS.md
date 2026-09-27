@@ -3,25 +3,28 @@
 > Bu dosya her çalışma oturumunun **başında okunur**, **sonunda güncellenir**.
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
-**Son güncelleme:** 2026-09-24
-**Bulunduğumuz faz:** Faz 2, STM32 tarafı (2.1 tamam, sırada 2.2)
+**Son güncelleme:** 2026-09-27
+**Bulunduğumuz faz:** Faz 2, STM32 tarafı (2.2 tamam, sırada 2.3)
 
 ---
 
 ## Şu an ne yapılıyor
 
-**Faz 2.1 bitti.** CubeMX projesi `firmware/` altında, saat HSE kristalinden 170 MHz.
-Uygulama kodu `firmware/app/` altında, `main.c`'ye yalnızca `USER CODE` bölümlerinde
-3 satır eklendi. Karta yüklendi: LD2'nin "nabız" deseniyle yanıp sönmesi, kristalin
-başladığını ve PLL'in 170 MHz'e kilitlendiğini doğruladı.
+**Faz 2.2 bitti.** Ajan kanalı (LPUART1) CubeMX'te çevre birimi olarak kuruldu, alma
+dairesel DMA, gönderme normal DMA ile (K-017, K-018). Kanal kodu `firmware/app/links/agent_link`
+altında ve kalıcı. `app.c`'deki yankı döngüsü geçici, Faz 2.6'da baytlar çerçeveleyiciye
+gidecek. Yük testi (`tools/echo_test.py`) 100 KB'ı kayıpsız geri aldı.
 
-**Sırada Faz 2.2: ajan kanalında yankı testi.** Önce bir karar gerekiyor: ajan kanalının
-UART'ı (LPUART1) şu an CubeMX'in kart destek paketi (BSP, `BSP_COM_Init`) üzerinden
-kuruluyor. Yankı testi için bu yeterli. Ama bekçi ajan kanalını kesmeyle (interrupt) ya da
-DMA ile okumalı. Bunun için LPUART1'i CubeMX'te normal bir çevre birimi olarak kurmak daha
-uygun olabilir. Bu, CubeMX'in ilk kez yeniden çalıştırılması olacak. O sırada `.cproject`'e
-eklenen `app/` yollarının korunup korunmadığına bakılacak (karşılaştırma için CubeMX'in
-dokunulmamış çıktısı: `5d3878e`).
+**CubeMX'in ilk yeniden üretiminden öğrenilenler** (Faz 2.3'te yine gerekecek):
+- "Keep User Code when re-generating" `main.c`'deki `USER CODE` satırlarımızı korudu.
+- `.cproject`'teki `app/` kaynak ve başlık yolları korundu. Yalnızca satır sırası değişti.
+- `MX_DMA_Init()`, `MX_LPUART1_UART_Init()`'ten önce üretildi (doğru sıra).
+- CubeMX her çevre birimini ayrı dosyaya yazıyor (`usart.c`, `dma.c`).
+- Üretimden sonra `git diff` ile bakıp **ayrı bir commit** atmak işe yaradı: CubeMX'in
+  ürettiği (`dbc454f`) ile bizim yazdığımız (`45231e1`) ayrı duruyor.
+
+**Sırada Faz 2.3: FDCAN iç döngü (loopback) testi.** CubeMX yeniden çalıştırılacak.
+Gönderme tamponu kuyruk modunda olmalı (aşağıda, "Sırada").
 
 ## Bitenler
 
@@ -47,10 +50,11 @@ dokunulmamış çıktısı: `5d3878e`).
       80 test · tekrar sayısı (K-015)
 - [x] **Faz 2.1 tamam:** CubeMX projesi (`5d3878e`, dokunulmamış hâl), `app/` katmanı
       (`9214910`)
+- [x] **Faz 2.2 tamam:** LPUART1 + DMA CubeMX'te (`dbc454f`), `agent_link` ve yankı testi
+      (`45231e1`)
 
 ## Sırada
 
-- [ ] **Faz 2.2:** ajan kanalında yankı testi. Önce LPUART1 kararı (yukarıda)
 - [ ] **Faz 2.3:** FDCAN iç döngü (loopback) testi. FDCAN1'in gönderme tamponu
       **kuyruk modunda** (`FDCAN_TX_QUEUE_MODE`) kurulmalı, FIFO modunda değil. `HALT`,
       `DRIVE` ve `GOAL` aynı düğümden (FDCAN1) çıktığı için hatta tahkime girmezler. Aralarındaki
@@ -74,6 +78,10 @@ dokunulmamış çıktısı: `5d3878e`).
 - [x] LED testi (plan 3.6). İlk denemede JBL kablosunun veri teli olmadığı anlaşıldı,
       veri kablosuyla çalıştı
 - [x] Faz 2.1 firmware: 27 kaynak dosya, 0 uyarı, flash 10 720 B. Kartta çalışıyor
+- [x] Faz 2.2 firmware: 0 uyarı, flash 18 424 B. Kartta çalışıyor, LD2 nabzı sürüyor
+- [x] Ajan kanalında elle yankı (minicom, `/dev/ttyACM0`, 115200)
+- [x] Ajan kanalında yük testi (`tools/echo_test.py`): 102 400 / 102 400 bayt, 0 fark,
+      11 422 B/s (hat sınırının %99,1'i). Dairesel tampon ~400 kez başa döndü
 - [x] CAN modülü: üzerinde `121` (120 Ω) sonlandırma direnci görüldü. Ek direnç gerekmiyor
 - [x] Protokol: 80 test, C↔Python bayt eşitliği dahil
 
@@ -94,6 +102,9 @@ Depo kökünden, CubeIDE penceresini açmadan:
 ```
 
 - `-v` yazılanı geri okuyup doğrular, `-rst` kartı yeniden başlatır.
+- Derleme `No Project matched "firmware/Debug"` uyarısı verip hiçbir şey yapmazsa proje
+  çalışma alanında kayıtlı değildir. Komutu `-import "$PWD/firmware"` ile yeniden çalıştır
+  (2026-09-27'de oldu).
 - **CubeIDE penceresiyle çalışırken** ayrı bir çalışma alanı seç (yine depo dışında).
   Projeyi **File → Import → Existing Projects into Workspace** ile `firmware/`'dan aktar,
   **"Copy projects into workspace" işaretini kaldır.**
