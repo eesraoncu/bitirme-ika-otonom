@@ -378,3 +378,28 @@ hataları da buradan gelir. Bayt başına kesme yine yoktur.
 bitmeden yenisi başlatılamaz, çağıran `agent_link_tx_ready()` ile sorar.
 
 **Doğrulama:** yankı testi, 100 KB, 0 fark, 11 422 B/s (hat sınırının %99,1'i).
+
+---
+
+## K-019 · CAN bit zamanlaması ve gönderme tamponu modları
+**Tarih:** 2026-09-28 · **Durum:** Yürürlükte
+
+| Ayar | Değer | Gerekçe |
+|---|---|---|
+| Saat | PCLK1, 170 MHz (K-016) | Bir bit = 340 saat periyodu |
+| Prescaler | 2 → 1 tq ≈ 11,76 ns, bit = 170 tq | Seçilebilecek en küçük değer (1'de Seg1 = 297 > 256). CiA küçük prescaler önerir |
+| Bölümler | 1 + 148 + 21, SJW 21 | Örnekleme %87,6. CiA'nın 500 kbit/s için önerdiği %87,5'e en yakın. SJW = Seg2 en geniş düzeltme payını verir |
+| FDCAN1 (bekçi) | Kuyruk modu | En küçük kimlik önce gider. HALT, bekleyen DRIVE/GOAL'un önüne geçer |
+| FDCAN2 (araç) | FIFO modu | Tek kimlik (TELEMETRY). Kuyruk modu aynı kimlikte tampon sırasına bakar, eski ölçüm yenisinden sonra gidebilirdi |
+| Kesme | Yok, alma kuyruğu app_loop()'ta yoklanır | K-017'deki gerekçe: karar süresi ölçümüne kesme gürültüsü girmesin |
+
+**Doğrulama (Faz 2.3, iç döngü):** aynı üç mesaj DRIVE → GOAL → HALT sırasıyla verildi,
+GOAL ve HALT DRIVE hattayken. Kuyruk modunda DRIVE, HALT, GOAL; FIFO modunda
+DRIVE, GOAL, HALT çıktı. FIFO birimi kontrol deneyidir: sonucun sebebinin şans ya da
+zamanlama değil mod olduğunu gösterir.
+
+**Bilinen sınır:** DRIVE hatta çıkmışsa HALT onu kesemez, en fazla bir çerçeve
+(~200 µs) bekler. CAN'de başlamış bir gönderim kesilmez.
+
+**Tuzak:** HAL_FDCAN_GetTxFifoFreeLevel() kuyruk modunda hep 0 döner. İlk denemede
+bekçi bu yüzden hiçbir mesaj gönderemedi, iç döngü testi bunu kablolamadan önce yakaladı.

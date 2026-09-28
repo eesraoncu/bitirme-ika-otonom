@@ -3,28 +3,30 @@
 > Bu dosya her çalışma oturumunun **başında okunur**, **sonunda güncellenir**.
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
-**Son güncelleme:** 2026-09-27
-**Bulunduğumuz faz:** Faz 2, STM32 tarafı (2.2 tamam, sırada 2.3)
+**Son güncelleme:** 2026-09-28
+**Bulunduğumuz faz:** Faz 2, STM32 tarafı (2.3 tamam, sırada 2.4)
 
 ---
 
 ## Şu an ne yapılıyor
 
-**Faz 2.2 bitti.** Ajan kanalı (LPUART1) CubeMX'te çevre birimi olarak kuruldu, alma
-dairesel DMA, gönderme normal DMA ile (K-017, K-018). Kanal kodu `firmware/app/links/agent_link`
-altında ve kalıcı. `app.c`'deki yankı döngüsü geçici, Faz 2.6'da baytlar çerçeveleyiciye
-gidecek. Yük testi (`tools/echo_test.py`) 100 KB'ı kayıpsız geri aldı.
+**Faz 2.3 bitti.** FDCAN1 ve FDCAN2 CubeMX'te iç döngü modunda kuruldu (K-019). Kanal
+kodu `firmware/app/links/can_link` altında ve kalıcı. `app.c`'deki test geçici. Aynı üç mesaj
+DRIVE → GOAL → HALT sırasıyla verildi, GOAL ile HALT DRIVE hattayken. Kuyruk modundaki FDCAN1
+DRIVE, HALT, GOAL; FIFO modundaki FDCAN2 DRIVE, GOAL, HALT sırasıyla gönderdi. TELEMETRY sağlam
+geri geldi, hata sayaçları 0.
 
-**CubeMX'in ilk yeniden üretiminden öğrenilenler** (Faz 2.3'te yine gerekecek):
-- "Keep User Code when re-generating" `main.c`'deki `USER CODE` satırlarımızı korudu.
-- `.cproject`'teki `app/` kaynak ve başlık yolları korundu. Yalnızca satır sırası değişti.
-- `MX_DMA_Init()`, `MX_LPUART1_UART_Init()`'ten önce üretildi (doğru sıra).
-- CubeMX her çevre birimini ayrı dosyaya yazıyor (`usart.c`, `dma.c`).
-- Üretimden sonra `git diff` ile bakıp **ayrı bir commit** atmak işe yaradı: CubeMX'in
-  ürettiği (`dbc454f`) ile bizim yazdığımız (`45231e1`) ayrı duruyor.
+**Faz 2.3'te öğrenilenler:**
+- **Kuyruk modunda `HAL_FDCAN_GetTxFifoFreeLevel()` hep 0 döner.** `TXFQS.TFFL` alanı yalnızca
+  FIFO'da anlamlı. İlk denemede bekçi bu yüzden hiçbir mesaj gönderemedi. Kartın yazmacından
+  okunarak doğrulandı: FDCAN1 `TXFQS = 0`, FDCAN2 `TXFQS = 0x00010103` (TFFL = 3), iki tampon da
+  boşken. Doluluk iki modda da geçerli olan `TFQF` bitinden soruluyor.
+- **Sıra testi zamanlamaya duyarlı.** Başlatılan birim hatta 11 bit sessizlik görene kadar
+  (~22 µs) gönderemez. O sırada üç mesaj da tamponda birikir ve HALT DRIVE'ın da önüne geçer.
+  Test bu yüzden önce birimin boşa çıkmasını, sonra DRIVE'ın hatta görünmesini
+  (`HAL_FDCAN_GetProtocolStatus`, `Activity`) bekliyor.
 
-**Sırada Faz 2.3: FDCAN iç döngü (loopback) testi.** CubeMX yeniden çalıştırılacak.
-Gönderme tamponu kuyruk modunda olmalı (aşağıda, "Sırada").
+**Sırada Faz 2.4: iki FDCAN birimi gerçek hat üzerinden.** Önce lehim (aşağıda, "Sırada").
 
 ## Bitenler
 
@@ -52,15 +54,18 @@ Gönderme tamponu kuyruk modunda olmalı (aşağıda, "Sırada").
       (`9214910`)
 - [x] **Faz 2.2 tamam:** LPUART1 + DMA CubeMX'te (`dbc454f`), `agent_link` ve yankı testi
       (`45231e1`)
+- [x] **Faz 2.3 tamam:** FDCAN1/2 CubeMX'te (`05d9469`), `can_link` ve iç döngü testi
+      (`c0c0d9d`)
 
 ## Sırada
 
-- [ ] **Faz 2.3:** FDCAN iç döngü (loopback) testi. FDCAN1'in gönderme tamponu
-      **kuyruk modunda** (`FDCAN_TX_QUEUE_MODE`) kurulmalı, FIFO modunda değil. `HALT`,
-      `DRIVE` ve `GOAL` aynı düğümden (FDCAN1) çıktığı için hatta tahkime girmezler. Aralarındaki
-      sırayı kartın kendi tamponu belirler. Kuyruk modu en küçük kimliği önce gönderir. FIFO modu
-      ise geliş sırasına göre gönderir ve `HALT` bir `DRIVE`'ın arkasında bekleyebilir
-      (`docs/protocol.md` §8)
+- [ ] **Faz 2.4:** FDCAN1 → SN65HVD230 → CANH/CANL → SN65HVD230 → FDCAN2.
+      - CubeMX'te iki birimin Mode'u **Normal** yapılıp yeniden üretilecek. `can_link`'in iç döngü
+        filtresi (filtre 1) bu durumda kendiliğinden kurulmaz.
+      - Kablolamadan önce PA11/PA12 (FDCAN1) ve PB12/PB13 (FDCAN2) pinlerinin kart üzerindeki
+        lehim köprüleriyle çakışıp çakışmadığına UM2505'ten bakılacak.
+      - `app.c`'deki test gerçek hat için uyarlanacak: FDCAN1 gönderir, FDCAN2 alır, TELEMETRY
+        ters yönde.
 - [ ] **CAN modüllerinin pin başlıklarını lehimle (Faz 2.4'ten önce şart).** Lehimsiz
       temas kesik kesik olur ve CAN hatası sanılır. Lehim sırasında ikinci modülde de
       `121` (120 Ω sonlandırma) olup olmadığına bak
@@ -79,6 +84,9 @@ Gönderme tamponu kuyruk modunda olmalı (aşağıda, "Sırada").
       veri kablosuyla çalıştı
 - [x] Faz 2.1 firmware: 27 kaynak dosya, 0 uyarı, flash 10 720 B. Kartta çalışıyor
 - [x] Faz 2.2 firmware: 0 uyarı, flash 18 424 B. Kartta çalışıyor, LD2 nabzı sürüyor
+- [x] Faz 2.3 firmware: 0 uyarı, flash 23 828 B. İç döngü testi geçti:
+      kuyruk modu DRIVE, HALT, GOAL. FIFO modu DRIVE, GOAL, HALT. TELEMETRY sağlam, bayt farkı 0,
+      TEC/REC 0 (RAM'den okundu)
 - [x] Ajan kanalında elle yankı (minicom, `/dev/ttyACM0`, 115200)
 - [x] Ajan kanalında yük testi (`tools/echo_test.py`): 102 400 / 102 400 bayt, 0 fark,
       11 422 B/s (hat sınırının %99,1'i). Dairesel tampon ~400 kez başa döndü
@@ -112,6 +120,17 @@ Depo kökünden, CubeIDE penceresini açmadan:
   değişebilir. Köprü şunları kullanmalı:
   - ajan: `/dev/serial/by-id/usb-STMicroelectronics_STLINK-V3_003B00163235511037333439-if02`
   - araç: `/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0`
+
+**Karttan RAM okuma** (çalışan programın değişkenleri, hata ayıklayıcı açmadan):
+
+```bash
+# Değişkenin adresi ve boyutu (her derlemede değişebilir)
+"$(find /opt/st/stm32cubeide_2.2.0/plugins -name arm-none-eabi-nm -type f | head -1)" \
+    -S firmware/Debug/firmware.elf | grep can_test_result
+# Çalışan karta dokunmadan oku. Salt okuma, onay gerekmez
+"$(find /opt/st/stm32cubeide_2.2.0/plugins -name STM32_Programmer_CLI -type f)" \
+    -c port=SWD mode=HOTPLUG -r32 <adres> <boyut>
+```
 
 ## Açık sorular / kararsız konular
 
