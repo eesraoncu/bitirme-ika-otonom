@@ -3,18 +3,28 @@
 > Bu dosya her çalışma oturumunun **başında okunur**, **sonunda güncellenir**.
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
-**Son güncelleme:** 2026-09-28
-**Bulunduğumuz faz:** Faz 2, STM32 tarafı (2.3 tamam, sırada 2.4)
+**Son güncelleme:** 2026-09-30
+**Bulunduğumuz faz:** Faz 2, STM32 tarafı (2.4 tamam)
 
 ---
 
 ## Şu an ne yapılıyor
 
-**Faz 2.3 bitti.** FDCAN1 ve FDCAN2 CubeMX'te iç döngü modunda kuruldu (K-019). Kanal
-kodu `firmware/app/links/can_link` altında ve kalıcı. `app.c`'deki test geçici. Aynı üç mesaj
-DRIVE → GOAL → HALT sırasıyla verildi, GOAL ile HALT DRIVE hattayken. Kuyruk modundaki FDCAN1
-DRIVE, HALT, GOAL; FIFO modundaki FDCAN2 DRIVE, GOAL, HALT sırasıyla gönderdi. TELEMETRY sağlam
-geri geldi, hata sayaçları 0.
+**Faz 2.4 bitti.** FDCAN1 ve FDCAN2 CubeMX'te Normal modda (`fbf4fc9`). Çerçeveler
+FDCAN1 → SN65HVD230 → CANH/CANL → SN65HVD230 → FDCAN2 yolundan geçiyor. `app.c`'deki test
+gerçek hatta uyarlandı (`ec731ce`), hâlâ geçici. FDCAN1 DRIVE → GOAL → HALT verdi, FDCAN2
+DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört hata sayacı da 0.
+`can_link` değişmedi. Filtre 1 Normal modda beklendiği gibi kurulmuyor.
+
+**Faz 2.4'te öğrenilenler:**
+- **Normal modda ACK için alıcının da hazır olması gerekiyor.** İç döngüde ACK'yi birim kendine
+  veriyordu. Gerçek hatta ACK'yi FDCAN2 veriyor. Senkronize olmamış bir alıcı ACK vermez ve
+  gönderen TEC'i 8 artırır. Test bu yüzden göndermeden önce iki birimin de boşa çıkmasını
+  bekliyor.
+- **FIFO kontrol deneyi (Faz 2.3'teki B) gerçek hatta yapılamaz.** FDCAN1'in filtresi araçtan
+  komut kimliği almaz. Deney iç döngüde yapılmıştı (K-019). Tamponun seçimi kabloya bağlı değil.
+- **CubeMX `.ioc`'ta `functionlistsort`'u kendisi tamamladı.** Bu listeye Faz 2.3'te
+  `MX_FDCAN2_Init` eklenmemişti. `main.c` değişmedi, yani çağrı zaten vardı.
 
 **Faz 2.3'te öğrenilenler:**
 - **Kuyruk modunda `HAL_FDCAN_GetTxFifoFreeLevel()` hep 0 döner.** `TXFQS.TFFL` alanı yalnızca
@@ -26,7 +36,8 @@ geri geldi, hata sayaçları 0.
   Test bu yüzden önce birimin boşa çıkmasını, sonra DRIVE'ın hatta görünmesini
   (`HAL_FDCAN_GetProtocolStatus`, `Activity`) bekliyor.
 
-**Sırada Faz 2.4: iki FDCAN birimi gerçek hat üzerinden.** Önce lehim (aşağıda, "Sırada").
+**Sırada:** isteğe bağlı olarak kopuk hat denemesi (CANH sökülür, testin nasıl kaldığı ve
+`PSR`/`ECR` okunur), ardından Faz 2.6'nın kartsız kısmı.
 
 ## Bitenler
 
@@ -56,19 +67,15 @@ geri geldi, hata sayaçları 0.
       (`45231e1`)
 - [x] **Faz 2.3 tamam:** FDCAN1/2 CubeMX'te (`05d9469`), `can_link` ve iç döngü testi
       (`c0c0d9d`)
+- [x] CAN modüllerinin pin başlıkları lehimlendi. PA11/PA12 ve PB12/PB13'ün kart üzerindeki
+      lehim köprüleriyle çakışmadığı UM2505'ten kontrol edildi. Kablolama kontrol edildi
+- [x] **Faz 2.4 tamam:** FDCAN1/2 Normal modda (`fbf4fc9`), gerçek hat testi (`ec731ce`)
 
 ## Sırada
 
-- [ ] **Faz 2.4:** FDCAN1 → SN65HVD230 → CANH/CANL → SN65HVD230 → FDCAN2.
-      - CubeMX'te iki birimin Mode'u **Normal** yapılıp yeniden üretilecek. `can_link`'in iç döngü
-        filtresi (filtre 1) bu durumda kendiliğinden kurulmaz.
-      - Kablolamadan önce PA11/PA12 (FDCAN1) ve PB12/PB13 (FDCAN2) pinlerinin kart üzerindeki
-        lehim köprüleriyle çakışıp çakışmadığına UM2505'ten bakılacak.
-      - `app.c`'deki test gerçek hat için uyarlanacak: FDCAN1 gönderir, FDCAN2 alır, TELEMETRY
-        ters yönde.
-- [ ] **CAN modüllerinin pin başlıklarını lehimle (Faz 2.4'ten önce şart).** Lehimsiz
-      temas kesik kesik olur ve CAN hatası sanılır. Lehim sırasında ikinci modülde de
-      `121` (120 Ω sonlandırma) olup olmadığına bak
+- [ ] **İsteğe bağlı, öğrenmek için: kopuk hat denemesi.** Kartın enerjisi kesikken CANH
+      teli sökülür. Beklenen: `fail_step = 14`, TEC büyür, `PSR.LEC` = ACK hatası. Sonra tel
+      takılır ve testin yeniden geçtiği görülür
 - [ ] **Faz 2.6'nın kartsız kısmı:** `firmware/app/protocol/` altında C çerçeveleyici.
       `test_vectors.json`'a karşı gcc ile test. Etiket sabit zamanlı karşılaştırılmalı
 - [ ] HMAC anahtarını üret: `secrets/hmac_key.bin` (32 bayt, depoya girmez)
@@ -87,6 +94,9 @@ geri geldi, hata sayaçları 0.
 - [x] Faz 2.3 firmware: 0 uyarı, flash 23 828 B. İç döngü testi geçti:
       kuyruk modu DRIVE, HALT, GOAL. FIFO modu DRIVE, GOAL, HALT. TELEMETRY sağlam, bayt farkı 0,
       TEC/REC 0 (RAM'den okundu)
+- [x] Faz 2.4 firmware: 0 uyarı, flash 23 796 B. Gerçek hat testi geçti: FDCAN2'ye
+      DRIVE, HALT, GOAL (0x110, 0x100, 0x120) sırasıyla geldi. TELEMETRY FDCAN1'e sağlam geldi,
+      bayt farkı 0, TEC/REC dördü de 0 (RAM'den okundu, `can_test_result` = `0x20000264`)
 - [x] Ajan kanalında elle yankı (minicom, `/dev/ttyACM0`, 115200)
 - [x] Ajan kanalında yük testi (`tools/echo_test.py`): 102 400 / 102 400 bayt, 0 fark,
       11 422 B/s (hat sınırının %99,1'i). Dairesel tampon ~400 kez başa döndü
