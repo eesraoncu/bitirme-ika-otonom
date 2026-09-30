@@ -403,3 +403,35 @@ zamanlama değil mod olduğunu gösterir.
 
 **Tuzak:** HAL_FDCAN_GetTxFifoFreeLevel() kuyruk modunda hep 0 döner. İlk denemede
 bekçi bu yüzden hiçbir mesaj gönderemedi, iç döngü testi bunu kablolamadan önce yakaladı.
+
+---
+
+## K-020 · Araç kanalı: USART1, iki seri kanal tek modülde
+**Tarih:** 2026-09-30 · **Durum:** Yürürlükte
+
+Araç kanalı (CP2102 modülü) USART1 üzerindedir: PC4 (TX), PC5 (RX), kartta D1/D0. Ayar
+115200 8N1, akış kontrolü yok. Alma DMA1 kanal 3 ile dairesel, gönderme kanal 4 ile
+normal modda yapılır. USART1 kesmesi açıktır. Bu, ajan kanalıyla aynı düzendir (K-017,
+K-018). İki kanal tek modülde toplanır: `firmware/app/links/serial_link`. Kanal `port`
+parametresiyle seçilir. Almayı durduran her hat hatası türüne göre sayılır: çerçeve (FE),
+gürültü (NE), taşma (ORE), diğer.
+
+**Neden:**
+- **Bir kavram tek klasörde.** İki kanal da aynı işi yapıyor: bayt taşımak. Ayrı modüller
+  aynı DMA kodunu iki kez taşırdı ve bir düzeltmenin iki yere yapılması gerekirdi.
+- **Baytın geldiği port kaybolmaz.** Çağıran her baytın hangi porttan geldiğini bilir. Porta
+  göre güven (`docs/protocol.md`) bunu gerektiriyor.
+- **Bekçi beklememeli, ölçüm temiz kalmalı.** Gerekçe K-017 ile aynı.
+- **Hatanın türü sebebini ayırır.** FE ve NE tel ya da elektrik sorununa, ORE yazılımın
+  baytları zamanında okuyamadığına işaret eder. Bu, "bozuk veri sessizce atılmaz, sayılır
+  ve raporlanır" kuralının (`docs/RULES.md` §1) hat katmanındaki karşılığı. Faz 5'teki
+  arıza deneylerinde hat hatalarını ayırt etmek için gerekli.
+- **Pin seçimi.** USART1 bu çipte PA9/PA10, PB6/PB7 ve PC4/PC5'e çıkabiliyor. Üçü de
+  boştaydı. PC4/PC5 seçildi (kartta D1/D0), gerekçesi kaydedilmedi. Başka bir birim
+  bu pinleri isterse yer değiştirmek serbest.
+
+**Bedeli:** her kanal yapısı 348 bayt RAM tutuyor, çoğu tamponlar. Tek hatada birden
+fazla bit gelebildiği için türlerin toplamı yeniden başlatma sayısından büyük olabilir.
+
+**Doğrulama:** iki kanal aynı anda 100 KB, 0 fark. Araç kanalına yanlış hızda (9600)
+5 × `0x00` gönderildi: restarts 5, frame 5, diğerleri 0. Ardından yankı çalıştı.

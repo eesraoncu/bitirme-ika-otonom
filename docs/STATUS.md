@@ -4,11 +4,36 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-09-30
-**Bulunduğumuz faz:** Faz 2, STM32 tarafı (2.4 tamam)
+**Bulunduğumuz faz:** Faz 2, STM32 tarafı (2.5 tamam)
 
 ---
 
 ## Şu an ne yapılıyor
+
+**Faz 2.5 bitti.** Araç kanalı USART1'de, PC4/PC5 (kartta D1/D0), CP2102 modülüne bağlı
+(`63d494d`). `agent_link`, iki kanala hizmet eden `serial_link` oldu (`8e9a382`). Kanal port
+parametresiyle seçiliyor. Almayı durduran hat hataları türüne göre sayılıyor (`c765bac`).
+İki kanal aynı anda 100 KB taşıdı, 0 fark. CAN testi geçmeye devam ediyor.
+
+**Faz 2.5'te öğrenilenler:**
+- **Akış kontrolü açık portta baytlar karta ulaşmıyor.** minicom'da donanım akış kontrolü
+  açıkken yazılan `abcdef` CP2102'de bekledi, karta hiç gitmedi. Port akış kontrolü kapalı
+  açılınca bu baytlar gönderilmedi, atıldı. Araç kanalı akış kontrolü kapalı açılmalı
+  (`rtscts=False`).
+- **DMA ile alırken her hat hatası almayı durdurur.** HAL bunu "blocking error" sayıyor
+  (`stm32g4xx_hal_uart.c`, `HAL_UART_IRQHandler`). `serial_link` almayı yeniden başlatıyor.
+  Bu yüzden her bozuk bayt ayrı bir hata olarak sayılıyor.
+- **Hatanın türü `ErrorCode`'da, ama yeniden başlatma onu siliyor.** `HAL_UART_Receive_DMA`
+  bu alanı sıfırlıyor. Tür yeniden başlatmadan önce okunmalı.
+- **Kasıtlı hat hatası üretmek kolay.** Portu yanlış hızda (9600) açıp `0x00` göndermek
+  yeterli: kart durma bitinin yerinde 0 görür ve bu bir çerçeve hatasıdır (FE).
+- **Araç kanalında 97 hat hatası görüldü, yeniden üretilemedi.** Sayaç o sırada türü
+  ayırmıyordu. Denenenler: 10 s boşta durma, portu 3 kez açıp kapama, CP2102'yi çıkarıp
+  takıp 30 s bekleme, minicom'un akış kontrolü davranışını taklit etme, 2 × 100 KB yük.
+  Hiçbiri sayacı artırmadı. Hatalar büyük ihtimalle kurulum sırasında bir kez oldu. Veri
+  akarken hiç kayıp olmadı. Bir tahmin (kanıtı yok): kartın TX pini, USB'si takılı olmayan
+  CP2102'yi sinyal teli üzerinden yarım besliyor ve çip bu arada anlamsız sinyal üretiyor.
+  Tekrar olursa ilk bakılacak yer tür sayaçları (aşağıda "Karttan RAM okuma").
 
 **Faz 2.4 bitti.** FDCAN1 ve FDCAN2 CubeMX'te Normal modda (`fbf4fc9`). Çerçeveler
 FDCAN1 → SN65HVD230 → CANH/CANL → SN65HVD230 → FDCAN2 yolundan geçiyor. `app.c`'deki test
@@ -75,6 +100,8 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
 - [x] **Faz 2.4 tamam:** FDCAN1/2 Normal modda (`fbf4fc9`), gerçek hat testi (`ec731ce`)
 - [x] Kopuk hat denemesi (öğrenmek için): CANH sökülünce test beklenen şekilde kaldı,
       tel takılınca yeniden geçti
+- [x] **Faz 2.5 tamam:** USART1 + DMA CubeMX'te (`63d494d`), `serial_link` (`8e9a382`),
+      hat hatası türü sayaçları (`c765bac`)
 
 ## Sırada
 
@@ -103,6 +130,11 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
       `PSR = 0x77B`: `LEC = 3` (ACK hatası), `EP = 1`, `EW = 1`, `BO = 0`. TEC 128'de duruyor,
       çünkü error passive gönderici ACK hatasında TEC'i artırmaz. Tel takılınca yeniden geçti,
       `PSR = 0x708` (`LEC = 0`, boşta, error active), `ECR = 0`
+- [x] Faz 2.5 firmware: 0 uyarı, flash 24 672 B. Araç kanalında elle yankı ve 100 KB yük
+      testi, 0 fark. İki kanal aynı anda 100 KB: ajan 11 411 B/s, araç 10 544 B/s, 0 fark
+- [x] Hat hatası sayaçları: araç kanalına 9600 baud'da 5 × `0x00` gönderildi. Sonuç
+      restarts 5, frame 5, noise/overrun/other 0. Ajan kanalında sayaçların hepsi 0.
+      Ardından 115200'de yankı çalıştı
 - [x] Ajan kanalında elle yankı (minicom, `/dev/ttyACM0`, 115200)
 - [x] Ajan kanalında yük testi (`tools/echo_test.py`): 102 400 / 102 400 bayt, 0 fark,
       11 422 B/s (hat sınırının %99,1'i). Dairesel tampon ~400 kez başa döndü
@@ -148,6 +180,16 @@ Depo kökünden, CubeIDE penceresini açmadan:
     -c port=SWD mode=HOTPLUG -r32 <adres> <boyut>
 ```
 
+**Seri hat hatası sayaçları.** Her kanalın yapısı (`agent`, `vehicle`) içinde, başlangıçtan
+`0x148` bayt sonra 5 × 4 bayt. Sırasıyla: restarts, frame (FE), noise (NE), overrun (ORE),
+other.
+
+```bash
+"$(find /opt/st/stm32cubeide_2.2.0/plugins -name arm-none-eabi-nm -type f | head -1)" \
+    -S firmware/Debug/firmware.elf | grep -E " (agent|vehicle)$"
+# <yapının adresi + 0x148>'den 20 bayt oku. c765bac'te: ajan 0x20000538, araç 0x20000694
+```
+
 ## Açık sorular / kararsız konular
 
 | Konu | Durum | Ne zaman karar verilecek |
@@ -156,6 +198,7 @@ Depo kökünden, CubeIDE penceresini açmadan:
 | Gazebo: Fortress + TurtleBot 4 mü, mevcut Harmonic'te kendi modelimiz mi | **Açık** (bkz. K-008) | Faz 3 başında |
 | LLM model seçimi (araç çağırma şart) | **Açık** | Faz 4 başında |
 | Senaryo başına tekrar sayısı | ✅ K-015: LLM senaryolarında 20, arızada 10 | — |
+| Araç kanalındaki 97 hat hatasının sebebi | **Açık**, yeniden üretilemedi | Tekrar görülürse, tür sayaçlarına bakılarak |
 
 ## Bilinen engeller
 
