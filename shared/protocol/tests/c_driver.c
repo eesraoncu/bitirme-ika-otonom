@@ -2,7 +2,8 @@
  * çalıştıran sürücü. test_c_framer.py bunu gcc ile derler, stdin'den komut
  * yollar ve cevabı Python referansıyla karşılaştırır.
  *
- * Her satır bir komut, her komuta bir satır cevap. Boş veri "-" ile yazılır.
+ * Her satır bir komut, her komuta bir satır cevap. Boş veri, girdide de
+ * çıktıda da "-" ile yazılır.
  *   crc <hex>               → CRC, 4 hane onaltılık
  *   cobs_enc <hex>          → kodlanmış veri
  *   cobs_dec <hex>          → çözülmüş veri; reddedilirse ERR
@@ -11,6 +12,12 @@
  *   sha256_rep <bayt> <n>   → n tane aynı bayttan oluşan verinin özeti
  *   hmac <anahtar> <parçalar> → HMAC-SHA256
  *   tag_eq <hex> <hex>      → hmac_tag_equal sonucu, 1 ya da 0
+ *   frame_enc <anahtar> <oturum> <tip> <seq> <ts> <yük>
+ *                           → hattaki baytlar (ayraç dahil); reddedilirse ERR
+ *   frame_dec <anahtar> <oturum> <kanal> <yön> <hex>
+ *                           → "OK <tip> <seq> <ts> <yük>" ya da "ERR <tür>"
+ *   frame_rx <hex>          → akıştaki olaylar: "F:<çerçeve>" ve "OVF"
+ * Sayılar ondalık yazılır. Kanal ve yön proto_msgs.h'deki değerlerdir.
  * <parçalar> noktayla bölünmüş onaltılık metindir ("aabb.cc"). Her parça ayrı
  * bir update çağrısıyla verilir: blok sınırı hataları böyle yakalanır. */
 #include <stdio.h>
@@ -21,10 +28,11 @@
 #include "auth/sha256.h"
 #include "protocol/cobs.h"
 #include "protocol/crc16.h"
+#include "protocol/frame.h"
 
 #define BUF_MAX    1024u
 #define CHUNKS_MAX 64u
-#define ARGS_MAX   3u
+#define ARGS_MAX   6u
 
 static int nibble(char c)
 {
@@ -77,12 +85,34 @@ static bool parse_hex(const char *s, uint8_t *out, size_t max, size_t *n)
     return true;
 }
 
-static void print_hex(const uint8_t *b, size_t n)
+static void print_hex_raw(const uint8_t *b, size_t n)
 {
+    if (n == 0u) {
+        printf("-");
+    }
     for (size_t i = 0; i < n; i++) {
         printf("%02x", (unsigned)b[i]);
     }
+}
+
+static void print_hex(const uint8_t *b, size_t n)
+{
+    print_hex_raw(b, n);
     printf("\n");
+}
+
+/* Ondalık sayı. Geçersizse ya da max'ı aşıyorsa false. */
+static bool parse_num(const char *s, unsigned long max, unsigned long *v)
+{
+    char *end;
+    *v = strtoul(s, &end, 10);
+    return *s != '\0' && *end == '\0' && *v <= max;
+}
+
+static bool parse_key(const char *s, uint8_t key[FRAME_KEY_BYTES])
+{
+    size_t n;
+    return parse_hex(s, key, FRAME_KEY_BYTES, &n) && n == FRAME_KEY_BYTES;
 }
 
 /* Bir komutu çalıştırır. Girdisi geçersizse false döner. */
@@ -156,6 +186,61 @@ static bool run(const char *cmd, char *const *arg, unsigned argc)
             return false;
         }
         printf("%d\n", hmac_tag_equal(in, in2, n) ? 1 : 0);
+    } else if (strcmp(cmd, "frame_enc") == 0 && argc == 6u) {
+        uint8_t key[FRAME_KEY_BYTES];
+        unsigned long session, type, seq, ts;
+        frame_t f;
+        if (!parse_key(arg[0], key) || !parse_num(arg[1], 0xFFFFFFFFul, &session) ||
+            !parse_num(arg[2], 0xFFul, &type) || !parse_num(arg[3], 0xFFFFFFFFul, &seq) ||
+            !parse_num(arg[4], 0xFFFFFFFFul, &ts) ||
+            !parse_hex(arg[5], f.payload, sizeof f.payload, &f.payload_len)) {
+            return false;
+        }
+        f.type = (uint8_t)type;
+        f.seq = (uint32_t)seq;
+        f.ts_ms = (uint32_t)ts;
+        size_t w = frame_encode(&f, key, (uint32_t)session, out);
+        if (w == 0u) {
+            printf("ERR\n");
+        } else {
+            print_hex(out, w);
+        }
+    } else if (strcmp(cmd, "frame_dec") == 0 && argc == 5u) {
+        static const char *const kinds[] = {"ok", "framing", "crc", "type", "auth"};
+        uint8_t key[FRAME_KEY_BYTES];
+        unsigned long session, channel, dir;
+        if (!parse_key(arg[0], key) || !parse_num(arg[1], 0xFFFFFFFFul, &session) ||
+            !parse_num(arg[2], 0xFFul, &channel) || !parse_num(arg[3], 0xFFul, &dir) ||
+            !parse_hex(arg[4], in, PROTO_MAX_WIRE_BYTES - 1u, &n)) {
+            return false;
+        }
+        frame_t f;
+        frame_result_t r = frame_decode(in, n, key, (uint32_t)session, (uint8_t)channel,
+                                        (uint8_t)dir, &f);
+        if (r == FRAME_OK) {
+            printf("OK %u %lu %lu ", (unsigned)f.type, (unsigned long)f.seq,
+                   (unsigned long)f.ts_ms);
+            print_hex(f.payload, f.payload_len);
+        } else {
+            printf("ERR %s\n", kinds[r]);
+        }
+    } else if (strcmp(cmd, "frame_rx") == 0 && argc == 1u) {
+        if (!parse_hex(arg[0], in, BUF_MAX, &n)) return false;
+        frame_rx_t rx;
+        frame_rx_init(&rx);
+        bool any = false;
+        for (size_t i = 0; i < n; i++) {
+            frame_rx_event_t ev = frame_rx_push(&rx, in[i]);
+            if (ev == FRAME_RX_FRAME) {
+                printf("%sF:", any ? " " : "");
+                print_hex_raw(rx.buf, rx.len);
+                any = true;
+            } else if (ev == FRAME_RX_OVERFLOW) {
+                printf("%sOVF", any ? " " : "");
+                any = true;
+            }
+        }
+        printf("%s\n", any ? "" : "-");
     } else {
         return false;
     }
