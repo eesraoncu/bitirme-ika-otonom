@@ -4,11 +4,37 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-09-30
-**Bulunduğumuz faz:** Faz 2, STM32 tarafı (2.5 tamam)
+**Bulunduğumuz faz:** Faz 2, STM32 tarafı (2.6'nın kartsız kısmı tamam)
 
 ---
 
 ## Şu an ne yapılıyor
+
+**Faz 2.6'nın kartsız kısmı bitti.** C çerçeveleyici üç parçada yazıldı, hepsi PC'de gcc
+ile test ediliyor (`shared/protocol/tests/test_c_framer.py`, `c_driver.c`):
+- `firmware/app/protocol/`: `crc16`, `cobs` (`da756d7`) ve `frame` (`fac14f0`):
+  kodlama, COBS → CRC → tip/yön/kanal/uzunluk → etiket sırasıyla çözme, akışı `0x00`'da
+  bölme (`frame_rx`).
+- `firmware/app/auth/`: `sha256`, `hmac_sha256` ve sabit zamanlı `hmac_tag_equal`
+  (`cfb1c5a`). Dışarıdan kod alınmadı (K-021).
+- 147 test geçiyor. 17 çerçeve bayt bayt aynı, 7 bozuk çerçeve doğru türle reddediliyor,
+  1 500 rastgele bozulmuş çerçevede ve 100 akışta C ile Python aynı kararı veriyor.
+  Kart derlemesi 0 uyarı. Kodu henüz kimse çağırmıyor, flash boyutu değişmedi.
+
+**Faz 2.6'da öğrenilenler (kartsız kısım):**
+- **Testin kendisi de sınanmalı.** Kodun bir kopyasına bilerek hata konup testlerin
+  yakalayıp yakalamadığına bakıldı (yön, kanal, etiket, oturum, kısa yük, taşma sınırı,
+  etiketin yalnız ilk baytı: hepsi yakalandı).
+- **Rastgele test nadir durumu ıskalar.** COBS çözme tamponu 42 bayta indirilince hiçbir test
+  kırılmadı: rastgele bozma "COBS'u geçerli ama 42 bayttan uzun" çerçeveyi neredeyse hiç
+  üretmiyor. Kritik kural için hedefli test eklendi. İlk rastgele COBS testinde de 500
+  girdinin hepsi reddediliyordu, yani yalnız bir yol sınanıyordu.
+- **Blok sınırları ayrı sınanmalı.** SHA-256 doldurmasının "uzunluğa yer kalmadı" sınırı bir
+  bayt kaydırılınca `"abc"` yine doğru çıktı, 56 baytlık girdide program çöktü (tamponun
+  dışına yazdı). 0–130 bayt her uzunluğu deneyen test bunu yakalar.
+- **`-Werror` bazı hatalı kopyaları derletmez.** Denetim silinince parametre kullanılmamış
+  kalıyor. Bu, testin yakaladığı anlamına gelmez; hatalı kopya derlenebilir yazılmalı.
+- **SHA-256 sabitleri ezberden yazılmadı.** 72 sabit asal sayılardan Python'la türetildi.
 
 **Faz 2.5 bitti.** Araç kanalı USART1'de, PC4/PC5 (kartta D1/D0), CP2102 modülüne bağlı
 (`63d494d`). `agent_link`, iki kanala hizmet eden `serial_link` oldu (`8e9a382`). Kanal port
@@ -65,7 +91,7 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
   Test bu yüzden önce birimin boşa çıkmasını, sonra DRIVE'ın hatta görünmesini
   (`HAL_FDCAN_GetProtocolStatus`, `Activity`) bekliyor.
 
-**Sırada:** Faz 2.6'nın kartsız kısmı (C çerçeveleyici).
+**Sırada:** Faz 2.6'nın kartlı kısmı (HMAC süresi, anahtar).
 
 ## Bitenler
 
@@ -102,12 +128,16 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
       tel takılınca yeniden geçti
 - [x] **Faz 2.5 tamam:** USART1 + DMA CubeMX'te (`63d494d`), `serial_link` (`8e9a382`),
       hat hatası türü sayaçları (`c765bac`)
+- [x] **Faz 2.6 kartsız kısmı tamam:** CRC-16 ve COBS (`da756d7`), SHA-256 ve HMAC
+      (`cfb1c5a`), çerçeve (`fac14f0`). 147 test
 
 ## Sırada
 
-- [ ] **Faz 2.6'nın kartsız kısmı:** `firmware/app/protocol/` altında C çerçeveleyici.
-      `test_vectors.json`'a karşı gcc ile test. Etiket sabit zamanlı karşılaştırılmalı
-- [ ] HMAC anahtarını üret: `secrets/hmac_key.bin` (32 bayt, depoya girmez)
+- [ ] **Faz 2.6'nın kartlı kısmı:** HMAC'in karttaki süresi (DWT, K-009) ve etiket
+      karşılaştırmasının farka bağlı olmadığının ölçümü. Süre büyükse: hazırlanmış HMAC
+      bağlamını bir kez kurup her çerçevede kopyalamak (blok işlemi 4'ten 2'ye iner)
+- [ ] HMAC anahtarını üret: `secrets/hmac_key.bin` (32 bayt, depoya girmez). Kart anahtarı,
+      derleme sırasında `secrets/`'tan üretilen bir C başlığından alır (`docs/protocol.md` §11)
 - [ ] Ollama kurulumu (model seçimi Faz 4'te)
 
 ## Doğrulanmış testler
@@ -135,6 +165,9 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
 - [x] Hat hatası sayaçları: araç kanalına 9600 baud'da 5 × `0x00` gönderildi. Sonuç
       restarts 5, frame 5, noise/overrun/other 0. Ajan kanalında sayaçların hepsi 0.
       Ardından 115200'de yankı çalıştı
+- [x] C çerçeveleyici (gcc, PC'de): 147 test. CRC `"123456789"` → `0x29B1`, SHA-256 NIST
+      girdileri ve 1 milyon `a`, HMAC RFC 4231'in 7 örneği, protocol.md §4.4'teki etiket
+      `06 1A 85 7A 51 0A AA 4E`. Çalıştırmak için: `python3 -m pytest shared/protocol/tests`
 - [x] Ajan kanalında elle yankı (minicom, `/dev/ttyACM0`, 115200)
 - [x] Ajan kanalında yük testi (`tools/echo_test.py`): 102 400 / 102 400 bayt, 0 fark,
       11 422 B/s (hat sınırının %99,1'i). Dairesel tampon ~400 kez başa döndü

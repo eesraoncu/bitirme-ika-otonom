@@ -435,3 +435,48 @@ fazla bit gelebildiği için türlerin toplamı yeniden başlatma sayısından b
 
 **Doğrulama:** iki kanal aynı anda 100 KB, 0 fark. Araç kanalına yanlış hızda (9600)
 5 × `0x00` gönderildi: restarts 5, frame 5, diğerleri 0. Ardından yankı çalıştı.
+
+---
+
+## K-021 · C çerçeveleyici: SHA-256 ve HMAC kendimiz yazıldı, testler PC'de
+**Tarih:** 2026-09-30 · **Durum:** Yürürlükte
+
+Çerçeve katmanı iki klasörde:
+- `firmware/app/protocol/` → `crc16`, `cobs`, `frame`
+- `firmware/app/auth/` → `sha256`, `hmac_sha256`
+
+Bunlar `frame.py`'nin karşılığı. SHA-256 (FIPS 180-4) ve HMAC (RFC 2104) dışarıdan
+alınmadı, kendimiz yazdık. Etiket `hmac_tag_equal()` ile sabit zamanlı karşılaştırılır.
+Kod kartsız, PC'de gcc ile sınanır: `shared/protocol/tests/test_c_framer.py` kart
+kaynaklarını `c_driver.c` ile birlikte derler ve cevapları Python referansıyla
+karşılaştırır.
+
+**Neden:**
+- **Öğrenme.** Projenin asıl amacı. Algoritma satır satır görülmüş oluyor.
+- **Çipte donanım desteği yok.** STM32G474'te HASH birimi yok (CubeMX çip listesi), SHA-256
+  zaten yazılımda olacaktı.
+- **Bağımlılık ve lisans sorusu yok.** mbedTLS tek fonksiyon için çok büyük. Kopyalanan
+  bir kod ise kaynağının ayrıca belgelenmesini gerektirirdi.
+- **Doğruluk testle kanıtlanıyor, güvenle değil.** NIST girdileri, RFC 4231'in 7 örneği,
+  0–130 bayt her uzunluk ve rastgele bölmelerle `hashlib`/`hmac`'e karşı. Sabitler
+  asal sayılardan türetildi.
+- **Kart gerektirmeyen test hızlı ve tekrarlanabilir.** Bir değişikliğin doğruluğu bir
+  saniyede görülüyor.
+
+**Tasarım kararları:**
+
+| Karar | Gerekçe |
+|---|---|
+| Çözme tamponu hattın sınırında (64), en uzun mesajda (42) değil | 42 bayttan uzun ama CRC'si doğru bir çerçeve Python'da TYPE (yanlış uzunluk) sayılır. Tampon 42 olsaydı C'de FRAMING olurdu ve iki tarafın sayaçları farklı şey söylerdi |
+| `frame_decode()` sayaç tutmaz, türü döndürür | Katman durumsuz kalsın. Sayaçlar, tekrar ve tazelik denetimi alıcının işi (Python'da da öyle) |
+| Mesaj bilgileri yalnızca `proto_msg_info()`'dan | Mesaj formatı tek yerde (K-003). Çerçeve kodunda hiçbir mesaj elle tanımlanmadı |
+| `hmac_sha256_init()` dış özeti de hazırlar | Hazırlanmış bağlam kopyalanıp her çerçevede kullanılabilir. Karttaki süre ölçümünden sonra gerekirse |
+
+**Bedeli:** Kendi yazdığımız kriptografi kodunun doğruluğundan biz sorumluyuz. Testler bu
+yüzden kasıtlı hata konmuş kopyalarla da denendi: 9 hatanın 9'u yakalandı. Zamanlama
+davranışı (sabit zamanlı karşılaştırma) PC testiyle kanıtlanamıyor, kartta DWT ile
+ölçülecek.
+
+**Doğrulama:** 147 test geçiyor. 17 çerçeve `test_vectors.json` ile bayt bayt aynı,
+7 bozuk çerçeve doğru türle reddediliyor, 1 500 rastgele bozulmuş çerçevede ve 100 akışta
+C ile Python aynı kararı veriyor.
