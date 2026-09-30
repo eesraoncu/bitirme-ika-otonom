@@ -4,8 +4,8 @@
 
 #include "main.h"   /* HAL (HAL_GetTick) ve BSP (BSP_LED_*) */
 #include "fdcan.h"  /* Geçici: Faz 2.4 testi birimin durumunu HAL'den soruyor */
-#include "links/agent_link.h"
 #include "links/can_link.h"
+#include "links/serial_link.h"
 #include "proto_msgs.h"
 
 /* Faz 2.1 doğrulaması: kısa bir "nabız". Saniyede bir, 100 ms yanık.
@@ -224,25 +224,31 @@ static void run_can_test(void)
 
 /* ---- Uygulama ------------------------------------------------------------ */
 
+/* Faz 2.2 ve 2.5 yankı testi: port'tan gelen her baytı aynı porta geri
+ * gönder. Gönderme meşgulken okunmaz, baytlar dairesel tamponda bekler.
+ * Faz 2.6'da baytlar burada çerçeveleyiciye verilecek. */
+static void echo(serial_link_port_t port)
+{
+    if (serial_link_tx_ready(port)) {
+        uint8_t buf[SERIAL_LINK_TX_MAX];
+        size_t n = serial_link_read(port, buf, sizeof buf);
+        if (n > 0u) {
+            (void)serial_link_send(port, buf, n);
+        }
+    }
+}
+
 void app_init(void)
 {
-    agent_link_init();
+    serial_link_init();
     can_link_init();
     run_can_test();
 }
 
 void app_loop(void)
 {
-    /* Faz 2.2 yankı testi: gelen her baytı geri gönder. Gönderme meşgulken
-     * okunmaz, baytlar dairesel tamponda bekler. Faz 2.6'da baytlar burada
-     * çerçeveleyiciye verilecek. */
-    if (agent_link_tx_ready()) {
-        uint8_t buf[AGENT_LINK_TX_MAX];
-        size_t n = agent_link_read(buf, sizeof buf);
-        if (n > 0u) {
-            (void)agent_link_send(buf, n);
-        }
-    }
+    echo(SERIAL_LINK_AGENT);
+    echo(SERIAL_LINK_VEHICLE);
 
     uint32_t period = can_test_result.passed ? PULSE_PERIOD_MS : FAIL_PERIOD_MS;
     uint32_t on     = can_test_result.passed ? PULSE_ON_MS     : FAIL_ON_MS;

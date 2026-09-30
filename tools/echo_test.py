@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Ajan kanalı yankı testi (Faz 2.2).
+"""Seri kanal yankı testi (Faz 2.2 ajan kanalı, Faz 2.5 araç kanalı).
 
 Kullanım:
-    python3 tools/echo_test.py                        # 100 KB, kalıcı port adı
+    python3 tools/echo_test.py                        # ajan kanalı, 100 KB
     python3 tools/echo_test.py --bytes 1000 --port /dev/ttyACM0
+    python3 tools/echo_test.py --port \\
+        /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0
+                                                      # araç kanalı (CP2102)
 
-Karttaki yankı programı (firmware/app/app.c) aldığı her baytı geri gönderir.
-Bu betik karta rastgele baytlar gönderir ve geri geleni gönderdiğiyle bayt
-bayt karşılaştırır. Böylece taşıma katmanı (USB, ST-LINK, LPUART1, DMA,
-dairesel tampon) protokol gelmeden, tek başına doğrulanır.
+Karttaki yankı programı (firmware/app/app.c) her porttan aldığı baytı aynı
+porta geri gönderir. Bu betik karta rastgele baytlar gönderir ve geri geleni
+gönderdiğiyle bayt bayt karşılaştırır. Böylece taşıma katmanı (USB, ST-LINK
+ya da CP2102, UART, DMA, dairesel tampon) protokol gelmeden, tek başına
+doğrulanır. İki kanal aynı anda, iki ayrı terminalde test edilebilir.
 
 Önce minicom gibi aynı portu açan programları kapatın. İki program aynı portu
 okursa baytları aralarında bölüşür ve test sahte kayıp gösterir.
