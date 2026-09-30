@@ -23,6 +23,10 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
   bekliyor.
 - **FIFO kontrol deneyi (Faz 2.3'teki B) gerçek hatta yapılamaz.** FDCAN1'in filtresi araçtan
   komut kimliği almaz. Deney iç döngüde yapılmıştı (K-019). Tamponun seçimi kabloya bağlı değil.
+- **LEC ve REC hatanın türünü ayırt ediyor.** Kopuk hat denemesinde (CANH sökülü) `LEC = 3`
+  (ACK hatası) ve REC = 0 okundu: bu "karşıda cevap veren yok" demek. Bozuk sinyal (ters bağlı
+  tel, kesik temas) bit/stuff hatası (`LEC` 1, 4, 5) ve artan REC ile görünür. Hat sorunu
+  çıkarsa ilk bakılacak yer `PSR` (`0x40006444`, `0x40006844`) ve `ECR` (`…40`, `…840`).
 - **CubeMX `.ioc`'ta `functionlistsort`'u kendisi tamamladı.** Bu listeye Faz 2.3'te
   `MX_FDCAN2_Init` eklenmemişti. `main.c` değişmedi, yani çağrı zaten vardı.
 
@@ -36,8 +40,7 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
   Test bu yüzden önce birimin boşa çıkmasını, sonra DRIVE'ın hatta görünmesini
   (`HAL_FDCAN_GetProtocolStatus`, `Activity`) bekliyor.
 
-**Sırada:** isteğe bağlı olarak kopuk hat denemesi (CANH sökülür, testin nasıl kaldığı ve
-`PSR`/`ECR` okunur), ardından Faz 2.6'nın kartsız kısmı.
+**Sırada:** Faz 2.6'nın kartsız kısmı (C çerçeveleyici).
 
 ## Bitenler
 
@@ -70,12 +73,11 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
 - [x] CAN modüllerinin pin başlıkları lehimlendi. PA11/PA12 ve PB12/PB13'ün kart üzerindeki
       lehim köprüleriyle çakışmadığı UM2505'ten kontrol edildi. Kablolama kontrol edildi
 - [x] **Faz 2.4 tamam:** FDCAN1/2 Normal modda (`fbf4fc9`), gerçek hat testi (`ec731ce`)
+- [x] Kopuk hat denemesi (öğrenmek için): CANH sökülünce test beklenen şekilde kaldı,
+      tel takılınca yeniden geçti
 
 ## Sırada
 
-- [ ] **İsteğe bağlı, öğrenmek için: kopuk hat denemesi.** Kartın enerjisi kesikken CANH
-      teli sökülür. Beklenen: `fail_step = 14`, TEC büyür, `PSR.LEC` = ACK hatası. Sonra tel
-      takılır ve testin yeniden geçtiği görülür
 - [ ] **Faz 2.6'nın kartsız kısmı:** `firmware/app/protocol/` altında C çerçeveleyici.
       `test_vectors.json`'a karşı gcc ile test. Etiket sabit zamanlı karşılaştırılmalı
 - [ ] HMAC anahtarını üret: `secrets/hmac_key.bin` (32 bayt, depoya girmez)
@@ -97,6 +99,10 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
 - [x] Faz 2.4 firmware: 0 uyarı, flash 23 796 B. Gerçek hat testi geçti: FDCAN2'ye
       DRIVE, HALT, GOAL (0x110, 0x100, 0x120) sırasıyla geldi. TELEMETRY FDCAN1'e sağlam geldi,
       bayt farkı 0, TEC/REC dördü de 0 (RAM'den okundu, `can_test_result` = `0x20000264`)
+- [x] Kopuk hat (CANH sökülü): `fail_step = 14`, iki birimde TEC = 128, REC = 0.
+      `PSR = 0x77B`: `LEC = 3` (ACK hatası), `EP = 1`, `EW = 1`, `BO = 0`. TEC 128'de duruyor,
+      çünkü error passive gönderici ACK hatasında TEC'i artırmaz. Tel takılınca yeniden geçti,
+      `PSR = 0x708` (`LEC = 0`, boşta, error active), `ECR = 0`
 - [x] Ajan kanalında elle yankı (minicom, `/dev/ttyACM0`, 115200)
 - [x] Ajan kanalında yük testi (`tools/echo_test.py`): 102 400 / 102 400 bayt, 0 fark,
       11 422 B/s (hat sınırının %99,1'i). Dairesel tampon ~400 kez başa döndü
