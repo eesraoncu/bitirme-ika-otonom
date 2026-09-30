@@ -22,9 +22,14 @@ typedef struct {
      * kuralı modülün dışına taşmaz. */
     uint8_t tx_buf[SERIAL_LINK_TX_MAX];
 
-    /* Almanın hat hatası yüzünden kaç kez yeniden başlatıldığı. Şimdilik
-     * yalnızca hata ayıklayıcıdan okunur. */
+    /* Almanın hat hatası yüzünden kaç kez yeniden başlatıldığı ve hatanın
+     * türü. Tek hatada birden fazla bit gelebilir, bu yüzden türlerin
+     * toplamı rx_restarts'tan büyük olabilir. Karttan RAM okunarak görülür. */
     uint32_t rx_restarts;
+    uint32_t rx_err_frame;     /* FE: durma bitinin yerinde 0 okundu */
+    uint32_t rx_err_noise;     /* NE: bir bitin örnekleri birbirini tutmadı */
+    uint32_t rx_err_overrun;   /* ORE: önceki bayt okunmadan yenisi geldi */
+    uint32_t rx_err_other;     /* PE, DMA, RTO: bu ayarda beklenmiyor */
 } channel_t;
 
 /* Başlangıç değeri verilmedi: verilseydi tamponlarıyla birlikte .data'ya
@@ -46,6 +51,20 @@ static void rx_start(channel_t *c)
     }
 }
 
+/* HAL hatanın türünü ErrorCode'a bit bit yazar. rx_start() bu alanı
+ * sıfırladığı için yeniden başlatmadan önce okunmalı. */
+static void count_rx_error(channel_t *c)
+{
+    uint32_t e = c->uart->ErrorCode;
+    c->rx_restarts++;
+    if (e & HAL_UART_ERROR_FE)  { c->rx_err_frame++; }
+    if (e & HAL_UART_ERROR_NE)  { c->rx_err_noise++; }
+    if (e & HAL_UART_ERROR_ORE) { c->rx_err_overrun++; }
+    if (e & ~(HAL_UART_ERROR_FE | HAL_UART_ERROR_NE | HAL_UART_ERROR_ORE)) {
+        c->rx_err_other++;
+    }
+}
+
 void serial_link_init(void)
 {
     agent.uart   = &hlpuart1;
@@ -61,7 +80,7 @@ size_t serial_link_read(serial_link_port_t port, uint8_t *out, size_t max)
     /* Taşma (overrun) gibi bir hat hatasında HAL almayı durdurur ve
      * RxState'i READY'ye çeker. Kendiliğinden yeniden başlamaz. */
     if (c->uart->RxState != HAL_UART_STATE_BUSY_RX) {
-        c->rx_restarts++;
+        count_rx_error(c);
         rx_start(c);
         return 0;
     }
