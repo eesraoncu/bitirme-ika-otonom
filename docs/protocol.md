@@ -163,7 +163,7 @@ karşılıyor.
 | | CRC | HMAC |
 |---|---|---|
 | Soru | "Hat bu baytları bozdu mu?" | "Bunu anahtarı bilen biri mi gönderdi?" |
-| Maliyet | Çok ucuz | Onlarca µs (Faz 2.6'da ölçülecek) |
+| Maliyet | Çok ucuz | Çerçeve başına 142 µs (`-Os`, kartta ölçüldü, K-022) |
 | Sayaç | `err_crc`: **hat kalitesi** | `err_auth`: **yakalanan saldırı** |
 
 **Gürültü ile saldırıyı ayırt etmek S1 için şart.** Tek bir "geçersiz çerçeve" sayacı
