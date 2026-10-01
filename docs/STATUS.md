@@ -4,11 +4,35 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-10-01
-**Bulunduğumuz faz:** Faz 2.6, STM32 tarafı (a: kartın komut alması tamam; b geofence, c uçtan uca karar, d kalp atışı kaldı)
+**Bulunduğumuz faz:** Faz 2.6, STM32 tarafı (a komut alma ve b coğrafi sınır tamam; c uçtan uca karar, d kalp atışı kaldı)
 
 ---
 
 ## Şu an ne yapılıyor
+
+**Faz 2.6 b bitti: coğrafi sınır** (`firmware/app/rules/geofence/`, K-024).
+`geofence_check(fence, nokta)` → `OK` / `OUTSIDE_ALLOWED` / `IN_FORBIDDEN`. Işın atma,
+yarı açık kural, tamsayı ve 64 bit çarpım. Sınırın üstü her zaman ihlal. Kod henüz
+kimseye bağlı değil (c'de `GOTO_CMD`'ye bağlanacak), kartta süre ölçülmedi. Testler PC'de:
+`firmware/tests/test_geofence.py`, 45 test. 24 elle hesaplanmış durum, delik, uç
+koordinatlar, geçersiz sınırlar ve dolanma sayısı kullanan bağımsız bir Python referansına
+karşı 51 462 rastgele nokta (11 236'sı tam sınırın üstünde). Kasıtlı hata konmuş 13
+kopyanın 13'ü yakalandı.
+
+**Faz 2.6 b'de öğrenilenler:**
+- **Yakalanmayan her "hata" hata değildir.** İlk denemede 10 kopyanın 4'ü yakalanmadı. Üçü
+  aynı davranışın başka bir yazımıydı: yarı açık kuralın öbür yönü (iki tarafta da `>=`),
+  ulaşılamayan bir dal (`> 0` yerine `>= 0`, çünkü o durumda kod zaten "sınırda" deyip
+  çıkmış oluyor), ışını sola atmak. Asıl hata iki tarafın farklı kural kullanmasıydı, o da
+  yakalandı.
+- **Dizinin dışını okumak cevabı değiştirmeyebilir.** Yasak çokgen sayısı denetlenmeyince kod
+  4 elemanlı dizinin 5.'sini okudu. Arkadaki bellek tesadüfen sıfırdı, sonuç doğru çıktı.
+  Test derlemesine `-fsanitize=address,undefined` eklenince yakalandı.
+- **Denetim aracı yapının içindeki taşmayı göremez.** İzinli çokgenin 17. köşesi yapının
+  içinden, (0, 0) olarak okundu. Test noktası da tam (0, 0)'dı ve şans eseri "dışarıda"
+  çıktı. Geçersiz sınır testi artık beş farklı yönde nokta deniyor.
+- **Bağımsız referans başka bir algoritma kullanmalı.** C ışın atma, Python dolanma
+  sayısı, sınır tespiti için C aralık denetimi, Python iç çarpım.
 
 **Faz 2.6 a bitti: kart komut alıyor** (K-023). Yankı kalktı. İki kanal
 `firmware/app/channel/` üzerinden çalışıyor: `frame_rx` → `frame_decode` → sayaç (REPLAY).
@@ -220,7 +244,7 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
       kablosu çekilince kalp atışı kuralı devreye giriyor; karar süresi ölçülebiliyor.
   - [x] **a. Kartın komut alması:** `channel/`, RNG ile oturum, `HELLO`/`STATUS`/
         `HEARTBEAT_ACK`, `tools/link_test.py` (K-023)
-  - [ ] **b. Coğrafi sınır:** `rules/geofence`, ışın atma, PC'de test. Gerçek koordinatlar Faz 3'te
+  - [x] **b. Coğrafi sınır:** `rules/geofence`, PC'de 45 test (K-024). Gerçek koordinatlar Faz 3'te
   - [ ] **c. Uçtan uca karar:** `GOTO_CMD` → geofence → CAN `GOAL` ya da `VERDICT`. Açılış `HOLD`,
         kabul için önce `RESET_CMD` (RULES §5.2). Karar süresi pinle ve DWT ile
   - [ ] **d. Kalp atışı:** donanım zamanlayıcısı, 500 ms'de `HOLD`. Önce kartın beslemesi
@@ -253,9 +277,12 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
 - [x] Hat hatası sayaçları: araç kanalına 9600 baud'da 5 × `0x00` gönderildi. Sonuç
       restarts 5, frame 5, noise/overrun/other 0. Ajan kanalında sayaçların hepsi 0.
       Ardından 115200'de yankı çalıştı
+- [x] Coğrafi sınır (gcc, ASan ve UBSan ile, PC'de): 45 test, 51 462 rastgele nokta Python
+      referansıyla aynı. Kasıtlı hata konmuş 13 kopyanın 13'ü yakalandı. Kart derlemeleri 0
+      uyarı, kod henüz çağrılmadığı için flash boyutu değişmedi
 - [x] C çerçeveleyici (gcc, PC'de): 147 test. CRC `"123456789"` → `0x29B1`, SHA-256 NIST
       girdileri ve 1 milyon `a`, HMAC RFC 4231'in 7 örneği, protocol.md §4.4'teki etiket
-      `06 1A 85 7A 51 0A AA 4E`. Çalıştırmak için: `python3 -m pytest shared/protocol/tests`
+      `06 1A 85 7A 51 0A AA 4E`. Çalıştırmak için: `python3 -m pytest shared/protocol/tests firmware/tests`
 - [x] HMAC kartta (Faz 2.6, `hmac_test_result`): `tag_ok = 1`, iki derlemede de. Release
       firmware 0 uyarı, flash 15 616 B. Debug firmware 0 uyarı, flash 28 144 B. Süreler
       yukarıdaki tabloda. CAN testi iki derlemede de geçti (sıra `0x110, 0x100, 0x120`,

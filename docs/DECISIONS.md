@@ -551,3 +551,37 @@ artar. Bu sayaç `STATUS`'ta yok, RAM'den okunur.
 
 **Doğrulama:** `tools/link_test.py`, 26 denetim, iki kanal, 5 çalıştırmanın 5'inde geçti
 (`docs/STATUS.md`).
+
+---
+
+## K-024 · Coğrafi sınır: sınırın üstü ihlal, tamsayı ışın atma
+**Tarih:** 2026-10-01 · **Durum:** Yürürlükte
+
+`firmware/app/rules/geofence/` bir noktayı izinli çokgene ve en fazla 4 yasak çokgene karşı
+denetler (RULES §3.1). **Sınırın tam üstündeki nokta her zaman ihlaldir:** izinli çokgenin
+kenarı ya da köşesi dışarı, yasak çokgeninki yasak bölge sayılır. Algoritma önce noktanın
+bir kenarın üstünde olup olmadığına açıkça bakar, sonra ışın atar (yarı açık kural). Hesap
+tamsayıyla, santimetre cinsinden yapılır. Çapraz çarpım 64 bittir. Geçersiz bir sınır
+(köşe ya da çokgen sayısı sınırların dışında) hiçbir noktaya izin vermez.
+
+**Neden:**
+- **Bekçi şüphede reddeder.** Işın atmanın sınır üstündeki cevabı tanımsızdır, aynı
+  kenardaki iki nokta farklı sonuç verebilir. Kenara tam oturan bir hedef, araç gövdesinin
+  yarısının dışarıda kalması demek. (Esra'nın kararı, 2026-10-01.)
+- **Tamsayı, NaN'siz ve belirlenimci.** Koordinatlar protokolde zaten `int16` cm
+  (`docs/protocol.md` §3). PC'deki test ile karttaki kod aynı girdiye birebir aynı cevabı
+  verir.
+- **64 bit çarpım.** İki çarpımın farkı ±8,6 milyara çıkabilir, 32 bit taşar. Cortex-M4'te
+  tek komut. Uç koordinat testi 32 bitlik kopyayı yakalıyor.
+- **Hatalı yapılandırma güvenli tarafa düşer.** Gerçek koordinatlar Faz 3'te bir veri
+  dosyasından gelecek. Yanlış üretilmiş bir sınır her şeye izin vermektense hiçbir şeye
+  izin vermemeli.
+
+**Bedeli:** Çokgenlerin basit olması (kenarların birbirini kesmemesi) burada denetlenmez,
+veri üretilirken denetlenmeli (Faz 3). Yasak bölge izinli çokgenin dışına taşıyorsa oradaki
+nokta `OUTSIDE_ALLOWED` olarak raporlanır.
+
+**Doğrulama:** `firmware/tests/test_geofence.py`, 45 test, ASan ve UBSan ile. 24 elle
+hesaplanmış durum (içbükey "U", ışının köşeden geçtiği noktalar, ±32 767). Dolanma sayısı
+kullanan bağımsız Python referansına karşı 51 462 rastgele nokta, 11 236'sı sınırın üstünde.
+Kasıtlı hata konmuş 13 kopyanın 13'ü yakalandı.
