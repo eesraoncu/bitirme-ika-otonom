@@ -585,3 +585,67 @@ nokta `OUTSIDE_ALLOWED` olarak raporlanır.
 hesaplanmış durum (içbükey "U", ışının köşeden geçtiği noktalar, ±32 767). Dolanma sayısı
 kullanan bağımsız Python referansına karşı 51 462 rastgele nokta, 11 236'sı sınırın üstünde.
 Kasıtlı hata konmuş 13 kopyanın 13'ü yakalandı.
+
+---
+
+## K-025 · Karar katmanı `guard/`, harita verisi `site/`, araç düğümü `vehicle_node/`
+**Tarih:** 2026-10-01 · **Durum:** Yürürlükte
+
+- **`firmware/app/guard/`:** denetim sırası (RULES §4) ve durum makinesi (§5.2). Kuralların
+  kendisi `rules/` altında kalır; `guard` hangi kuralın önce baktığını, retin hangi gerekçeyle
+  döndüğünü ve durumun nasıl değiştiğini tutar. Donanıma dokunmaz: girdi alır, karar
+  (`VERDICT` + gönderilecek `GOAL`) döndürür. Çıktıları göndermek `app.c`'nin işi.
+- **`firmware/app/site/`:** coğrafi sınır, başlangıç noktası ve güvenli noktalar bir arada.
+  Faz 3'te tek bir harita dosyasından üretilecekler. Şu an `site_data.c`'de deneme verisi.
+  Reddedilen hedefin ipucu, **hedefe** en yakın güvenli nokta (eşitlikte sıra numarası küçük).
+- **`firmware/app/vehicle_node/`:** FDCAN2, araç tarafı (K-002, protocol.md §8). CAN'den gelen
+  onaylı mesajı araç kanalına, araç kanalından gelen `TELEMETRY`'yi CAN'e taşır. CAN kimliği →
+  mesaj eşlemesi açılışta üretilmiş tablodan çıkarılır, elle yazılmaz (K-003).
+- **`rules/heartbeat/`:** TIM6, 10 kHz, 5 000 sayımda taşar (500 ms). Her geçerli `HEARTBEAT`
+  sayacı sıfırlar. Taşma kesmesi "bağlantı öldü" bayrağını kurar, `HOLD`'a geçiş ana döngüde.
+- **Karar süresi** çerçevenin son baytı geldiği an başlar (HMAC dahil), `VERDICT` ve CAN
+  mesajı kuyruğa girince biter. DWT ile `goto_timing`'e yazılır, PA8 aynı aralıkta 1'dir.
+- **`NO_HEARTBEAT` gerekçesi** (protokol, `f7d9822`): kalp atışı yokken gelen `SIFIRLA`'nın
+  reddi için. Mevcut gerekçelerden biri ajana yanlış bilgi verirdi.
+
+**Neden:**
+- **Bir kavram tek klasörde.** Denetim sırası ile durum makinesi aynı soruya cevap veriyor:
+  "bu komuta kart ne yapar". Harita verisinin parçaları aynı kaynaktan gelecek.
+- **Karar mantığı PC'de sınanabilmeli.** `guard` donanımdan bağımsız olduğu için gcc ile,
+  bellek denetim araçları açık sınanıyor (`firmware/tests/test_guard.py`, 18 test, kasıtlı
+  hata konmuş 14 kopyanın 14'ü yakalandı).
+- **Kalp atışı yazılım döngüsüne bağlı değil** (RULES §3.5): süreyi donanım ölçüyor.
+
+**Bedeli:**
+- **Tepki ana döngüde.** Kesme yalnızca bayrak kuruyor; durum değişikliği ve 20 Hz sıfır hız
+  ana döngüden. Ana döngü takılırsa kart `HOLD`'a geçer ama sıfır hız gönderemez. Bunun
+  cevabı bağımsız bir bekçi zamanlayıcısı (IWDG) olurdu; kapsam kuralına göre Faz 4–5'te
+  değerlendirilecek (STATUS, açık sorular).
+- **Faz 4'e kalanlar:** FRESHNESS, LIMIT, CONSISTENCY, RECOVERY durumu (sayaç tutuluyor,
+  geçiş yok), `WAIT_CMD`, `SPEED_LIMIT_CMD`, `STOP_CMD`, `VELOCITY_CMD`. Bunlar şu an
+  `VERDICT` almıyor.
+- **Fiziksel kablo çekme testi yapılmadı.** Kartın beslemesi ajan kanalının USB'sinden
+  ayrılmalı (donanım kararı, STATUS "Bilinen engeller").
+
+**Doğrulama:** `tools/decision_test.py` kartta 26 denetim, Debug ve Release'te geçti. Karar
+süresi Release'te 169–177 µs.
+
+---
+
+## K-026 · CubeMX komut satırından, değişiklik önce kopyada
+**Tarih:** 2026-10-01 · **Durum:** Yürürlükte
+
+CubeMX ayarı, pencere açmadan da yapılabilir: `.ioc`'ye yalnızca istenen satırlar eklenir,
+sonra `~/STM32CubeMX/STM32CubeMX -q <betik>` ile `config load <ioc>` ve `project generate`.
+Adlar CubeMX'in kendi veritabanından alınır (`db/mcu/IP/*_Modes.xml`, `db/plugins/clock/`).
+Değişiklik önce projenin geçici bir kopyasında üretilir, depodakiyle farkı incelenir, ancak
+ondan sonra depoya alınır. Üretilen kod her zamanki gibi ayrı bir commit'tir. CubeMX'in
+penceresiyle yapılan ayar da geçerliliğini korur.
+
+**Neden:** Esra'nın onayı beklenmeden yürütülen işte (2.6'nın kapanışı) TIM6 ve PA8 gerekti.
+CubeMX `.ioc`'yi yüklerken doğruluyor ve kendi düzenine sokuyor (sıralama, eksik kalan
+`MX_RNG_Init`'i fonksiyon listesine ekledi). Fark incelendiğinde yalnızca beklenen dosyalar
+değişmişti; `.cproject` değişmedi.
+
+**Bedeli:** `.ioc`'nin satır biçimi belgelenmiş bir arayüz değil. Elle eklenen satır yanlışsa
+CubeMX onu sessizce düşürebilir. Bu yüzden üretilen kodun farkı her seferinde okunur.

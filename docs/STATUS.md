@@ -4,11 +4,51 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-10-01
-**Bulunduğumuz faz:** Faz 2.6, STM32 tarafı (a komut alma ve b coğrafi sınır tamam; c uçtan uca karar, d kalp atışı kaldı)
+**Bulunduğumuz faz:** Faz 2 bitti (2.6 kapandı). Sırada Faz 3, önce disk ve Gazebo kararı
 
 ---
 
 ## Şu an ne yapılıyor
+
+**Faz 2.6 kapandı** (K-025, K-026). Plandaki "bitti sayılır" ölçütleri kartta, `tools/decision_test.py`
+ile (26 denetim, Debug ve Release'te, art arda çalıştırmalarda hepsi geçti):
+- **İzinli hedef geçiyor:** `GOTO_CMD` (100, −200) → `VERDICT ACCEPTED`, `GOAL` FDCAN1 → CAN
+  hattı → FDCAN2 → araç kanalından aynı değerlerle çıktı.
+- **Dışarıdaki hedef gerekçeyle dönüyor:** izinli alanın dışı, yasak bölge, izinli alanın tam
+  kenarı → `GEOFENCE` + doğru gerekçe + en yakın güvenli nokta. Araca hiçbir `GOAL` gitmedi.
+- **Kalp atışı:** kesilince 523–525 ms sonra araç kanalına 20 Hz sıfır hız başladı (50 ms
+  aralık, kartın zaman damgasından), kart `HOLD`'a geçti ve kalp atışı geri gelince
+  `SIFIRLA` olmadan `NORMAL`'e dönmedi. **Fiziksel kablo çekme testi yapılmadı:** kart o
+  kablodan beslendiği için kapanır (bkz. "Bilinen engeller"). Test, köprünün kalp atışını
+  keserek yapıldı; kartın gördüğü olay aynı, yeter ki kart beslenmeye devam etsin.
+- **Karar süresi** (`goto_timing`, GOTO_CMD çerçevesinin son baytından `VERDICT` ve CAN
+  mesajı kuyruğa girene kadar, HMAC dahil): **Release 169–177 µs** (12 karar), Debug
+  853–886 µs (24 karar). PA8 pini aynı aralıkta 1 oluyor; mantık analizörü olmadığı için
+  pin ölçülmedi (K-009).
+- Yeni modüller: `guard/` (denetim sırası ve durum makinesi), `site/` (deneme harita
+  verisi), `rules/heartbeat/` (TIM6), `vehicle_node/` (FDCAN2, araç tarafı),
+  `timing/timing` (pin). CubeMX'te TIM6 ve PA8, komut satırından (K-026). Protokole
+  `NO_HEARTBEAT` gerekçesi eklendi, şema özeti `0xD9092C66` (`f7d9822`).
+- PC testleri: 210 (`python3 -m pytest shared/protocol/tests firmware/tests`). `guard`'a
+  kasıtlı hata konmuş 14 kopyanın 14'ü yakalandı.
+- **Kartta şu an Release derlemesi yüklü.**
+
+**Faz 2.6 c ve d'de öğrenilenler:**
+- **Bilgisayarın okuma anı ölçüm değildir.** "1 saniyede kaç `DRIVE`" sayımı 26 çıktı: önceki
+  adımda biriken çerçeveler de sayılmıştı. Kartın her çerçeveye koyduğu `ts_ms` ile aralık
+  ölçülünce 50 ms çıktı.
+- **Elle hesaplanan beklenen değer de yanılabilir.** İki test, en yakın güvenli noktayı yanlış
+  hesapladığım için kaldı; kod doğruydu. Kare uzaklıklar yazılı hesaplanıp testin yanına not
+  edildi.
+- **Arka planda gönderen bir iş parçacığı sayaç sırasını bozabilir.** Kalp atışı ayrı
+  iş parçacığından giderken komutun sayacı `agent.seq`'ten okunuyordu, arada ilerleyebilirdi.
+  Sayaç gönderilen baytlardan okunuyor, sayaç verme ile yazma aynı kilitte.
+- **Kart yeniden başlarken çerçeve yarıda kalır.** USB köprüsü yarım baytları tutup port
+  açılınca veriyor. İlk geçerli çerçeveden önceki bozukluk atlanıyor (köprü için §10).
+- **`-Werror` bazı kasıtlı hataları derletmez** (`uint8_t ≤ 255` her zaman doğru). Hatalı
+  kopya derlenebilir yazıldı, yakalandı. Faz 2.6 a'daki dersin tekrarı.
+- **CubeMX komut satırından çalışıyor** (`-q`, `config load` + `project generate`). Değişiklik
+  önce projenin geçici bir kopyasında üretilip farkı incelendi (K-026).
 
 **Faz 2.6 b bitti: coğrafi sınır** (`firmware/app/rules/geofence/`, K-024).
 `geofence_check(fence, nokta)` → `OK` / `OUTSIDE_ALLOWED` / `IN_FORBIDDEN`. Işın atma,
@@ -193,7 +233,7 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
   Test bu yüzden önce birimin boşa çıkmasını, sonra DRIVE'ın hatta görünmesini
   (`HAL_FDCAN_GetProtocolStatus`, `Activity`) bekliyor.
 
-**Sırada:** Faz 2.6'nın kalanı, dört adımda (bkz. "Sırada"). Plan: `docs/Bitirme_Uygulama_Plani.docx` §5.
+**Sırada:** Faz 3 (plan §5): simülasyon, harita, Nav2, köprü. Önce disk yeri ve Gazebo kararı.
 
 ## Bitenler
 
@@ -236,20 +276,21 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
       sabit zamanlı karşılaştırma ölçüldü (K-022)
 - [x] **HMAC anahtarı:** `tools/gen_key.py`, `firmware/app/auth/key`. Parmak izi kartta ve
       bilgisayarda aynı
+- [x] **Faz 2.6 tamam:** a komut alma (K-023), b coğrafi sınır (K-024), c uçtan uca karar ve
+      d kalp atışı (K-025). CubeMX: RNG (`139a189`), TIM6 ve PA8 (`11d6ef0`, K-026)
 
 ## Sırada
 
-- [ ] **Faz 2.6'nın kalanı.** Plandaki "bitti sayılır": elle gönderilen hedef izinli bölgedeyse
-      CAN'den geçip araç kanalından çıkıyor, dışındaysa gerekçeyle ajan kanalına dönüyor; USB
-      kablosu çekilince kalp atışı kuralı devreye giriyor; karar süresi ölçülebiliyor.
-  - [x] **a. Kartın komut alması:** `channel/`, RNG ile oturum, `HELLO`/`STATUS`/
-        `HEARTBEAT_ACK`, `tools/link_test.py` (K-023)
-  - [x] **b. Coğrafi sınır:** `rules/geofence`, PC'de 45 test (K-024). Gerçek koordinatlar Faz 3'te
-  - [ ] **c. Uçtan uca karar:** `GOTO_CMD` → geofence → CAN `GOAL` ya da `VERDICT`. Açılış `HOLD`,
-        kabul için önce `RESET_CMD` (RULES §5.2). Karar süresi pinle ve DWT ile
-  - [ ] **d. Kalp atışı:** donanım zamanlayıcısı, 500 ms'de `HOLD`. Önce kartın beslemesi
-        (kablo çekilince kart da kapanıyor, bkz. "Bilinen engeller")
-  - FRESHNESS zaman eşitlemesi gerektiriyor, planda Faz 4'te. 2.6'ya alınmıyor
+- [ ] **Kablo çekme testi (Esra, donanım).** Kartın beslemesi ajan kanalının USB'sinden
+      ayrılmalı (bkz. "Bilinen engeller"), sonra kablo çekilip `decision_test.py`'deki
+      kalp atışı adımının aynısı gözlenmeli: 500 ms sonra araç kanalına sıfır hız
+- [ ] **Faz 3 öncesi kararlar:** disk yeri (bölüm düzeni), Gazebo sürümü (K-008)
+- [ ] **Faz 3:** RTAB-Map ile harita, Nav2, köprü (`guard_bridge`). Köprü `tools/link_test.py`
+      ve `decision_test.py`'deki `Link` mantığını kullanabilir (`docs/protocol.md` §10).
+      Haritadan `site_data.c` ve Nav2 yasak bölge maskesi aynı dosyadan üretilmeli
+- [ ] Faz 4'e kalanlar (bilerek): FRESHNESS (zaman eşitlemesi), LIMIT, CONSISTENCY,
+      RECOVERY durumu (üst üste 5 içerik reddi), `WAIT_CMD`/`SPEED_LIMIT_CMD`/`STOP_CMD`/
+      `VELOCITY_CMD` işleme, araç konumunun coğrafi sınır denetimi
 - [ ] Ollama kurulumu (model seçimi Faz 4'te)
 
 ## Doğrulanmış testler
@@ -291,6 +332,11 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
       `gen_key.py`'ninkiyle aynı. Derlenmiş dosyadaki `auth_key` iki derlemede de
       `hmac_key.bin` ile bayt bayt aynı. Anahtar başlığı yokken derleme tek mesajla duruyor.
       Release firmware 0 uyarı, flash 15 748 B. HMAC ve CAN testleri geçmeye devam ediyor
+- [x] Faz 2.6 c/d firmware: Debug 0 uyarı, flash 39 520 B; Release 0 uyarı, 21 268 B.
+      `python3 tools/decision_test.py` 26 denetim, `link_test.py` 25 denetim, ikisi de art arda
+      çalıştırmalarda Debug ve Release'te geçti. Karar süresi Release 169–177 µs, Debug
+      853–886 µs. `guard_can_tx_full`, `vehicle_node_errors` 0. `guard` PC'de 18 test,
+      kasıtlı hata konmuş 14 kopyanın 14'ü yakalandı
 - [x] Faz 2.6 a firmware (Debug): 0 uyarı, flash 32 568 B. Release 0 uyarı, 17 600 B.
       `python3 tools/link_test.py`: 26 denetim geçti, 5 çalıştırmanın 5'inde. Ajan kanalında
       `HELLO` (şema `0xB12F26D8`, `HOLD`), imzalı `HEARTBEAT` → `HEARTBEAT_ACK`. Tekrar
@@ -356,24 +402,13 @@ other.
 # <yapının adresi + 0x148>'den 20 bayt oku. c765bac'te: ajan 0x20000538, araç 0x20000694
 ```
 
-**HMAC süre ölçümü** (`hmac_test_result`, 20 × 4 bayt). Sırasıyla: magic (`0x4AC7E57D`),
-tag_ok, sonra 9 çift (en kısa, en uzun) çevrim: empty, hmac_full, hmac_prepared,
-equal_same, equal_diff0, equal_diff7, memcmp_same, memcmp_diff0, memcmp_diff7. Net süre
-için `empty`'nin en kısası çıkarılır.
-
-```bash
-# Release derlemesi (-Os). Debug için yol firmware/Debug
-/opt/st/stm32cubeide_2.2.0/headless-build.sh -data ~/STM32CubeIDE/ws_headless -build firmware/Release
-# Adres her derlemede değişebilir. Release'de son okunan 0x200004D8 (2026-10-01)
-"$(find /opt/st/stm32cubeide_2.2.0/plugins -name arm-none-eabi-nm -type f | head -1)" \
-    -S firmware/Release/firmware.elf | grep hmac_test_result
-"$(find /opt/st/stm32cubeide_2.2.0/plugins -name STM32_Programmer_CLI -type f)" \
-    -c port=SWD mode=HOTPLUG -r32 <adres> 0x50
-```
-
-**Anahtar parmak izi** (`key_check_result`, 12 bayt): magic (`0x4E7C4EC4`), ardından 8
-bayt parmak izi. `-r8 <adres> 0xC` ile okunur, `python3 tools/gen_key.py`'nin yazdırdığıyla
-karşılaştırılır.
+**Faz 2.6'nın RAM değişkenleri** (adresleri `arm-none-eabi-nm -S <elf> | grep <ad>` ile):
+- `goto_timing` (16 bayt): count, last, min, max, çevrim (170 MHz'de 5,9 ns). Karar süresi.
+- `guard_can_tx_full` (4 bayt), `vehicle_node_errors` (8 bayt: bilinmeyen CAN kimliği,
+  FDCAN2 tamponu dolu). Hepsi 0 olmalı.
+- `can_test_result`: açılıştaki Faz 2.4 CAN testi, nabız LED'i buna bağlı.
+- Faz 2.6'nın ara ölçümleri (`hmac_test_result`, `key_check_result`) `abf1b7e`'de kaldırıldı.
+  Kodları git geçmişinde: `1e803bc`, `907aaff`.
 
 ## Açık sorular / kararsız konular
 
@@ -384,6 +419,8 @@ karşılaştırılır.
 | LLM model seçimi (araç çağırma şart) | **Açık** | Faz 4 başında |
 | Senaryo başına tekrar sayısı | ✅ K-015: LLM senaryolarında 20, arızada 10 | — |
 | Araç kanalındaki 97 hat hatasının sebebi | **Açık**, yeniden üretilemedi | Tekrar görülürse, tür sayaçlarına bakılarak |
+| Ana döngü takılırsa (kalp atışı kesmeyle algılanır, tepki ana döngüde) | **Açık**, bağımsız bekçi zamanlayıcısı (IWDG) olabilir (K-025) | Faz 4–5, kapsam kuralına göre |
+| PA8 hangi sokette | **Doğrulanmadı**, UM2505'e bakılacak | Mantık analizörü alınırsa (K-009) |
 
 ## Bilinen engeller
 
@@ -407,8 +444,10 @@ karşılaştırılır.
   kablosunu çek" diye test ediyor. Ama Nucleo varsayılan olarak o kablodan besleniyor
   (JP5 = 5V_STLK). Kapanan kart kalp atışı kuralını işletemez. **Olası çözüm:** kartı
   E5V girişinden CP2102'nin 5V pininden beslemek. Böylece ajan kanalı kopunca kart araç
-  kanalının USB'sinden beslenmeye devam eder. **Faz 2'de UM2505 güç şemasından
-  doğrulanacak.**
+  kanalının USB'sinden beslenmeye devam eder. **UM2505 güç şemasından doğrulanmadı:**
+  2026-10-01'de st.com'a bu bilgisayardan erişilemedi. Atlama teli (JP5) ve E5V pini
+  değişikliği donanım kararı, Esra kılavuza bakarak yapacak. Yazılım tarafı hazır:
+  `decision_test.py` kalp atışını keserek aynı olayı sınıyor.
 
 ## Nerede takıldım
 

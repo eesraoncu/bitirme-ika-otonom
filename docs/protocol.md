@@ -480,6 +480,17 @@ Köprü, protokolün bilgisayar tarafındaki tek uygulayıcısıdır:
 - `VERDICT`'i ajana iletmek. **C yapılandırmasında gerekçeyi gizlemek** (§7.3)
 - `STATUS` sayaçlarını deney kaydına yazmak
 
+Faz 2.6'nın test betiklerinden (`tools/link_test.py`, `tools/decision_test.py`) köprüye kalan üç ders:
+
+- **Akışa senkron olmak.** Kart sürekli gönderir. Port bir çerçevenin ortasında açılabilir:
+  ilk ayraca (`0x00`) kadar gelen baytlar atılır.
+- **Bozuk çerçeveyi sayıp geçmek, durmamak.** Kart yeniden başlarken gönderdiği çerçeve
+  yarıda kalır, USB köprüsü (ST-LINK, CP2102) o baytları tutup sonra verir. Köprü bunu
+  bir hata olarak sayar ve sonraki çerçeveye geçer.
+- **Gönderen tek sırada yazmalı.** Sayaç verme ile yazma aynı kilitte olmalı. İki iş
+  parçacığı çerçeveleri sayaç sırasının tersine yazarsa kart küçük sayaçlıyı `REPLAY` ile
+  düşürür.
+
 ---
 
 ## 11. Anahtar
