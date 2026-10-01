@@ -4,11 +4,30 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-10-01
-**Bulunduğumuz faz:** Faz 2, STM32 tarafı (2.6'nın kartta ölçüm kısmı tamam, sırada anahtar)
+**Bulunduğumuz faz:** Faz 2, STM32 tarafı (2.6'nın ölçüm ve anahtar kısmı tamam)
 
 ---
 
 ## Şu an ne yapılıyor
+
+**HMAC anahtarı üretildi ve karta taşındı.** `tools/gen_key.py`, `secrets/hmac_key.bin`'i
+(32 bayt, `os.urandom`) ve kartın başlığı `secrets/hmac_key.h`'yi üretiyor. İkisi de
+depoya girmiyor. Kart anahtarı `firmware/app/auth/key`'den alıyor (`auth_key`), başlık
+yoksa derleme açık bir mesajla duruyor. Doğrulama anahtar gösterilmeden yapıldı:
+`HMAC(anahtar, "IKA anahtar denetimi")`'nin ilk 8 baytı (parmak izi) bilgisayarda ve
+kartta aynı: `F6 17 EE 60 18 84 07 7C`. Anahtarı henüz hiçbir çerçeve kullanmıyor.
+
+**Anahtar aşamasında öğrenilenler:**
+- **Anahtar gösterilmeden denetlenebilir.** Sabit bir mesajın HMAC'i iki tarafta aynıysa
+  anahtar da aynıdır. HMAC'ten anahtar geri çıkarılamadığı için bu 8 bayt belgeye yazılabilir.
+- **Üretici anahtarın üzerine yazmamalı.** Yazsaydı betiği ikinci kez çalıştırmak kart ile
+  bilgisayarı habersizce farklı anahtarlara düşürürdü. Belirti yalnızca "her çerçeve
+  `err_auth`" olurdu.
+- **Doğrulama kodu da yanılabilir.** Derlenmiş dosyadaki anahtar ilk iki karşılaştırmada
+  "FARKLI" çıktı. Sebep objdump çıktısını yanlış ayrıştırmaktı (adres 7 hane, Release'te
+  adres 4'ün katı değil). Ham bayt (`objcopy -O binary`) ile ikisi de "AYNI".
+- **`#error`'dan sonra derleyici başka hatalar da sayar.** Kodun geri kalanı `#else` içine
+  alınınca yalnızca asıl mesaj görünüyor.
 
 **HMAC kartta ölçüldü** (`firmware/app/timing/dwt`, `app.c`'de geçici test, K-022). Girdi
 `test_vectors.json`'daki VERDICT çerçevesi (en uzun yük, 23 bayt). Kartın hesapladığı
@@ -124,7 +143,7 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
   Test bu yüzden önce birimin boşa çıkmasını, sonra DRIVE'ın hatta görünmesini
   (`HAL_FDCAN_GetProtocolStatus`, `Activity`) bekliyor.
 
-**Sırada:** HMAC anahtarını üretmek ve karta derleme sırasında vermek.
+**Sırada:** Faz 2.7'ye geçmeden önce plana bakılacak (bkz. "Sırada").
 
 ## Bitenler
 
@@ -165,11 +184,12 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
       (`cfb1c5a`), çerçeve (`fac14f0`). 147 test
 - [x] **Faz 2.6 kartta ölçüm tamam:** DWT çevrim sayacı (`timing/dwt`), HMAC süresi ve
       sabit zamanlı karşılaştırma ölçüldü (K-022)
+- [x] **HMAC anahtarı:** `tools/gen_key.py`, `firmware/app/auth/key`. Parmak izi kartta ve
+      bilgisayarda aynı
 
 ## Sırada
 
-- [ ] HMAC anahtarını üret: `secrets/hmac_key.bin` (32 bayt, depoya girmez). Kart anahtarı,
-      derleme sırasında `secrets/`'tan üretilen bir C başlığından alır (`docs/protocol.md` §11)
+- [ ] Faz 2.6'dan sonraki adım için uygulama planına bakılacak
 - [ ] Ollama kurulumu (model seçimi Faz 4'te)
 
 ## Doğrulanmış testler
@@ -204,6 +224,10 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
       firmware 0 uyarı, flash 15 616 B. Debug firmware 0 uyarı, flash 28 144 B. Süreler
       yukarıdaki tabloda. CAN testi iki derlemede de geçti (sıra `0x110, 0x100, 0x120`,
       TEC/REC 0)
+- [x] Anahtar (`key_check_result`): kartın parmak izi `F6 17 EE 60 18 84 07 7C`,
+      `gen_key.py`'ninkiyle aynı. Derlenmiş dosyadaki `auth_key` iki derlemede de
+      `hmac_key.bin` ile bayt bayt aynı. Anahtar başlığı yokken derleme tek mesajla duruyor.
+      Release firmware 0 uyarı, flash 15 748 B. HMAC ve CAN testleri geçmeye devam ediyor
 - [x] Ajan kanalında elle yankı (minicom, `/dev/ttyACM0`, 115200)
 - [x] Ajan kanalında yük testi (`tools/echo_test.py`): 102 400 / 102 400 bayt, 0 fark,
       11 422 B/s (hat sınırının %99,1'i). Dairesel tampon ~400 kez başa döndü
@@ -215,6 +239,8 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
 Depo kökünden, CubeIDE penceresini açmadan:
 
 ```bash
+# Anahtar başlığı. Depo yeni klonlandıysa bir kez. Anahtar varsa korunur
+python3 tools/gen_key.py
 # Derle. Çalışma alanı depo DIŞINDA. İlk seferde -import de verilir
 /opt/st/stm32cubeide_2.2.0/headless-build.sh -data ~/STM32CubeIDE/ws_headless \
     -import "$PWD/firmware" -build firmware/Debug
@@ -267,12 +293,16 @@ için `empty`'nin en kısası çıkarılır.
 ```bash
 # Release derlemesi (-Os). Debug için yol firmware/Debug
 /opt/st/stm32cubeide_2.2.0/headless-build.sh -data ~/STM32CubeIDE/ws_headless -build firmware/Release
-# Adres derlemeye göre değişir: Release'de 0x200004D0, Debug'da 0x200003F0 (2026-10-01)
+# Adres her derlemede değişebilir. Release'de son okunan 0x200004D8 (2026-10-01)
 "$(find /opt/st/stm32cubeide_2.2.0/plugins -name arm-none-eabi-nm -type f | head -1)" \
     -S firmware/Release/firmware.elf | grep hmac_test_result
 "$(find /opt/st/stm32cubeide_2.2.0/plugins -name STM32_Programmer_CLI -type f)" \
     -c port=SWD mode=HOTPLUG -r32 <adres> 0x50
 ```
+
+**Anahtar parmak izi** (`key_check_result`, 12 bayt): magic (`0x4E7C4EC4`), ardından 8
+bayt parmak izi. `-r8 <adres> 0xC` ile okunur, `python3 tools/gen_key.py`'nin yazdırdığıyla
+karşılaştırılır.
 
 ## Açık sorular / kararsız konular
 

@@ -74,6 +74,11 @@ durumda bile kartın içerik kuralları, fiziksel limitleri ve kalp atışı ça
 eder.** HMAC bir katmandır, güvenliğin temeli değildir. Temel, basit ve bağımsız
 denetleyicidir (Simplex).
 
+**Karta fiziksel erişim de kapsam dışı.** Anahtar kartın flash'ında durur ve okuma koruması
+(RDP) açık değildir: kartın ST-LINK'ine bağlanan biri anahtarı okuyabilir. Gerçek bir
+araçta okuma koruması açılır ve hata ayıklama bağlantısı kapatılır. Bu düzenekte kart her
+yüklemede ST-LINK'le programlandığı için açılmadı.
+
 **Protokolle gönderilmeyenler:** coğrafi sınır çokgenleri, güvenli noktalar ve eşikler.
 Bunlar derleme zamanında karta gömülür. Güvenilmeyen tarafın bunları değiştirebilmesi
 denetimin anlamını ortadan kaldırırdı.
@@ -481,7 +486,15 @@ Köprü, protokolün bilgisayar tarafındaki tek uygulayıcısıdır:
 
 - 32 bayt rastgele. `secrets/hmac_key.bin` dosyasında durur, **depoya girmez** (K-007,
   `.gitignore`).
-- Kart için derleme sırasında `secrets/` altından bir C başlığı üretilir (Faz 2).
+- Anahtar ve kartın başlığı `tools/gen_key.py` ile üretilir: `secrets/hmac_key.bin` yoksa
+  `os.urandom` ile oluşturulur, varsa **üzerine yazılmaz**. `secrets/hmac_key.h` her
+  çalıştırmada .bin'den yeniden yazılır. CubeIDE derlerken betik çalıştırmadığı için
+  başlık derlemeden önce üretilir. Kart anahtarı `firmware/app/auth/key` üzerinden alır.
+  Başlık yoksa derleme durur.
+- **Parmak izi:** `HMAC(anahtar, "IKA anahtar denetimi")`'nin ilk 8 baytı. İki tarafın aynı
+  anahtarı bildiği, anahtar gösterilmeden bununla denetlenir. Gizli değildir.
+- Anahtar değiştirilirse kart yeniden derlenip yüklenmeli. Aksi hâlde her çerçeve
+  `err_auth` ile reddedilir.
 - `test_vectors.json`'daki anahtar (`00 01 02 … 1F`) **yalnızca test içindir**, gerçek
   anahtar olarak kullanılmaz.
 
