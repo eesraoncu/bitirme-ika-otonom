@@ -4,7 +4,7 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-10-01
-**Bulunduğumuz faz:** Faz 2, STM32 tarafı (2.6'nın ölçüm ve anahtar kısmı tamam)
+**Bulunduğumuz faz:** Faz 2.6, STM32 tarafı (çerçeveleyici, HMAC ölçümü ve anahtar tamam; alıcı, geofence, kalp atışı, ölçüm pini kaldı)
 
 ---
 
@@ -143,7 +143,7 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
   Test bu yüzden önce birimin boşa çıkmasını, sonra DRIVE'ın hatta görünmesini
   (`HAL_FDCAN_GetProtocolStatus`, `Activity`) bekliyor.
 
-**Sırada:** Faz 2.7'ye geçmeden önce plana bakılacak (bkz. "Sırada").
+**Sırada:** Faz 2.6'nın kalanı, dört adımda (bkz. "Sırada"). Plan: `docs/Bitirme_Uygulama_Plani.docx` §5.
 
 ## Bitenler
 
@@ -189,7 +189,17 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
 
 ## Sırada
 
-- [ ] Faz 2.6'dan sonraki adım için uygulama planına bakılacak
+- [ ] **Faz 2.6'nın kalanı.** Plandaki "bitti sayılır": elle gönderilen hedef izinli bölgedeyse
+      CAN'den geçip araç kanalından çıkıyor, dışındaysa gerekçeyle ajan kanalına dönüyor; USB
+      kablosu çekilince kalp atışı kuralı devreye giriyor; karar süresi ölçülebiliyor.
+  - [ ] **a. Kartın komut alması:** yankı yerine `frame_rx` → `frame_decode`, sayaç (REPLAY),
+        `STATUS` sayaçları, `HELLO_REQ`/`HELLO` ile oturum. Elle imzalı mesaj gönderen araç
+  - [ ] **b. Coğrafi sınır:** `rules/geofence`, ışın atma, PC'de test. Gerçek koordinatlar Faz 3'te
+  - [ ] **c. Uçtan uca karar:** `GOTO_CMD` → geofence → CAN `GOAL` ya da `VERDICT`. Açılış `HOLD`,
+        kabul için önce `RESET_CMD` (RULES §5.2). Karar süresi pinle ve DWT ile
+  - [ ] **d. Kalp atışı:** donanım zamanlayıcısı, 500 ms'de `HOLD`. Önce kartın beslemesi
+        (kablo çekilince kart da kapanıyor, bkz. "Bilinen engeller")
+  - FRESHNESS zaman eşitlemesi gerektiriyor, planda Faz 4'te. 2.6'ya alınmıyor
 - [ ] Ollama kurulumu (model seçimi Faz 4'te)
 
 ## Doğrulanmış testler
