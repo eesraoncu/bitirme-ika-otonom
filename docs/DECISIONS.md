@@ -480,3 +480,44 @@ davranışı (sabit zamanlı karşılaştırma) PC testiyle kanıtlanamıyor, ka
 **Doğrulama:** 147 test geçiyor. 17 çerçeve `test_vectors.json` ile bayt bayt aynı,
 7 bozuk çerçeve doğru türle reddediliyor, 1 500 rastgele bozulmuş çerçevede ve 100 akışta
 C ile Python aynı kararı veriyor.
+
+---
+
+## K-022 · HMAC kartta ölçüldü: etiket her çerçevede baştan hesaplanır
+**Tarih:** 2026-10-01 · **Durum:** Yürürlükte
+
+HMAC'in karttaki süresi ve etiket karşılaştırmasının sabit zamanlı olduğu DWT çevrim
+sayacıyla ölçüldü (K-009). Sayaç `firmware/app/timing/dwt`'de. Süre sınırın çok altında
+kaldığı için hazırlanmış HMAC bağlamı (K-021) **kullanılmıyor**: `frame.c`'nin
+`compute_tag`'i anahtarı her çerçevede yeniden hazırlıyor.
+
+**Sonuç** (VERDICT çerçevesi, en uzun yük, net çevrim, 170 MHz):
+
+| | Release (`-Os`) | Debug (`-O0`) |
+|---|---|---|
+| Tam HMAC (4 blok) | 24 098, **142 µs** | 131 403, 773 µs |
+| Hazırlanmış bağlam (2 blok) | 12 730, 75 µs | 65 977, 388 µs |
+| `hmac_tag_equal`: eşit / fark 0. bayt / fark 7. bayt | 140 / 140 / 140 | 343 / 343 / 343 |
+| `memcmp` (kontrol): eşit / fark 0. bayt / fark 7. bayt | 147 / 48 / 139 | 144 / 45 / 136 |
+
+**Yöntem:** Her ölçüm 1000 kez tekrarlanır, en kısa ve en uzun süre saklanır. Kesmeler her
+ölçüm süresince kapalıdır. Ölçmenin kendi maliyeti (boş fonksiyon) çıkarılır. Sonuç RAM'den
+salt okuma ile alınır (`docs/STATUS.md`). Kartın etiketi test vektörüyle karşılaştırılır.
+`memcmp` kontrol deneyidir: ölçümün bayta bağlı farkı görebildiğini gösterir.
+
+**Neden hazırlanmış bağlam kullanılmıyor:**
+- **Süre hat süresinin yanında küçük.** En kısa komut (`VELOCITY_CMD`, 25 bayt) hatta
+  2,2 ms sürüyor, tam HMAC 142 µs. Hat tamamen dolu olsa bile (~460 çerçeve/s)
+  işlemcinin yaklaşık %6,5'i HMAC'e gidiyor. 20 Hz'lik hız akışında %0,3.
+- **Daha az durum, daha az hata yeri.** Hazırlanmış bağlam başlatmada bir kez kurulup
+  saklanmak zorunda. Kod `frame.py` ile birebir aynı yapıda kalıyor.
+
+**Bedeli:** Çerçeve başına 67 µs (Release) fazladan süre. Karar süresi ölçümünde (S1) bu
+süre sonuca dahil.
+
+**Ne zaman yeniden bakılır:** Karar süresi bütçesi aşılırsa ya da hat hızı artarsa.
+Değişiklik `compute_tag`'e sınırlı, `hmac_sha256_init()` dış özeti zaten hazırlıyor.
+
+**Dikkat:** Sabit zamanlılık derleyicinin ürettiği koda bağlı. `-Os`'ta `hmac_tag_equal`'ın
+makine kodu `objdump` ile okundu, döngüde erken çıkış yok. Derleyici ya da derleme seçeneği
+değişirse ölçüm tekrarlanır.

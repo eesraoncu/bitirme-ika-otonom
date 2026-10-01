@@ -506,6 +506,6 @@ tampona sığmayan çerçeve, yanlış yön biti ya da tipine sığmayan enum de
 |---|---|
 | ~~C çerçeveleyici: COBS, CRC, HMAC-SHA256. `test_vectors.json`'a karşı doğrulanacak~~ ✅ `firmware/app/protocol/`, `firmware/app/auth/` (K-021) | Faz 2.6 |
 | ~~Etiketin sabit zamanlı karşılaştırılması (§4.5)~~ ✅ `hmac_tag_equal()`. Süre ölçümü kartta | Faz 2.6 |
-| HMAC'in karttaki süresi (DWT ile) | Faz 2.6 |
+| ~~HMAC'in karttaki süresi (DWT ile)~~ ✅ `-Os`'ta 142 µs, karşılaştırma sabit zamanlı (K-022) | Faz 2.6 |
 | Baud hızının ölçümle kesinleşmesi | Faz 2 |
 | A yapılandırmasında köprünün kartı nasıl atlayacağı | Faz 5 |

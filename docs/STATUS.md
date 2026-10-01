@@ -3,12 +3,45 @@
 > Bu dosya her çalışma oturumunun **başında okunur**, **sonunda güncellenir**.
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
-**Son güncelleme:** 2026-09-30
-**Bulunduğumuz faz:** Faz 2, STM32 tarafı (2.6'nın kartsız kısmı tamam)
+**Son güncelleme:** 2026-10-01
+**Bulunduğumuz faz:** Faz 2, STM32 tarafı (2.6'nın kartta ölçüm kısmı tamam, sırada anahtar)
 
 ---
 
 ## Şu an ne yapılıyor
+
+**HMAC kartta ölçüldü** (`firmware/app/timing/dwt`, `app.c`'de geçici test, K-022). Girdi
+`test_vectors.json`'daki VERDICT çerçevesi (en uzun yük, 23 bayt). Kartın hesapladığı
+etiket vektördekiyle aynı: kriptografi kodu ARM'da da doğru. Süreler (net, `empty`
+çıkarılmış, 170 MHz):
+
+| | Release (`-Os`) | Debug (`-O0`) |
+|---|---|---|
+| A. Tam HMAC (4 blok) | 24 098 çevrim, **142 µs** | 131 403 çevrim, 773 µs |
+| B. Hazırlanmış bağlam (2 blok) | 12 730 çevrim, **75 µs** | 65 977 çevrim, 388 µs |
+| C. `hmac_tag_equal`: eşit / fark 0. bayt / fark 7. bayt | 140 / 140 / 140 | 343 / 343 / 343 |
+| D. `memcmp` (kontrol): eşit / fark 0. bayt / fark 7. bayt | 147 / 48 / 139 | 144 / 45 / 136 |
+
+En kısa komut (`VELOCITY_CMD`, 25 bayt) hatta 2,2 ms sürüyor. Hazırlanmış bağlam şimdilik
+kullanılmıyor (K-022). **Kartta şu an Release derlemesi yüklü.** İşlev olarak Debug ile
+aynı. CAN testi iki derlemede de geçti.
+
+**Kartta ölçümden öğrenilenler:**
+- **Kontrol deneyi olmadan "sabit zamanlı" sonucu boştur.** `hmac_tag_equal` üç durumda da
+  aynı süreyi verdi. Bunun bir anlamı olması için ölçümün farkı görebildiği gösterilmeliydi:
+  `memcmp`'te fark 0. bayttayken ve 7. bayttayken süreler arasında 91 çevrim var (doğru
+  bayt başına ~13 çevrim).
+- **Derleme seçeneği süreyi 5,5 kat değiştiriyor.** Tezde verilecek sayı, karta gerçekten
+  yüklenen derlemenin sayısı olmalı ve seçeneği yanında yazılmalı.
+- **Derleyici sabit zamanlılığı bozabilir, makine koduna bakılmalı.** `-Os`'ta
+  `hmac_tag_equal` için üretilen kod `objdump` ile okundu: döngüde erken çıkış yok.
+  Derleyici ya da seçenek değişirse ölçüm tekrarlanmalı.
+- **`memcmp`'in farkı iki derlemede de 91 çevrim.** `memcmp` newlib-nano'dan önceden
+  derlenmiş geliyor. Bizim `-O` seçimimiz onu etkilemiyor.
+- **Kesmeler kapalıyken ölçüm çok kararlı.** Debug'da A için en kısa ile en uzun arası 12
+  çevrim. Karşılaştırmalarda en uzun süre yalnızca her grubun ilk ölçümünde farklı
+  (büyük ihtimalle flash önbelleği henüz dolmamış). Release'de B'nin aralığı 200 çevrim
+  (%1,6), sebebi bulunmadı.
 
 **Faz 2.6'nın kartsız kısmı bitti.** C çerçeveleyici üç parçada yazıldı, hepsi PC'de gcc
 ile test ediliyor (`shared/protocol/tests/test_c_framer.py`, `c_driver.c`):
@@ -91,7 +124,7 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
   Test bu yüzden önce birimin boşa çıkmasını, sonra DRIVE'ın hatta görünmesini
   (`HAL_FDCAN_GetProtocolStatus`, `Activity`) bekliyor.
 
-**Sırada:** Faz 2.6'nın kartlı kısmı (HMAC süresi, anahtar).
+**Sırada:** HMAC anahtarını üretmek ve karta derleme sırasında vermek.
 
 ## Bitenler
 
@@ -130,12 +163,11 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
       hat hatası türü sayaçları (`c765bac`)
 - [x] **Faz 2.6 kartsız kısmı tamam:** CRC-16 ve COBS (`da756d7`), SHA-256 ve HMAC
       (`cfb1c5a`), çerçeve (`fac14f0`). 147 test
+- [x] **Faz 2.6 kartta ölçüm tamam:** DWT çevrim sayacı (`timing/dwt`), HMAC süresi ve
+      sabit zamanlı karşılaştırma ölçüldü (K-022)
 
 ## Sırada
 
-- [ ] **Faz 2.6'nın kartlı kısmı:** HMAC'in karttaki süresi (DWT, K-009) ve etiket
-      karşılaştırmasının farka bağlı olmadığının ölçümü. Süre büyükse: hazırlanmış HMAC
-      bağlamını bir kez kurup her çerçevede kopyalamak (blok işlemi 4'ten 2'ye iner)
 - [ ] HMAC anahtarını üret: `secrets/hmac_key.bin` (32 bayt, depoya girmez). Kart anahtarı,
       derleme sırasında `secrets/`'tan üretilen bir C başlığından alır (`docs/protocol.md` §11)
 - [ ] Ollama kurulumu (model seçimi Faz 4'te)
@@ -168,6 +200,10 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
 - [x] C çerçeveleyici (gcc, PC'de): 147 test. CRC `"123456789"` → `0x29B1`, SHA-256 NIST
       girdileri ve 1 milyon `a`, HMAC RFC 4231'in 7 örneği, protocol.md §4.4'teki etiket
       `06 1A 85 7A 51 0A AA 4E`. Çalıştırmak için: `python3 -m pytest shared/protocol/tests`
+- [x] HMAC kartta (Faz 2.6, `hmac_test_result`): `tag_ok = 1`, iki derlemede de. Release
+      firmware 0 uyarı, flash 15 616 B. Debug firmware 0 uyarı, flash 28 144 B. Süreler
+      yukarıdaki tabloda. CAN testi iki derlemede de geçti (sıra `0x110, 0x100, 0x120`,
+      TEC/REC 0)
 - [x] Ajan kanalında elle yankı (minicom, `/dev/ttyACM0`, 115200)
 - [x] Ajan kanalında yük testi (`tools/echo_test.py`): 102 400 / 102 400 bayt, 0 fark,
       11 422 B/s (hat sınırının %99,1'i). Dairesel tampon ~400 kez başa döndü
@@ -221,6 +257,21 @@ other.
 "$(find /opt/st/stm32cubeide_2.2.0/plugins -name arm-none-eabi-nm -type f | head -1)" \
     -S firmware/Debug/firmware.elf | grep -E " (agent|vehicle)$"
 # <yapının adresi + 0x148>'den 20 bayt oku. c765bac'te: ajan 0x20000538, araç 0x20000694
+```
+
+**HMAC süre ölçümü** (`hmac_test_result`, 20 × 4 bayt). Sırasıyla: magic (`0x4AC7E57D`),
+tag_ok, sonra 9 çift (en kısa, en uzun) çevrim: empty, hmac_full, hmac_prepared,
+equal_same, equal_diff0, equal_diff7, memcmp_same, memcmp_diff0, memcmp_diff7. Net süre
+için `empty`'nin en kısası çıkarılır.
+
+```bash
+# Release derlemesi (-Os). Debug için yol firmware/Debug
+/opt/st/stm32cubeide_2.2.0/headless-build.sh -data ~/STM32CubeIDE/ws_headless -build firmware/Release
+# Adres derlemeye göre değişir: Release'de 0x200004D0, Debug'da 0x200003F0 (2026-10-01)
+"$(find /opt/st/stm32cubeide_2.2.0/plugins -name arm-none-eabi-nm -type f | head -1)" \
+    -S firmware/Release/firmware.elf | grep hmac_test_result
+"$(find /opt/st/stm32cubeide_2.2.0/plugins -name STM32_Programmer_CLI -type f)" \
+    -c port=SWD mode=HOTPLUG -r32 <adres> 0x50
 ```
 
 ## Açık sorular / kararsız konular
