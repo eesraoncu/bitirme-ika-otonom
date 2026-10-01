@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "auth/key.h"
+#include "timing/timing.h"
 
 /* HELLO yayını ve HELLO_REQ cevabı aynı sınırı paylaşır: en fazla 500 ms'de
  * bir, yani saniyede 2 (docs/protocol.md §5.3). */
@@ -130,7 +131,12 @@ void channel_poll(channel_t *ch, uint32_t now_ms, const channel_board_t *board,
     for (size_t i = 0; i < n; i++) {
         switch (frame_rx_push(&ch->rx, buf[i])) {
         case FRAME_RX_FRAME:
+            /* Karar süresi burada başlar: çerçeve tamamlandı, henüz
+             * çözülmedi. HMAC doğrulaması da süreye dahil. */
+            ch->frame_t0 = dwt_cycles();
+            timing_pin_high();
             on_wire_frame(ch, now_ms, board, handler);
+            timing_pin_low();
             break;
         case FRAME_RX_OVERFLOW:
             ch->cnt.err_framing++;

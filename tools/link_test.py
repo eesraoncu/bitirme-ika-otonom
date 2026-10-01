@@ -23,6 +23,7 @@ import argparse
 import os
 import struct
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
@@ -58,6 +59,9 @@ class Link:
         self.decoder = fr.StreamDecoder()
         self.pending: List[Tuple[fr.Frame, type]] = []   # okunmuş, henüz bakılmamış
         self.synced = False   # ilk ayraç görüldü mü
+        self.clean = False    # ilk geçerli çerçeve görüldü mü
+        # Kalp atışı başka bir iş parçacığından gönderilebilir (decision_test.py)
+        self.lock = threading.Lock()
         self.session_id: Optional[int] = None
         self.seq = 0
         self.board_ms_at: Tuple[int, float] = (0, time.monotonic())
@@ -93,9 +97,19 @@ class Link:
                 data = data[i + 1:]
                 self.synced = True
             for item in self.decoder.feed(data):
-                if isinstance(item, fr.FrameError):
-                    raise item
-                got = self._decode(item)
+                try:
+                    if isinstance(item, fr.FrameError):
+                        raise item
+                    got = self._decode(item)
+                except fr.FrameError:
+                    # Kart yeniden başlarken gönderdiği çerçeve yarıda kalır;
+                    # USB köprüsü o baytları tutup port açılınca verir. İlk
+                    # geçerli çerçeveden önceki bozukluk bunun izidir, sonraki
+                    # her bozukluk gerçek bir hatadır.
+                    if self.clean:
+                        raise
+                    continue
+                self.clean = True
                 if got is not None:
                     self.pending.append(got)
         return self.pending.pop(0) if self.pending else None
@@ -130,8 +144,9 @@ class Link:
 
     def frame(self, msg, *, seq: Optional[int] = None) -> fr.Frame:
         if seq is None:
-            self.seq += 1
-            seq = self.seq
+            with self.lock:
+                self.seq += 1
+                seq = self.seq
         return fr.Frame(msg.ID, seq, self.board_now(), msg.pack())
 
     def encode(self, f: fr.Frame, *, key: Optional[bytes] = None,
@@ -140,13 +155,22 @@ class Link:
                                self.session_id if session_id is None else session_id)
 
     def write(self, wire: bytes) -> None:
-        self.ser.write(wire)
-        self.ser.flush()
+        with self.lock:
+            self.ser.write(wire)
+            self.ser.flush()
 
     def send(self, msg) -> bytes:
-        wire = self.encode(self.frame(msg))
-        self.write(wire)
+        # Sayaç ve yazma tek kilitte: iki iş parçacığı çerçeveleri sayaç
+        # sırasının tersine yazarsa kart küçük sayaçlıyı REPLAY ile düşürür.
+        with self.lock:
+            wire = self.encode(self.frame_locked(msg))
+            self.ser.write(wire)
+            self.ser.flush()
         return wire
+
+    def frame_locked(self, msg) -> fr.Frame:
+        self.seq += 1
+        return fr.Frame(msg.ID, self.seq, self.board_now(), msg.pack())
 
     # -- oturum --------------------------------------------------------------
 
@@ -192,9 +216,14 @@ def corrupt_crc(wire: bytes) -> bytes:
     return fr.cobs_encode(bytes(raw)) + bytes([m.FRAME_DELIMITER])
 
 
+# Kendiliğinden akan mesajlar: HELLO yayını, saniyede bir STATUS, HOLD'da araç
+# kanalına 20 Hz sıfır hız (docs/RULES.md §5.2).
+BACKGROUND = (m.Status, m.Hello, m.Drive)
+
+
 def no_reply(link: Link, what: str, rep: Report) -> None:
-    """Hatalı mesaja cevap gelmemeli. HELLO yayını ve STATUS zaten akabilir."""
-    others = [c.NAME for _, c in link.receive(REPLY_WAIT_S) if c not in (m.Status, m.Hello)]
+    """Hatalı mesaja cevap gelmemeli. Kendiliğinden akan mesajlar sayılmaz."""
+    others = [c.NAME for _, c in link.receive(REPLY_WAIT_S) if c not in BACKGROUND]
     rep.check(not others, f"{what}: cevap yok", ", ".join(others) if others else "")
 
 
@@ -254,7 +283,6 @@ def test_agent(link: Link, rep: Report) -> int:
         rep.check(d == n, f"STATUS.{name} +{n}", f"+{d}")
     d_ok = (after.frames_ok - before.frames_ok) & 0xFFFF
     rep.check(d_ok == 1, "STATUS.frames_ok +1 (yalnızca son HEARTBEAT)", f"+{d_ok}")
-    rep.check(after.telemetry_age_ms == 0xFFFF, "telemetri yaşı doymuş (henüz işlenmiyor)")
 
     # HELLO_REQ seli: saniyede en fazla 2 cevap. Art arda 5 istek → 1 HELLO
     link.receive(0.6)   # son HELLO'dan beri 500 ms geçsin

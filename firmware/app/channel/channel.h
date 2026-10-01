@@ -57,6 +57,8 @@ typedef struct {
     uint8_t txq_head;
     uint8_t txq_len;
     uint32_t tx_dropped;       /* kuyruk doluydu. STATUS'ta yok, RAM'den okunur */
+    uint32_t frame_t0;         /* son çerçevenin tamamlandığı an (DWT çevrimi).
+                                  Handler karar süresini bundan ölçer (K-009) */
 } channel_t;
 
 /* Kartın HELLO ve STATUS'a giren, tek bir kanala ait olmayan durumu. */
@@ -66,7 +68,8 @@ typedef struct {
     uint16_t telemetry_age_ms;
 } channel_board_t;
 
-/* Tüm denetimleri geçen bir çerçeve için çağrılır. */
+/* Tüm denetimleri geçen bir çerçeve için çağrılır. Çerçevenin ayracı
+ * geldiğinden beri ölçüm pini (PA8) 1'dir, handler dönünce 0 olur. */
 typedef void (*channel_handler_t)(channel_t *ch, const frame_t *f);
 
 void channel_init(channel_t *ch, serial_link_port_t port, uint8_t proto_ch,

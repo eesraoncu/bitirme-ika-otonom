@@ -6,10 +6,14 @@
 #include "fdcan.h"  /* Geçici: Faz 2.4 testi birimin durumunu HAL'den soruyor */
 #include "rng.h"    /* CubeMX: hrng, oturum kimliği için */
 #include "channel/channel.h"
+#include "guard/guard.h"
 #include "links/can_link.h"
 #include "links/serial_link.h"
 #include "proto_msgs.h"
-#include "timing/dwt.h"
+#include "rules/heartbeat/heartbeat.h"
+#include "site/site.h"
+#include "timing/timing.h"
+#include "vehicle_node/vehicle_node.h"
 
 /* Faz 2.1 doğrulaması: kısa bir "nabız". Saniyede bir, 100 ms yanık.
  * LED testinin 500/500 deseninden gözle ayırt edilsin diye farklı seçildi.
@@ -227,17 +231,23 @@ static void run_can_test(void)
 
 /* ---- Uygulama ------------------------------------------------------------ */
 
+/* HOLD'da araca 20 Hz'de sıfır hız gönderilir: araç tarafının son komutu
+ * tutup tutmadığına güvenilmez (docs/RULES.md §5.2). */
+#define HOLD_DRIVE_PERIOD_MS 50u
+
 static channel_t agent_ch;
 static channel_t vehicle_ch;
+static guard_t guard;
+static uint32_t last_hold_drive_ms;
+static bool telemetry_seen;
+static uint32_t last_telemetry_ms;
 
-/* Kartın durumu. Durum makinesi Faz 2.6 c'de gelecek. O zamana kadar kart
- * açıldığı gibi HOLD'da kalır (docs/RULES.md §5.2). Telemetri henüz
- * işlenmiyor, yaşı doymuş değerde. */
-static channel_board_t board = {
-    .state = PROTO_BOARD_STATE_HOLD,
-    .reject_streak = 0u,
-    .telemetry_age_ms = UINT16_MAX,
-};
+/* Karar süresi: GOTO_CMD çerçevesinin tamamlanmasından VERDICT ve GOAL
+ * kuyruğa girene kadar (K-009). Karttan salt okuma ile okunur. */
+volatile timing_stats_t goto_timing;
+
+/* Kuyruk dolduğu için CAN'e konamayan onaylı mesaj. RAM'den okunur. */
+volatile uint32_t guard_can_tx_full;
 
 /* Oturum kimliği, açılışta donanım RNG'den (docs/protocol.md §5.2). RNG
  * hata verirse (saat ya da tohum hatası) kart çalışmaz: tahmin edilebilir ya
@@ -252,32 +262,111 @@ static uint32_t new_session_id(void)
     return id;
 }
 
+static void guard_can_send(uint16_t can_id, const uint8_t *data, uint8_t len)
+{
+    can_frame_t cf = { .id = can_id, .len = len };
+    memcpy(cf.data, data, len);
+    if (!can_link_send(CAN_LINK_GUARD, &cf)) {
+        guard_can_tx_full++;
+    }
+}
+
+static void send_decision(channel_t *ch, const guard_decision_t *d)
+{
+    uint8_t p[PROTO_SIZE_VERDICT];
+    proto_verdict_encode(&d->verdict, p);
+    (void)channel_send(ch, PROTO_ID_VERDICT, p, sizeof p);
+    if (d->send_goal) {
+        uint8_t g[PROTO_SIZE_GOAL];
+        proto_goal_encode(&d->goal, g);
+        guard_can_send(PROTO_CAN_ID_GOAL, g, sizeof g);
+    }
+}
+
+static void on_heartbeat(channel_t *ch, const frame_t *f)
+{
+    /* Uzunluk frame_decode'da denetlendi. Yine de sonuca bakılır:
+     * çözülmemiş bir yük hiçbir zaman kullanılmasın. */
+    proto_heartbeat_t hb;
+    if (!proto_heartbeat_decode(f->payload, f->payload_len, &hb)) {
+        return;
+    }
+    heartbeat_feed();
+    proto_heartbeat_ack_t ack = {
+        .echo_pc_ms = hb.echo_pc_ms,
+        .state = guard.state,
+        .reject_streak = guard.reject_streak,
+    };
+    uint8_t p[PROTO_SIZE_HEARTBEAT_ACK];
+    proto_heartbeat_ack_encode(&ack, p);
+    (void)channel_send(ch, PROTO_ID_HEARTBEAT_ACK, p, sizeof p);
+}
+
 static void on_agent_frame(channel_t *ch, const frame_t *f)
 {
-    if (f->type == PROTO_ID_HEARTBEAT) {
-        /* Uzunluk frame_decode'da denetlendi. Yine de sonuca bakılır:
-         * çözülmemiş bir yük hiçbir zaman kullanılmasın. */
-        proto_heartbeat_t hb;
-        if (!proto_heartbeat_decode(f->payload, f->payload_len, &hb)) {
+    guard_decision_t d;
+    switch (f->type) {
+    case PROTO_ID_HEARTBEAT:
+        on_heartbeat(ch, f);
+        break;
+    case PROTO_ID_GOTO_CMD: {
+        proto_goto_cmd_t cmd;
+        if (!proto_goto_cmd_decode(f->payload, f->payload_len, &cmd)) {
             return;
         }
-        proto_heartbeat_ack_t ack = {
-            .echo_pc_ms = hb.echo_pc_ms,
-            .state = board.state,
-            .reject_streak = board.reject_streak,
-        };
-        uint8_t p[PROTO_SIZE_HEARTBEAT_ACK];
-        proto_heartbeat_ack_encode(&ack, p);
-        (void)channel_send(ch, PROTO_ID_HEARTBEAT_ACK, p, sizeof p);
+        guard_goto(&guard, &site, f->seq, &cmd, &d);
+        send_decision(ch, &d);
+        timing_record(&goto_timing, ch->frame_t0);
+        break;
     }
-    /* Zaman aşımı Faz 2.6 d'de, görev ve hız komutları c'de. */
+    case PROTO_ID_RESET_CMD:
+        guard_reset(&guard, f->seq, heartbeat_alive(), &d);
+        send_decision(ch, &d);
+        break;
+    default:
+        /* VELOCITY_CMD, WAIT_CMD, SPEED_LIMIT_CMD, STOP_CMD Faz 3-4'te. */
+        break;
+    }
 }
 
 static void on_vehicle_frame(channel_t *ch, const frame_t *f)
 {
-    /* TELEMETRY Faz 2.6 c'de işlenecek. */
     (void)ch;
-    (void)f;
+    if (f->type == PROTO_ID_TELEMETRY) {
+        vehicle_node_telemetry(f);
+    }
+}
+
+/* Bekçi düğümüne (FDCAN1) araç tarafından gelen: TELEMETRY. İçeriği
+ * tutarlılık kuralında kullanılacak (Faz 4), şimdilik yalnızca yaşı. */
+static void guard_can_poll(uint32_t now)
+{
+    can_frame_t cf;
+    while (can_link_receive(CAN_LINK_GUARD, &cf)) {
+        if (cf.id == PROTO_CAN_ID_TELEMETRY) {
+            telemetry_seen = true;
+            last_telemetry_ms = now;
+        }
+    }
+}
+
+static uint16_t telemetry_age_ms(uint32_t now)
+{
+    uint32_t age = telemetry_seen ? now - last_telemetry_ms : UINT16_MAX;
+    return age > UINT16_MAX ? UINT16_MAX : (uint16_t)age;
+}
+
+static void hold_drive(uint32_t now)
+{
+    if (guard.state != PROTO_BOARD_STATE_HOLD ||
+        now - last_hold_drive_ms < HOLD_DRIVE_PERIOD_MS) {
+        return;
+    }
+    last_hold_drive_ms = now;
+    proto_drive_t zero = { .v_mm_s = 0, .w_mrad_s = 0 };
+    uint8_t p[PROTO_SIZE_DRIVE];
+    proto_drive_encode(&zero, p);
+    guard_can_send(PROTO_CAN_ID_DRIVE, p, sizeof p);
 }
 
 void app_init(void)
@@ -287,16 +376,32 @@ void app_init(void)
     can_link_init();
     run_can_test();
 
+    guard_init(&guard);
+    vehicle_node_init();
     uint32_t session_id = new_session_id();
     channel_init(&agent_ch, SERIAL_LINK_AGENT, PROTO_CH_AGENT, session_id);
     channel_init(&vehicle_ch, SERIAL_LINK_VEHICLE, PROTO_CH_VEHICLE, session_id);
+    heartbeat_init();
 }
 
 void app_loop(void)
 {
     uint32_t now = HAL_GetTick();
+
+    if (heartbeat_take_lost()) {
+        guard_heartbeat_lost(&guard);
+    }
+    channel_board_t board = {
+        .state = guard.state,
+        .reject_streak = guard.reject_streak,
+        .telemetry_age_ms = telemetry_age_ms(now),
+    };
+
     channel_poll(&agent_ch, now, &board, on_agent_frame);
     channel_poll(&vehicle_ch, now, &board, on_vehicle_frame);
+    guard_can_poll(now);
+    hold_drive(now);
+    vehicle_node_poll(&vehicle_ch);
     channel_service(&agent_ch, now, &board);
     channel_service(&vehicle_ch, now, &board);
 
