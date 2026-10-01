@@ -5,6 +5,7 @@
 #include "main.h"   /* HAL (HAL_GetTick) ve BSP (BSP_LED_*) */
 #include "fdcan.h"  /* Geçici: Faz 2.4 testi birimin durumunu HAL'den soruyor */
 #include "auth/hmac_sha256.h"
+#include "auth/key.h"
 #include "links/can_link.h"
 #include "links/serial_link.h"
 #include "proto_msgs.h"
@@ -391,6 +392,36 @@ static void run_hmac_test(void)
     hmac_test_result.magic = HMAC_TEST_MAGIC;
 }
 
+/* ---- Faz 2.6: anahtar denetimi (geçici) ----------------------------------
+ *
+ * Kart ile bilgisayar aynı anahtarı mı biliyor? Anahtar ekrana yazılmadan
+ * denetlenir: herkesin bildiği sabit bir mesajın HMAC'i (parmak izi) iki
+ * tarafta hesaplanır. tools/gen_key.py aynı mesajla aynı 8 baytı yazdırır.
+ * HMAC'ten anahtar geri çıkarılamadığı için parmak izi gizli değildir. */
+
+#define KEY_CHECK_MAGIC  0x4E7C4EC4u
+#define KEY_CHECK_MSG    "IKA anahtar denetimi"   /* gen_key.py: FINGERPRINT_MSG */
+
+typedef struct {
+    uint32_t magic;            /* KEY_CHECK_MAGIC: denetim çalıştı */
+    uint8_t fingerprint[8];
+} key_check_result_t;
+
+volatile key_check_result_t key_check_result;
+
+static void run_key_check(void)
+{
+    hmac_sha256_ctx_t c;
+    uint8_t d[SHA256_DIGEST_BYTES];
+    hmac_sha256_init(&c, auth_key, sizeof auth_key);
+    hmac_sha256_update(&c, (const uint8_t *)KEY_CHECK_MSG, sizeof KEY_CHECK_MSG - 1u);
+    hmac_sha256_final(&c, d);
+    for (size_t i = 0; i < sizeof key_check_result.fingerprint; i++) {
+        key_check_result.fingerprint[i] = d[i];
+    }
+    key_check_result.magic = KEY_CHECK_MAGIC;
+}
+
 /* ---- Uygulama ------------------------------------------------------------ */
 
 /* Faz 2.2 ve 2.5 yankı testi: port'tan gelen her baytı aynı porta geri
@@ -414,6 +445,7 @@ void app_init(void)
     can_link_init();
     run_can_test();
     run_hmac_test();
+    run_key_check();
 }
 
 void app_loop(void)
