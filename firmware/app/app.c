@@ -4,9 +4,11 @@
 
 #include "main.h"   /* HAL (HAL_GetTick) ve BSP (BSP_LED_*) */
 #include "fdcan.h"  /* Geçici: Faz 2.4 testi birimin durumunu HAL'den soruyor */
+#include "auth/hmac_sha256.h"
 #include "links/can_link.h"
 #include "links/serial_link.h"
 #include "proto_msgs.h"
+#include "timing/dwt.h"
 
 /* Faz 2.1 doğrulaması: kısa bir "nabız". Saniyede bir, 100 ms yanık.
  * LED testinin 500/500 deseninden gözle ayırt edilsin diye farklı seçildi.
@@ -222,6 +224,173 @@ static void run_can_test(void)
     can_test_result.magic = TEST_MAGIC;
 }
 
+/* ---- Faz 2.6: HMAC süre ölçümü (geçici) ----------------------------------
+ *
+ * A. Tam HMAC: anahtar her seferinde yeniden hazırlanır (frame.c'nin
+ *    compute_tag'i böyle). 4 SHA-256 blok işlemi: ipad, opad, veri, dış özet.
+ * B. Hazırlanmış bağlam kopyalanır, yalnızca veri ve dış özet işlenir: 2 blok.
+ * C. hmac_tag_equal: etiketler eşit, fark 0. baytta, fark 7. baytta.
+ *    Üçünün süresi aynı olmalı.
+ * D. Aynı üç durum memcmp ile. Kontrol deneyi: memcmp ilk farkta durur,
+ *    süresi farklı çıkmalı. Çıkmazsa ölçüm bu farkı göremiyor demektir.
+ *
+ * Girdi test_vectors.json'daki VERDICT çerçevesi: en uzun yük (23 bayt),
+ * test anahtarı ve test oturumu. Kartta hesaplanan etiket vektördekiyle
+ * karşılaştırılır (tag_ok): kriptografi kodu ilk kez ARM'da çalışıyor.
+ *
+ * Her ölçüm HMAC_RUNS kez tekrarlanır, en kısa ve en uzun süre saklanır.
+ * Kesmeler her ölçümün süresince kapalı: SysTick ya da UART kesmesi araya
+ * girip süreyi uzatmasın. Bir ölçüm 1 ms'den çok kısa olduğu için SysTick
+ * kesmesi kaybolmaz, yalnızca ölçüm bitince işlenir. */
+
+#define HMAC_TEST_MAGIC  0x4AC7E57Du
+#define HMAC_RUNS        1000u
+
+typedef struct {
+    uint32_t min;
+    uint32_t max;
+} cycles_t;
+
+/* Karttan salt okuma ile okunur. Süreler çevrim (170 MHz'de 5,9 ns) ve
+ * empty dahil, yani her birinden empty.min çıkarılmalı. */
+typedef struct {
+    uint32_t magic;          /* HMAC_TEST_MAGIC: ölçüm sonuna kadar çalıştı */
+    uint32_t tag_ok;         /* 1: A ve B'nin etiketi test vektörüyle aynı */
+    cycles_t empty;          /* boş fonksiyon: çağrının ve ölçümün kendi maliyeti */
+    cycles_t hmac_full;      /* A */
+    cycles_t hmac_prepared;  /* B */
+    cycles_t equal_same;     /* C */
+    cycles_t equal_diff0;
+    cycles_t equal_diff7;
+    cycles_t memcmp_same;    /* D */
+    cycles_t memcmp_diff0;
+    cycles_t memcmp_diff7;
+} hmac_test_result_t;
+
+volatile hmac_test_result_t hmac_test_result;
+
+static const uint8_t test_key[32] = {
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+    0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
+};
+
+/* session_id = 0x1234ABCD, küçük uçlu (proto_put_u32 gibi). */
+static const uint8_t test_sid[4] = { 0xCD, 0xAB, 0x34, 0x12 };
+
+/* VERDICT: başlık (9) ‖ yük (23). */
+static const uint8_t test_body[PROTO_HEADER_BYTES + PROTO_MAX_PAYLOAD_BYTES] = {
+    0x90, 0xF3, 0x03, 0x00, 0x00, 0xBE, 0xC3, 0x00, 0x00,
+    0xEF, 0xCD, 0xAB, 0x89, 0x01, 0x07, 0x35, 0x5C, 0x79, 0xFE, 0xFF, 0xA5,
+    0x86, 0x01, 0x00, 0x5A, 0x79, 0xFE, 0xFF, 0xEF, 0x03, 0x10, 0xFC,
+};
+
+static const uint8_t test_tag[PROTO_TAG_BYTES] = {
+    0xD1, 0x8F, 0xD5, 0xB0, 0x30, 0xE0, 0x2C, 0x5B,
+};
+
+/* Ölçülen fonksiyonların girdisi ve çıktısı. Fonksiyonlar parametresiz,
+ * çünkü hepsi aynı measure() ile ölçülüyor. */
+static hmac_sha256_ctx_t prepared;
+static uint8_t digest[SHA256_DIGEST_BYTES];
+static uint8_t tag_same[PROTO_TAG_BYTES];
+static uint8_t tag_diff0[PROTO_TAG_BYTES];
+static uint8_t tag_diff7[PROTO_TAG_BYTES];
+static const uint8_t *tag_other;
+/* volatile: sonuç kullanılmasa da derleyici karşılaştırmayı silmesin. */
+static volatile bool tag_sink;
+
+static void run_nothing(void)
+{
+}
+
+static void run_hmac_full(void)
+{
+    hmac_sha256_ctx_t c;
+    hmac_sha256_init(&c, test_key, sizeof test_key);
+    hmac_sha256_update(&c, test_sid, sizeof test_sid);
+    hmac_sha256_update(&c, test_body, sizeof test_body);
+    hmac_sha256_final(&c, digest);
+}
+
+static void run_hmac_prepared(void)
+{
+    hmac_sha256_ctx_t c = prepared;
+    hmac_sha256_update(&c, test_sid, sizeof test_sid);
+    hmac_sha256_update(&c, test_body, sizeof test_body);
+    hmac_sha256_final(&c, digest);
+}
+
+static void run_tag_equal(void)
+{
+    tag_sink = hmac_tag_equal(test_tag, tag_other, PROTO_TAG_BYTES);
+}
+
+static void run_memcmp(void)
+{
+    tag_sink = (memcmp(test_tag, tag_other, PROTO_TAG_BYTES) == 0);
+}
+
+static void measure(void (*fn)(void), volatile cycles_t *out)
+{
+    uint32_t lo = UINT32_MAX;
+    uint32_t hi = 0u;
+    for (uint32_t i = 0; i < HMAC_RUNS; i++) {
+        __disable_irq();
+        uint32_t t0 = dwt_cycles();
+        fn();
+        uint32_t dt = dwt_cycles() - t0;
+        __enable_irq();
+        if (dt < lo) {
+            lo = dt;
+        }
+        if (dt > hi) {
+            hi = dt;
+        }
+    }
+    out->min = lo;
+    out->max = hi;
+}
+
+static void measure_compare(void (*fn)(void), volatile cycles_t *same,
+                            volatile cycles_t *diff0, volatile cycles_t *diff7)
+{
+    tag_other = tag_same;
+    measure(fn, same);
+    tag_other = tag_diff0;
+    measure(fn, diff0);
+    tag_other = tag_diff7;
+    measure(fn, diff7);
+}
+
+static void run_hmac_test(void)
+{
+    hmac_sha256_init(&prepared, test_key, sizeof test_key);
+
+    memcpy(tag_same, test_tag, sizeof tag_same);
+    memcpy(tag_diff0, test_tag, sizeof tag_diff0);
+    memcpy(tag_diff7, test_tag, sizeof tag_diff7);
+    tag_diff0[0] ^= 0x01u;
+    tag_diff7[PROTO_TAG_BYTES - 1u] ^= 0x01u;
+
+    measure(run_nothing, &hmac_test_result.empty);
+
+    measure(run_hmac_full, &hmac_test_result.hmac_full);
+    bool ok = memcmp(digest, test_tag, PROTO_TAG_BYTES) == 0;
+    memset(digest, 0, sizeof digest);   /* B kendi sonucunu yazmalı */
+    measure(run_hmac_prepared, &hmac_test_result.hmac_prepared);
+    ok = ok && memcmp(digest, test_tag, PROTO_TAG_BYTES) == 0;
+    hmac_test_result.tag_ok = ok;
+
+    measure_compare(run_tag_equal, &hmac_test_result.equal_same,
+                    &hmac_test_result.equal_diff0, &hmac_test_result.equal_diff7);
+    measure_compare(run_memcmp, &hmac_test_result.memcmp_same,
+                    &hmac_test_result.memcmp_diff0, &hmac_test_result.memcmp_diff7);
+
+    hmac_test_result.magic = HMAC_TEST_MAGIC;
+}
+
 /* ---- Uygulama ------------------------------------------------------------ */
 
 /* Faz 2.2 ve 2.5 yankı testi: port'tan gelen her baytı aynı porta geri
@@ -240,9 +409,11 @@ static void echo(serial_link_port_t port)
 
 void app_init(void)
 {
+    dwt_init();
     serial_link_init();
     can_link_init();
     run_can_test();
+    run_hmac_test();
 }
 
 void app_loop(void)
