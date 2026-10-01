@@ -75,6 +75,7 @@ enums:
       IN_RECOVERY: 20
       IN_HOLD: 21
       NOT_IN_HOLD: 22         # SIFIRLA yalnızca HOLD'da geçerli
+      NO_HEARTBEAT: 23        # SIFIRLA yalnızca kalp atışı canlıyken geçerli (RULES §5.2)
       # GEOFENCE
       GOAL_OUTSIDE_ALLOWED: 30  # hint = en yakın kayıtlı güvenli nokta
       GOAL_IN_FORBIDDEN: 31     # hint = en yakın kayıtlı güvenli nokta

@@ -18,7 +18,7 @@
 #include <stdint.h>
 
 #define PROTO_SCHEMA_VERSION     1u
-#define PROTO_SCHEMA_HASH        0xB12F26D8u
+#define PROTO_SCHEMA_HASH        0xD9092C66u
 #define PROTO_FRAME_DELIMITER    0x00u
 #define PROTO_HEADER_BYTES       9u
 #define PROTO_TAG_BYTES          8u
@@ -133,6 +133,7 @@ typedef enum {
     PROTO_REASON_IN_RECOVERY = 20,
     PROTO_REASON_IN_HOLD = 21,
     PROTO_REASON_NOT_IN_HOLD = 22,
+    PROTO_REASON_NO_HEARTBEAT = 23,
     PROTO_REASON_GOAL_OUTSIDE_ALLOWED = 30,
     PROTO_REASON_GOAL_IN_FORBIDDEN = 31,
     PROTO_REASON_ABOVE_MAX = 40,
@@ -152,6 +153,7 @@ static inline bool proto_reason_is_valid(uint8_t v)
     case 20u:
     case 21u:
     case 22u:
+    case 23u:
     case 30u:
     case 31u:
     case 40u:

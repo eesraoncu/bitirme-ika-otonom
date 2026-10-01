@@ -13,7 +13,7 @@ from enum import IntEnum
 from typing import ClassVar, Dict, Optional, Type
 
 SCHEMA_VERSION = 1
-SCHEMA_HASH = 0xB12F26D8
+SCHEMA_HASH = 0xD9092C66
 FRAME_DELIMITER = 0x00
 HEADER_FORMAT = "<BII"  # type, seq, ts_ms
 HEADER_BYTES = 9
@@ -68,6 +68,7 @@ class Reason(IntEnum):
     IN_RECOVERY = 20
     IN_HOLD = 21
     NOT_IN_HOLD = 22
+    NO_HEARTBEAT = 23
     GOAL_OUTSIDE_ALLOWED = 30
     GOAL_IN_FORBIDDEN = 31
     ABOVE_MAX = 40

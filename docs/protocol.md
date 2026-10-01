@@ -298,7 +298,7 @@ Her kanalın kendi sayaç alanı vardır. Oturum kimliği ortaktır.
 
 ### 5.4 Şema özeti: tek kaynak ilkesinin çalışma zamanı denetimi
 
-`HELLO`, `messages.yaml`'ın 32 bitlik özetini taşır (şu an `0xB12F26D8`). Özet yalnızca
+`HELLO`, `messages.yaml`'ın 32 bitlik özetini taşır (şu an `0xD9092C66`). Özet yalnızca
 anlamı değiştiren düzenlemelerde değişir, `doc:` satırlarındaki düzenlemeler onu etkilemez.
 
 Köprünün özeti karttakinden farklıysa köprü **çalışmayı reddeder.** K-003'ün önlemek
@@ -385,7 +385,7 @@ Planın istediği üç şey, "hangi kural, neden, izinli değer aralığı", şu
 |---|---|---|---|
 | `TOO_OLD` | komut yaşı (ms) | — / 200 | — |
 | `FROM_FUTURE` | yaş (ms, negatif) | −50 / — | — |
-| `IN_RECOVERY`, `IN_HOLD`, `NOT_IN_HOLD` | — | — | — |
+| `IN_RECOVERY`, `IN_HOLD`, `NOT_IN_HOLD`, `NO_HEARTBEAT` | — | — | — |
 | `GOAL_OUTSIDE_ALLOWED`, `GOAL_IN_FORBIDDEN` | — | — | **en yakın kayıtlı güvenli nokta** |
 | `ABOVE_MAX`, `NOT_POSITIVE` | istenen (mm/s) | 1 / 300 | — |
 | `TOO_FAR` | fark (cm) | — / tolerans (cm) | **aracın gerçek konumu** |

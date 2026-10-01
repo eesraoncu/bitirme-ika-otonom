@@ -1,6 +1,6 @@
 {
   "doc": "Faz 2'deki C çerçeveleyicisi bu baytları birebir üretmeli ve bad_frames'i belirtilen türle reddetmeli. Anahtar YALNIZCA TEST içindir.",
-  "schema_hash": "0xB12F26D8",
+  "schema_hash": "0xD9092C66",
   "test_key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
   "session_id": 305441741,
   "crc16_ccitt_false": [
