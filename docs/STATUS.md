@@ -4,11 +4,37 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-10-01
-**Bulunduğumuz faz:** Faz 2.6, STM32 tarafı (çerçeveleyici, HMAC ölçümü ve anahtar tamam; alıcı, geofence, kalp atışı, ölçüm pini kaldı)
+**Bulunduğumuz faz:** Faz 2.6, STM32 tarafı (a: kartın komut alması tamam; b geofence, c uçtan uca karar, d kalp atışı kaldı)
 
 ---
 
 ## Şu an ne yapılıyor
+
+**Faz 2.6 a bitti: kart komut alıyor** (K-023). Yankı kalktı. İki kanal
+`firmware/app/channel/` üzerinden çalışıyor: `frame_rx` → `frame_decode` → sayaç (REPLAY).
+Reddedilen her çerçeve kendi `STATUS` sayacını artırıyor, karttan cevap çıkmıyor. Oturum
+kimliği açılışta donanım RNG'den (CubeMX'te RNG açıldı, CK48 saati HSI48: `139a189`). Kart
+`HELLO`'yu oturum kurulana kadar 500 ms'de bir yayınlıyor, `HELLO_REQ`'e saniyede en fazla 2
+kez cevap veriyor, `STATUS`'u saniyede bir gönderiyor, `HEARTBEAT`'e `HEARTBEAT_ACK` ile
+cevap veriyor. Kart hep `HOLD`'da (durum makinesi c'de). `tools/link_test.py` 26 denetimi
+iki kanalda yapıyor, 5 çalıştırmanın 5'inde de geçti.
+
+**Faz 2.6 a'da öğrenilenler:**
+- **Testi ikinci kez çalıştırmak da bir testtir.** İlk çalıştırma kusursuz geçti. İkincisinde
+  kart `HELLO` yayınını kesmişti ve betik, oturum kimliğini öğrenmeden gelen bir `STATUS`'u
+  doğrulamaya çalışıp düştü. Kartta hata yoktu, betikte vardı.
+- **Port bir çerçevenin ortasında açılabilir.** Kart sürekli gönderdiği için betiğin ilk
+  okuduğu parça yarım çerçeve olabiliyor (`COBS kodu çerçeve sonunun ötesini gösteriyor`).
+  Rastgele görülüyordu. İlk ayraca kadar gelen baytlar atılınca kayboldu. Faz 3'teki
+  köprünün de aynısını yapması gerekecek.
+- **Okunan ama bakılmayan çerçeve kaybolmamalı.** Tek okumada birden fazla çerçeve gelebiliyor.
+  Betik aradığını bulunca kalanını atıyordu. Yazarken fark edildi, bekleme listesi eklendi.
+- **Derleyici uyarısı bir tasarım sorusuydu.** Release'te `hb.echo_pc_ms may be used
+  uninitialized`: çözme fonksiyonunun sonucu yok sayılmıştı. Uyarı bastırılmadı, sonuç
+  denetlendi.
+- **RNG tam 48 MHz istiyor.** PLLQ 340 MHz'den 48'i üretemiyor (2, 4, 6, 8 ile bölünüyor).
+  CK48 Clock Mux'ta HSI48 seçildi. HSI48 kristalsiz ve hassas değil, ama RNG rastgeleliği
+  saatten değil gürültüden alıyor.
 
 **HMAC anahtarı üretildi ve karta taşındı.** `tools/gen_key.py`, `secrets/hmac_key.bin`'i
 (32 bayt, `os.urandom`) ve kartın başlığı `secrets/hmac_key.h`'yi üretiyor. İkisi de
@@ -192,8 +218,8 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
 - [ ] **Faz 2.6'nın kalanı.** Plandaki "bitti sayılır": elle gönderilen hedef izinli bölgedeyse
       CAN'den geçip araç kanalından çıkıyor, dışındaysa gerekçeyle ajan kanalına dönüyor; USB
       kablosu çekilince kalp atışı kuralı devreye giriyor; karar süresi ölçülebiliyor.
-  - [ ] **a. Kartın komut alması:** yankı yerine `frame_rx` → `frame_decode`, sayaç (REPLAY),
-        `STATUS` sayaçları, `HELLO_REQ`/`HELLO` ile oturum. Elle imzalı mesaj gönderen araç
+  - [x] **a. Kartın komut alması:** `channel/`, RNG ile oturum, `HELLO`/`STATUS`/
+        `HEARTBEAT_ACK`, `tools/link_test.py` (K-023)
   - [ ] **b. Coğrafi sınır:** `rules/geofence`, ışın atma, PC'de test. Gerçek koordinatlar Faz 3'te
   - [ ] **c. Uçtan uca karar:** `GOTO_CMD` → geofence → CAN `GOAL` ya da `VERDICT`. Açılış `HOLD`,
         kabul için önce `RESET_CMD` (RULES §5.2). Karar süresi pinle ve DWT ile
@@ -238,8 +264,16 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
       `gen_key.py`'ninkiyle aynı. Derlenmiş dosyadaki `auth_key` iki derlemede de
       `hmac_key.bin` ile bayt bayt aynı. Anahtar başlığı yokken derleme tek mesajla duruyor.
       Release firmware 0 uyarı, flash 15 748 B. HMAC ve CAN testleri geçmeye devam ediyor
+- [x] Faz 2.6 a firmware (Debug): 0 uyarı, flash 32 568 B. Release 0 uyarı, 17 600 B.
+      `python3 tools/link_test.py`: 26 denetim geçti, 5 çalıştırmanın 5'inde. Ajan kanalında
+      `HELLO` (şema `0xB12F26D8`, `HOLD`), imzalı `HEARTBEAT` → `HEARTBEAT_ACK`. Tekrar
+      oynatılan, yanlış anahtarla ve başka oturumla imzalanan, biti bozuk, ajan kanalından
+      gelen `TELEMETRY` ve 70 baytlık çerçeve: cevap yok, `err_replay` +1, `err_auth` +2,
+      `err_crc` +1, `err_type` +1, `err_framing` +1. 5 `HELLO_REQ` → 1 `HELLO`. Araç kanalında
+      oturum kimliği aynı, `TELEMETRY` kabul, `HEARTBEAT` `err_type`. CAN testi geçmeye devam ediyor
 - [x] Ajan kanalında elle yankı (minicom, `/dev/ttyACM0`, 115200)
-- [x] Ajan kanalında yük testi (`tools/echo_test.py`): 102 400 / 102 400 bayt, 0 fark,
+- [x] Ajan kanalında yük testi (`tools/echo_test.py`, **Faz 2.6 a'dan beri kartta yankı yok**,
+      betik ancak `139a189` ve öncesindeki bir firmware ile çalışır): 102 400 / 102 400 bayt, 0 fark,
       11 422 B/s (hat sınırının %99,1'i). Dairesel tampon ~400 kez başa döndü
 - [x] CAN modülü: üzerinde `121` (120 Ω) sonlandırma direnci görüldü. Ek direnç gerekmiyor
 - [x] Protokol: 80 test, C↔Python bayt eşitliği dahil

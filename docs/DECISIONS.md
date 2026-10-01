@@ -521,3 +521,33 @@ Değişiklik `compute_tag`'e sınırlı, `hmac_sha256_init()` dış özeti zaten
 **Dikkat:** Sabit zamanlılık derleyicinin ürettiği koda bağlı. `-Os`'ta `hmac_tag_equal`'ın
 makine kodu `objdump` ile okundu, döngüde erken çıkış yok. Derleyici ya da derleme seçeneği
 değişirse ölçüm tekrarlanır.
+
+---
+
+## K-023 · Kanal katmanı: sayaç, oturum ve STATUS `channel/` içinde
+**Tarih:** 2026-10-01 · **Durum:** Yürürlükte
+
+Bir seri kanalın protokol durumu `firmware/app/channel/`'dadır: son kabul edilen sayaç
+(REPLAY), `STATUS` sayaçları, giden sayaç, oturumun o kanalda kurulup kurulmadığı ve
+gönderme kuyruğu. `serial_link` (bayt taşır) ve `frame` (çerçeveyi çözer) durumsuz kalır.
+Oturum kimliği açılışta donanım RNG'sinden alınır ve iki kanalda ortaktır. RNG hata
+verirse kart çalışmaz.
+
+**Neden:**
+- **Sayaç kanalın bilgisidir.** Her kanalın kendi sayaç alanı var (`docs/protocol.md`
+  §5.3). Planın klasör yapısı tekrar kontrolünü `auth/`'a koyuyordu. `auth/` imza işi olarak
+  kaldı. Sayaç, kanalın diğer durum bilgileriyle aynı yerde: bir kanalın davranışını
+  değiştirmek tek klasöre bakmayı gerektiriyor.
+- **`HELLO_REQ` sayacı değiştirmez.** İmzasız bir mesaj sayacı ileri itebilseydi, saldırgan
+  sayacı yükseltip köprünün meşru çerçevelerini REPLAY ile düşürtebilirdi (RULES §4).
+- **Gönderme kuyruğu (4 mesaj).** Hat bir çerçeveyi ~4 ms'de taşıyor. Kuyruk olmasa
+  `STATUS` gönderilirken gelen `HEARTBEAT`'in cevabı kaybolurdu. Sayaç ve zaman damgası
+  çerçeve hatta çıkarken verilir: `HEARTBEAT_ACK`'in zamanı kuyrukta beklenen süreyi
+  içermez (saat eşitleme, §6).
+- **RNG'nin saati HSI48.** RNG tam 48 MHz istiyor. PLLQ 340 MHz'den 48'i üretemiyor.
+
+**Bedeli:** Her kanal yapısı 224 bayt RAM. Kuyruk dolarsa mesaj atılır ve `tx_dropped`
+artar. Bu sayaç `STATUS`'ta yok, RAM'den okunur.
+
+**Doğrulama:** `tools/link_test.py`, 26 denetim, iki kanal, 5 çalıştırmanın 5'inde geçti
+(`docs/STATUS.md`).
