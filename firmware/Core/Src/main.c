@@ -22,6 +22,7 @@
 #include "fdcan.h"
 #include "usart.h"
 #include "rng.h"
+#include "tim.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -96,6 +97,7 @@ int main(void)
   MX_FDCAN2_Init();
   MX_USART1_UART_Init();
   MX_RNG_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
