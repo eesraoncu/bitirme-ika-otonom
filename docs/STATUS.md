@@ -3,12 +3,48 @@
 > Bu dosya her çalışma oturumunun **başında okunur**, **sonunda güncellenir**.
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
-**Son güncelleme:** 2026-10-01
-**Bulunduğumuz faz:** Faz 2 bitti (2.6 kapandı). Sırada Faz 3, önce disk ve Gazebo kararı
+**Son güncelleme:** 2026-10-05
+**Bulunduğumuz faz:** Faz 2 bitti (2.6 kapandı), kablo çekme testi yapıldı (K-029). Faz 3 öncesi kararlar verildi (K-027, K-028), sırada Faz 3
 
 ---
 
 ## Şu an ne yapılıyor
+
+**Kablo çekme testi yapıldı** (K-029, `tools/unplug_test.py`). Kart E5V'den beslendi (JP5 [5-6],
+CP2102 +5V → CN7 pin 6), ajanın USB kablosu (CN1) test sırasında elle çekildi. Üç
+çalıştırmada kopma bölümü eksiksiz geçti:
+- Son kalp atışından ilk sıfır hıza **500–501 ms** (kartın saatiyle: son `HEARTBEAT_ACK`'in
+  `ts_ms`'i → ilk `DRIVE`'ın `ts_ms`'i). Bilgisayarın saatiyle 569–605 ms: fark iki USB
+  köprüsünün gecikmesi.
+- Araç kanalına 20 Hz sıfır hız (41–42 `DRIVE`, aralık 48–52 ms), kart `HOLD`'da, araç
+  kanalında aynı oturum, kartın saati ilerliyor: kopma kartı yeniden başlatmıyor.
+- **Bulgu: kablo geri takılınca kart yeniden başlıyor** (3/3; yeni oturum, ajan portu Linux'ta
+  görünmeden 61 ms önce). JP3 çıkarılınca da oluyor. `RCC_CSR` temizlenip CN1 yeniden
+  takıldı: yalnızca `PINRSTF` (`0x04000010`). Besleme düşmüyor, yazılım reseti değil. JP3'süz
+  birikmiş bayraklarda `SFTRSTF` vardı: ST-LINK açılırken işlemciyi resetliyor, JP3
+  yalnızca yolunu değiştiriyor gibi. Kart `HOLD`'da açılıyor (güvenli taraf). Bu yüzden geri
+  takma sonrası hata sayaçları ve `HOLD` mandalı fiziksel testte ölçülemedi.
+- Test sonrası JP5 5V_STLK'e dönecek, E5V teli çıkarılacak (Esra, "Sırada"). JP3 takılı.
+
+**Kablo çekme testinde öğrenilenler:**
+- **Kanal başına "kuruldu" bayrağı var.** Kart bir kanala, o kanaldan imzalı çerçeve gelene
+  kadar 500 ms'de bir `HELLO` yayınlıyor (`channel.c`). İlk betik araç kanalındaki her `HELLO`'yu
+  "kart yeniden başladı" sandı. Yeniden başlamanın işareti `HELLO` değil, oturum kimliğinin
+  değişmesi. Betik artık başta araç kanalından telemetri de gönderiyor.
+- **Kart yeni açılınca ilk telemetri çerçevesi kayboldu** (`frames_ok 0 → 0`, bir önceki
+  çalıştırmada `1 → 1`). Tahmin: CP2102 kartla aynı anda enerjilenirken hatta bir çöp bayt
+  kalıyor ve ilk çerçeveyi bozuyor. Doğrulanmadı. Köprü için ders: ilk çerçeveden önce bir
+  ayraç (`0x00`) göndermek.
+- **Tahmin edilen sebep yanlış çıkabilir.** Reset için JP3'ten şüphelenildi, JP3'süz deney
+  bunu eledi. Önce kontrol deneyi (JP3 takılıyken anı ölçmek), sonra tek değişken.
+- **İşlemci reset sebebini kendisi tutuyor** (`RCC_CSR`, `0x40021094`: bit 26 `PINRSTF`,
+  27 `BORRSTF`, 28 `SFTRSTF`). Bayraklar birikiyor; anlamlı olması için önce `RMVF` (bit 23)
+  ile temizlenmeli. Yazılım reseti `PINRSTF`'i de kaldırır.
+- **Araç "Error" dese de yazma olmuş olabilir.** `STM32_Programmer_CLI -w32` yazdıktan sonra
+  geri okuyup karşılaştırıyor; `RMVF` kendiliğinden 0'a döndüğü için "Failed to download
+  data" dedi, bayraklar yine de temizlenmişti. Sonuç her zaman ayrı bir okumayla denetlenmeli.
+- **Bilgisayarın saati bu ölçüm için yanlış araç.** Kablo çekilirken yazma bir süre işletim
+  sisteminin tamponuna "başarılı" gidebiliyor, gelen çerçeve de USB köprüsünde bekliyor.
 
 **Faz 2.6 kapandı** (K-025, K-026). Plandaki "bitti sayılır" ölçütleri kartta, `tools/decision_test.py`
 ile (26 denetim, Debug ve Release'te, art arda çalıştırmalarda hepsi geçti):
@@ -18,9 +54,8 @@ ile (26 denetim, Debug ve Release'te, art arda çalıştırmalarda hepsi geçti)
   kenarı → `GEOFENCE` + doğru gerekçe + en yakın güvenli nokta. Araca hiçbir `GOAL` gitmedi.
 - **Kalp atışı:** kesilince 523–525 ms sonra araç kanalına 20 Hz sıfır hız başladı (50 ms
   aralık, kartın zaman damgasından), kart `HOLD`'a geçti ve kalp atışı geri gelince
-  `SIFIRLA` olmadan `NORMAL`'e dönmedi. **Fiziksel kablo çekme testi yapılmadı:** kart o
-  kablodan beslendiği için kapanır (bkz. "Bilinen engeller"). Test, köprünün kalp atışını
-  keserek yapıldı; kartın gördüğü olay aynı, yeter ki kart beslenmeye devam etsin.
+  `SIFIRLA` olmadan `NORMAL`'e dönmedi. Fiziksel kablo çekme testi sonradan yapıldı (yukarıda,
+  K-029).
 - **Karar süresi** (`goto_timing`, GOTO_CMD çerçevesinin son baytından `VERDICT` ve CAN
   mesajı kuyruğa girene kadar, HMAC dahil): **Release 169–177 µs** (12 karar), Debug
   853–886 µs (24 karar). PA8 pini aynı aralıkta 1 oluyor; mantık analizörü olmadığı için
@@ -281,10 +316,10 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
 
 ## Sırada
 
-- [ ] **Kablo çekme testi (Esra, donanım).** Kartın beslemesi ajan kanalının USB'sinden
-      ayrılmalı (bkz. "Bilinen engeller"), sonra kablo çekilip `decision_test.py`'deki
-      kalp atışı adımının aynısı gözlenmeli: 500 ms sonra araç kanalına sıfır hız
-- [ ] **Faz 3 öncesi kararlar:** disk yeri (bölüm düzeni), Gazebo sürümü (K-008)
+- [x] **Kablo çekme testi** (K-029): 500–501 ms, 20 Hz, `HOLD`. Geri takmada reset bulgusu
+- [ ] **Besleme varsayılana (Esra, donanım):** USB'leri çıkar, JP5'i 5V_STLK'e al, CN7 pin 6'daki
+      E5V telini çıkar
+- [x] **Faz 3 öncesi kararlar:** Gazebo Fortress + TurtleBot 4 (K-027), disk engeli kalktı (K-028)
 - [ ] **Faz 3:** RTAB-Map ile harita, Nav2, köprü (`guard_bridge`). Köprü `tools/link_test.py`
       ve `decision_test.py`'deki `Link` mantığını kullanabilir (`docs/protocol.md` §10).
       Haritadan `site_data.c` ve Nav2 yasak bölge maskesi aynı dosyadan üretilmeli
@@ -344,6 +379,9 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
       gelen `TELEMETRY` ve 70 baytlık çerçeve: cevap yok, `err_replay` +1, `err_auth` +2,
       `err_crc` +1, `err_type` +1, `err_framing` +1. 5 `HELLO_REQ` → 1 `HELLO`. Araç kanalında
       oturum kimliği aynı, `TELEMETRY` kabul, `HEARTBEAT` `err_type`. CAN testi geçmeye devam ediyor
+- [x] Kablo çekme (`tools/unplug_test.py`, Release firmware, E5V beslemesi): üç
+      çalıştırmada kopma bölümünün bütün denetimleri geçti, sıfır hıza 500 / 500 / 501 ms
+      (kartın saati). Geri takma denetimleri üçünde de kaldı: kart yeniden başlıyor (K-029)
 - [x] Ajan kanalında elle yankı (minicom, `/dev/ttyACM0`, 115200)
 - [x] Ajan kanalında yük testi (`tools/echo_test.py`, **Faz 2.6 a'dan beri kartta yankı yok**,
       betik ancak `139a189` ve öncesindeki bir firmware ile çalışır): 102 400 / 102 400 bayt, 0 fark,
@@ -415,39 +453,24 @@ other.
 | Konu | Durum | Ne zaman karar verilecek |
 |---|---|---|
 | LPUART1: BSP üzerinden mi, CubeMX'te çevre birimi olarak mı | ✅ K-017: CubeMX'te çevre birimi, alma DMA ile | — |
-| Gazebo: Fortress + TurtleBot 4 mü, mevcut Harmonic'te kendi modelimiz mi | **Açık** (bkz. K-008) | Faz 3 başında |
+| Gazebo: Fortress + TurtleBot 4 mü, mevcut Harmonic'te kendi modelimiz mi | ✅ K-027: Fortress + TurtleBot 4 | — |
 | LLM model seçimi (araç çağırma şart) | **Açık** | Faz 4 başında |
 | Senaryo başına tekrar sayısı | ✅ K-015: LLM senaryolarında 20, arızada 10 | — |
 | Araç kanalındaki 97 hat hatasının sebebi | **Açık**, yeniden üretilemedi | Tekrar görülürse, tür sayaçlarına bakılarak |
 | Ana döngü takılırsa (kalp atışı kesmeyle algılanır, tepki ana döngüde) | **Açık**, bağımsız bekçi zamanlayıcısı (IWDG) olabilir (K-025) | Faz 4–5, kapsam kuralına göre |
-| PA8 hangi sokette | **Doğrulanmadı**, UM2505'e bakılacak | Mantık analizörü alınırsa (K-009) |
+| PA8 hangi sokette | ✅ UM2505 Tablo 15–16: CN9 pin 8 (Arduino D7), ayrıca CN10 pin 23 | — |
+| Kablo geri takılınca ST-LINK kartı resetliyor, JP3'süz yol | **Açık**, birikmiş bayraklarda `SFTRSTF` (K-029) | Gerekirse, Faz 5 tekrarlarından önce |
 
 ## Bilinen engeller
 
-- **Disk çok dar: 2,8 GB boş (%95).** Faz 3 (Gazebo Fortress + TurtleBot 4, ~2 GB) ve
-  Faz 4 (Ollama modeli, ~4 GB) bu hâliyle sığmaz.
-  - Kolay aday: `~/STM32Cube/Repository/*.zip` (364 MB). CubeMX'in indirdiği G4 paket
-    arşivleri, açılmış hâli ayrıca duruyor.
-  - `~/.config/Cursor` + `~/.cursor` (1,85 GB): Cursor kullanıldığı için dokunulmuyor.
-  - **Asıl sebep bölüm düzeni:** disk 477 GB ama Ubuntu bölümü (`nvme0n1p5`) 60 GB.
-    390 GB BitLocker'lı Windows bölümü, 24 GB ASUS kurtarma bölümü. Kalıcı çözüm
-    Windows'tan yer ayırıp Ubuntu'ya yeni bir bölüm eklemek olabilir. **Riskli bir işlem:
-    önce yedek alınmalı, BitLocker askıya alınmalı, küçültme Windows'ta yapılmalı.**
-    Faz 3'ten önce karar verilecek.
 - **NVIDIA sürücüsü kurulu değil.** Kartta RTX 3050 Mobile var (~4 GB VRAM) ama sistem
   Intel iGPU kullanıyor, `nvidia-smi` yok. Faz 4'te yerel LLM için sürücü kurulmalı;
   kurulmazsa model CPU'da çok yavaş kalır ve API'ye geçmek gerekebilir.
 - **Gazebo sürüm çakışması.** Sistemde Harmonic (gz-sim8) var; TurtleBot 4'ün Humble
   simülatörü Fortress'e bağımlı. Yan yana kurulabilirler ama `ign`/`gz` komutları ve
   ortam değişkenleri karışabilir.
-- **Kablo çekme testi kartı da kapatıyor.** Plan bağlantı kopmasını "kartın USB
-  kablosunu çek" diye test ediyor. Ama Nucleo varsayılan olarak o kablodan besleniyor
-  (JP5 = 5V_STLK). Kapanan kart kalp atışı kuralını işletemez. **Olası çözüm:** kartı
-  E5V girişinden CP2102'nin 5V pininden beslemek. Böylece ajan kanalı kopunca kart araç
-  kanalının USB'sinden beslenmeye devam eder. **UM2505 güç şemasından doğrulanmadı:**
-  2026-10-01'de st.com'a bu bilgisayardan erişilemedi. Atlama teli (JP5) ve E5V pini
-  değişikliği donanım kararı, Esra kılavuza bakarak yapacak. Yazılım tarafı hazır:
-  `decision_test.py` kalp atışını keserek aynı olayı sınıyor.
+- **Kablo geri takılınca kart yeniden başlıyor** (K-029). Geri takma sonrası `HOLD` mandalı
+  ve kopma sırasındaki ajan kanalı hata sayaçları fiziksel testte ölçülemiyor.
 
 ## Nerede takıldım
 

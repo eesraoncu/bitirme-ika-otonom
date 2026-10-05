@@ -649,3 +649,60 @@ değişmişti; `.cproject` değişmedi.
 
 **Bedeli:** `.ioc`'nin satır biçimi belgelenmiş bir arayüz değil. Elle eklenen satır yanlışsa
 CubeMX onu sessizce düşürebilir. Bu yüzden üretilen kodun farkı her seferinde okunur.
+
+---
+
+## K-027 · Gazebo: Fortress + TurtleBot 4 (K-008'i kapatır)
+**Tarih:** 2026-10-05 · **Durum:** Yürürlükte
+
+Faz 3 simülasyonu Gazebo Fortress ve TurtleBot 4'ün Humble simülatörüyle yapılır. Sistemdeki
+Harmonic (gz-sim8) kaldırılmaz, ikisi yan yana durur.
+
+**Neden:** TurtleBot 4 hazır RGB-D kamera, lidar ve sürüş sistemiyle geliyor. Harmonic'te
+aracı, kamerayı ve lidarı elle tanımlamak Faz 3'e 1–2 hafta ekliyordu. Disk artık engel
+değil (K-028).
+
+**Bedeli:** İki sürüm yan yana. Fortress `ign`, Harmonic `gz` komutunu kullanıyor, ortam
+değişkenleri (`IGN_*` / `GZ_*`) karışabilir. Simülasyon açılırken hangi sürümün çalıştığı
+denetlenmeli. ~2 GB disk.
+
+---
+
+## K-028 · Disk engeli kalktı
+**Tarih:** 2026-10-05 · **Durum:** Yürürlükte
+
+Ubuntu bölümü (`nvme0n1p5`) 84 GB, 26 GB boş (2026-10-05, `df -h /`). Faz 3 (~2 GB) ve Faz 4
+(Ollama modeli, ~4 GB) sığıyor. Ek temizlik yapılmadı.
+
+**Neden:** Daha önce bölüm 60 GB ve 2,8 GB boştu, Faz 3'ten önce karar bekliyordu. Bölüm
+büyütüldükten sonra bu karar gereksiz kaldı.
+
+---
+
+## K-029 · Kablo çekme testi: E5V beslemesi, süre kartın saatiyle
+**Tarih:** 2026-10-05 · **Durum:** Yürürlükte
+
+Ajan bağlantısının fiziksel kopması, kart ajan kablosundan değil **E5V'den** beslenirken
+sınanır: JP5 [5-6], CP2102'nin +5V pini → CN7 pin 6 (UM2505 Tablo 4, Tablo 7, §7.4.1).
+Açma sırası: önce CP2102 (LD3 yeşil), sonra CN1. Test `tools/unplug_test.py`.
+
+Kopmadan sıfır hıza geçen süre **kartın saatiyle** ölçülür: son `HEARTBEAT_ACK`'in `ts_ms`'i
+ile ilk `DRIVE`'ın `ts_ms`'i. Bilgisayarın ölçtüğü süre yalnızca bilgi içindir.
+
+Testten sonra JP5 varsayılana (5V_STLK) döner, E5V teli çıkarılır. Faz 5'teki 10 tekrar
+(K-015) için düzen bu maddeye bakılarak yeniden kurulur.
+
+**Neden:** Nucleo varsayılan olarak ajan kablosundan beslenir, kablo çekilince kart da
+kapanır ve kalp atışı kuralını işletemez. E5V düzeninde kart araç tarafından beslenir, gerçek
+araca da daha çok benzer (kart aracın beslemesinden, ajan bilgisayarından değil).
+Bilgisayarın saati iki USB köprüsünün gecikmesini de katıyor: aynı olayda kart 500 ms,
+bilgisayar 569–605 ms ölçtü.
+
+**Bedeli (sınırlılık):** Kablo **geri takılırken** kart yeniden başlıyor. Reset bayrakları
+(`RCC_CSR`) okundu: JP3 takılıyken yalnızca `PINRSTF` (besleme ya da yazılım değil, reset
+pini). JP3 çıkarılınca reset yine oluyor ve birikmiş bayraklarda `SFTRSTF` görüldü. Yorum:
+ST-LINK açılırken işlemciyi resetliyor, JP3 yalnızca yolunu değiştiriyor (JP3'süz kısım
+temiz ölçümle doğrulanmadı). Kart `HOLD`'da açıldığı için güvenli tarafa düşüyor, ama
+geri takmadan sonra `HOLD` mandalı fiziksel testte gösterilemiyor (`decision_test.py`
+yazılımla gösteriyor). Gerçek araçta ajan karta ST-LINK üzerinden bağlanmaz; bu
+geliştirme kartına özgü.
