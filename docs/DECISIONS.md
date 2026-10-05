@@ -740,3 +740,54 @@ kısmı öne alındı.
 
 **Bedeli:** Faz 3'te kart hız komutunu denetlemeden geçirir; yalnızca durum makinesi
 (`HOLD`) ve kalp atışı korur.
+
+---
+
+## K-032 · Deney sahası: kendi açık saha dünyamız (`ika_saha`)
+**Tarih:** 2026-10-05 · **Durum:** Yürürlükte
+
+Faz 3–5'in simülasyon ortamı TurtleBot 4'ün hazır dünyaları (`warehouse`, `depot`, `maze`)
+değil, sıfırdan yazılan bir açık saha: `ros2_ws/src/ika_sim/worlds/ika_saha.sdf`.
+
+- **Boyut ve düzen:** 20 × 12 m, x −3…17, y −6…6. Beton bariyerlerle çevrili, doğuda
+  ~3,9 m açık kapı (y −1,97…1,97). İçinde konteyner, kamyonet, çöp konteyneri. Planlanan
+  3 yasak bölge: personel alanı, kazı alanı (başlangıçtan kapıya giden düz yolun üstünde),
+  yakıt alanı. Taslak koordinatlar `docs/STATUS.md`'de.
+- **Koordinat ilkesi:** Robot dünyanın (0, 0) noktasında, doğuya (yaw 0) bakarak başlar.
+  RTAB-Map haritanın başlangıcını robotun ilk konumu kabul ettiği için dünya koordinatı =
+  harita koordinatı. Kartın coğrafi sınırı doğrudan dünyanın tasarımından yazılabilir.
+  Robotu başka bir açıyla başlatmak bu eşitliği bozar.
+- **Yasak bölgeler yalnızca görsel** (`visual` var, `collision` yok): lidar ve fizik
+  onları görmez, robot fiziksel olarak girebilir. Onu yalnızca kurallar durdurur (Nav2
+  maskesi, kartın coğrafi sınırı). Deneyin ölçtüğü şey bu.
+- **Dokular kendi betiğimizle** (`ika_sim/tools/gen_textures.py`, sabit tohum 2026):
+  asfalt, konteyner, yasak bölge boyası, çöp konteyneri. Lisans yok, tekrarlanabilir,
+  tekrar etmeyen desen (görsel haritalama için). PNG/JPG'ler depoda.
+- **Hazır model (Gazebo Fuel) kuralı:** kullanmadan önce dosyasında `<static>`, çarpışma
+  şeklinin basitliği ve malzeme türü (`materials/scripts` = eski tür) denetlenir. Yalnızca
+  CC0 lisanslı modeller. Şu an: Jersey Barrier, Pickup.
+- **Başlatma:** `ros2 launch ros2_ws/src/ika_sim/launch/ika_sim.launch.py`. TurtleBot 4'ün
+  başlatma dosyası dünya arama yolunu (`IGN_GAZEBO_RESOURCE_PATH`) baştan yazdığı için onun
+  `ignition.launch.py`'si bu dosyada tekrarlanır ve yola `worlds/` eklenir. `.sdf`'deki
+  `<world name>` dosya adıyla aynı olmalı: ROS köprüleri konu adlarını ondan kurar.
+
+**Neden:** Esra SDF'yi öğrenmek istedi. Ayrıca deney ortamı tamamen kontrol altında
+olur: yasak bölgeler ve güvenli noktalar koordinatları bilinerek yerleştirilir, 3.2'deki
+saha tanımı dünyanın tasarımından çıkar. Açık saha İKA temasına daha yakın.
+
+**Bedeli:** Hazır dünyaya göre ~1–2 oturum iş. Açık sahada kamera için doku azdır; dokular
+ve nesneler bunu telafi etmeli, 3.1'de haritalamayla sınanacak.
+
+---
+
+## K-033 · RTAB-Map kamera + lidar ile çalışır (plan belgesinden sapma)
+**Tarih:** 2026-10-05 · **Durum:** Yürürlükte
+
+Plan belgesi RTAB-Map'i yalnızca RGB-D (kamera) modunda istiyordu. Faz 3.1'de kamera +
+lidar kullanılır (`subscribe_scan:=true`, `scan_topic:=/scan`).
+
+**Neden:** Kamera konum tanıma ve döngü kapatma için, lidar Nav2'nin kullanacağı 2D engel
+haritası için. TurtleBot 4 simülatörünün kamerası 320×240; derinlikten üretilen 2D harita
+gürültülü olabilir.
+
+**Bedeli:** vSLAM çalışmasındaki salt kamera düzeninden ayrılır; tezde gerekçesiyle yazılır.

@@ -4,11 +4,72 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-10-05
-**Bulunduğumuz faz:** Faz 2 bitti (2.6 kapandı), kablo çekme testi yapıldı (K-029). Faz 3 öncesi kararlar verildi (K-027, K-028), sırada Faz 3
+**Bulunduğumuz faz:** Faz 3. 3.0 kurulum bitti, deney sahası (kendi dünyamız, K-032) yazılıyor: Blok 1–4 yazıldı, Blok 5 (yasak bölgeler) sırada
 
 ---
 
 ## Şu an ne yapılıyor
+
+**Faz 3: deney sahası `ika_saha` yazılıyor** (K-032). Hazır TurtleBot 4 dünyaları yerine
+sıfırdan, blok blok, Esra'nın onayıyla yazılan bir açık saha. Çalıştırmak için (depo
+kökünden, önceki simülasyon kapalıyken):
+
+```bash
+ros2 launch ros2_ws/src/ika_sim/launch/ika_sim.launch.py
+python3 ros2_ws/src/ika_sim/tools/gen_textures.py   # dokular değişecekse; çıktı aynı kalır
+```
+
+Dosyalar (`ros2_ws/src/ika_sim/`):
+- `worlds/ika_saha.sdf`: dünya. Başındaki yorum blokların sırasını ve Fuel model kuralını anlatır.
+- `launch/ika_sim.launch.py`: Gazebo + `/clock` köprüsü + TurtleBot 4'ün `turtlebot4_spawn.launch.py`'si.
+  Dünya arama yoluna `worlds/`'ü ekler (K-032).
+- `tools/gen_textures.py` → `worlds/textures/`: `asfalt.jpg` (1050×650, 21 × 13 m, 2 cm/px),
+  `konteyner.jpg`, `yasak.jpg`, `cop.jpg`. Sabit tohum; yeni doku listenin sonuna eklenir ki
+  eskilerin rastgele dizisi değişmesin (denetlendi: bayt bayt aynı).
+
+Bloklar:
+
+| Blok | İçerik | Durum |
+|---|---|---|
+| 1 | Fizik (3 ms), 3 dünya eklentisi, sahne, güneş ışığı, 60 × 40 m zemin | ✅ simde görüldü; kamera, lidar, `/odom`, `/clock` veri veriyor |
+| 2 | `<sky>`, 15 Jersey Barrier (kuzey/güney 5'er, merkezler 4 m arayla; batı 3; doğu 2), doğuda kapı | ✅ simde görüldü |
+| 3 | Doku üreteci, saha yüzeyi (yalnız `visual`, zeminden 2 mm yukarıda, `albedo_map`) | ✅ simde görüldü: çatlaklar, lekeler, zemin numaraları |
+| 4 | Konteyner (kendi kutumuz, 6,06 × 2,44 × 2,59 m, merkez (6, 2,6)), kamyonet (Fuel Pickup, (13,4, 4,3)), çöp konteyneri (kendi kutumuz, 1,4 × 2,0 × 1,3 m, (−1,8, 4,5)) | ⚠️ ilk hâli simde görüldü; aşağıdaki düzeltmeler **simde henüz görülmedi** |
+| 5 | Yasak bölgeler: zemin boyaları (`yasak.jpg`, yalnız `visual`), kazı alanı köşelerine koniler, personel alanına masalar, yakıt alanına silindir tanklar | sırada |
+
+Blok 4'ün ilk hâlinde iki sorun çıktı, düzeltildi, **doğrulanması gerekiyor**:
+- Kamyonet konteynere 18 cm giriyordu. Kamyonet modeli inç biriminde, 5,66 m ve simetrik
+  değil (DAE'den ölçüldü). Konteyner x 8 → 6, kamyonet 13,8 → 13,4: arada 1,4 m, kamyonetle
+  bariyer arasında 0,5 m.
+- Fuel'deki Dumpster simsiyah göründü ve simülasyon hızı **%0,67**'ye düştü (10 s'de
+  simülasyon saati ilerlemedi, Gazebo sunucusu bir çekirdeği doldurdu). Model statik değil,
+  çarpışma şekli mesh, malzemesi eski tür. Yerine kendi statik kutumuz (`cop.jpg`).
+- Denetlenecek: hız oranı %28–33'e döndü mü, kamyonet ile konteyner arasında boşluk var mı,
+  çöp konteyneri yeşil mi.
+
+Taslak yerleşim (Blok 5 ve 3.2 için; saha 1 m batıya kaydırıldıktan sonraki hâli):
+- İzinli alan: bariyerlerin içi. Bariyerin tabanı 0,81 m geniş (çizgiden 0,405 m içeri
+  taşar); izinli çokgen bariyer çizgisinden en az ~0,9 m içeride tanımlanmalı (3.2).
+- Yasak 1, personel alanı: x 2…6, y −5,5…−2,5. Yasak 2, kazı alanı: x 9…11, y −1…1.
+  Yasak 3, yakıt alanı: x 11,5…16, y −5,5…−2,5 (kesin değerler Blok 5'te).
+- Yer adı / güvenli nokta adayları: şarj istasyonu (0, 0), kapı önü (~16, 0), konteyner
+  arkası (~6, 4,9), konteyner önü (~6, 0,5), batı köşe (~1, 3,5).
+
+**Deney sahasında öğrenilenler:**
+- **Şarj istasyonu robotun 0,157 m önünde.** TurtleBot 4 istasyonu robotun önüne, ona dönük
+  koyar (`turtlebot4_spawn.launch.py`, `/sim_ground_truth_dock_pose` x = 0,157). Robot
+  istasyondan geri geri, batıya çıkar. Batı bariyeri bu yüzden x −2 → −3'e alındı.
+- **3B görünüm `<scene><background>`'ı kullanmıyor**, gökyüzü siyah kaldı. `<sky>` çözdü.
+- **Göreli doku yolu `.sdf`'nin klasörüne göre çözülüyor** (`textures/asfalt.jpg` çalıştı).
+- **`ign sdf -k` Fuel adreslerini çözemez** ("callback is empty", her include için 2 hata).
+  Yapı hatası ayrı sayılır: Fuel dışındaki hata sayısı 0 olmalı. Modeller önbelleğe
+  `ign fuel download -u <adres>` ile indirilir.
+- **Modeli ölçmeden yerleştirme.** Kamyonetin boyu tahminden 0,66 m uzun çıktı. Mesh'in
+  sınırları DAE'deki köşe listesinden ve `<unit meter>`'dan hesaplanabilir.
+- **HMI'daki pil %0 yanıltıcı:** `/battery_state` `percentage: 1.0` (0–1 arası, yani %100).
+- **Simülasyon gerçek zamanın ~%30'u hızında** (Intel iGPU, NVIDIA sürücüsü yok). Harita ve
+  Nav2 `/clock`'u kullandığı için etkilenmez, yalnızca uzun sürer. Kart ise gerçek zamanda
+  çalışır (kalp atışı 500 ms): 3.3'te köprü tasarlanırken hesaba katılmalı.
 
 **Kablo çekme testi yapıldı** (K-029, `tools/unplug_test.py`). Kart E5V'den beslendi (JP5 [5-6],
 CP2102 +5V → CN7 pin 6), ajanın USB kablosu (CN1) test sırasında elle çekildi. Üç
@@ -327,8 +388,11 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
         `/oakd/rgb/preview/camera_info` (çerçeve `oakd_rgb_camera_optical_frame`), `/scan`
         (~28 Hz), `/odom`, `/tf`, `/clock`, aracın hız girişi `/cmd_vel`. Dünyalar: `warehouse`,
         `depot`, `maze`
-  - [ ] **3.1 Harita:** RTAB-Map RGB-D, klavyeyle gezdirme, harita `ros2_ws/src/ika_nav/maps/`.
-        Bitti: Nav2'nin okuyacağı `.pgm`/`.yaml` depoda
+  - [ ] **Deney sahası `ika_saha`** (K-032, yukarıda): Blok 1–3 ✅, Blok 4 yazıldı (düzeltmeleri
+        simde doğrulanacak), Blok 5 yasak bölgeler sırada. Bitti: saha simde açılıyor, hız oranı
+        hazır dünyalarınkine yakın, yasak bölgeler zeminde görünüyor
+  - [ ] **3.1 Harita:** `ika_saha`'da RTAB-Map, kamera + lidar (K-033), klavyeyle gezdirme,
+        harita `ros2_ws/src/ika_nav/maps/`. Bitti: Nav2'nin okuyacağı `.pgm`/`.yaml` depoda
   - [ ] **3.2 Saha tanımı ve Nav2:** izinli alan, yasak bölgeler, güvenli noktalar tek dosyada;
         `site_data.c` ve Nav2 yasak bölge maskesi ondan üretilir (yeri o adımda kararlaştırılacak).
         Bitti: RViz "2D Goal Pose" ile araç hedefe gidiyor, maske Nav2'de, kart aynı bölgeleri biliyor
@@ -476,6 +540,9 @@ other.
 
 ## Bilinen engeller
 
+- **Simülasyon yavaş:** gerçek zamanın ~%28–33'ü (TurtleBot 4 + kamera + lidar, Intel iGPU).
+  Kartın gerçek zamanlı kuralları (kalp atışı) ile simülasyon saati arasındaki fark 3.3'te
+  düşünülmeli. NVIDIA sürücüsü kurulursa iyileşebilir.
 - **NVIDIA sürücüsü kurulu değil.** Kartta RTX 3050 Mobile var (~4 GB VRAM) ama sistem
   Intel iGPU kullanıyor, `nvidia-smi` yok. Faz 4'te yerel LLM için sürücü kurulmalı;
   kurulmazsa model CPU'da çok yavaş kalır ve API'ye geçmek gerekebilir.
