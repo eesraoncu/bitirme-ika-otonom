@@ -706,3 +706,37 @@ temiz ölçümle doğrulanmadı). Kart `HOLD`'da açıldığı için güvenli ta
 geri takmadan sonra `HOLD` mandalı fiziksel testte gösterilemiyor (`decision_test.py`
 yazılımla gösteriyor). Gerçek araçta ajan karta ST-LINK üzerinden bağlanmaz; bu
 geliştirme kartına özgü.
+
+---
+
+## K-030 · ROS↔Harmonic köprü paketleri kaldırılır (K-027'ye ek)
+**Tarih:** 2026-10-05 · **Durum:** Yürürlükte
+
+TurtleBot 4 simülatörü için `ros-humble-ros-gzharmonic*` paketleri (6 adet) kaldırılır,
+yerine Fortress'in `ros-humble-ros-gz-*` paketleri gelir. Gazebo Harmonic'in kendisi
+(gz-sim8) kalır.
+
+**Neden:** K-027 "Harmonic'le yan yana durur" diyordu. Gazebo'nun iki sürümü için doğru, ama
+ROS köprü paketleri birbirini dışlıyor (`Conflicts: ros-humble-ros-gz-sim` …). Deneme
+kurulumu (`apt-get -s`) bunu gösterdi. Bu 6 paketi sistemdeki başka paket kullanmıyor; tek
+bir `apt install ros-humble-ros-gzharmonic` ile kurulmuşlardı.
+
+**Bedeli:** ROS 2'den Harmonic'e bağlanan eski işler (vSLAM çalışması gibi) bu bilgisayarda
+çalışmaz. Geri kurulursa TurtleBot 4 simülatörü kalkar.
+
+---
+
+## K-031 · Nav2'nin hız komutu Faz 3'te karttan geçer (asgari aktarma)
+**Tarih:** 2026-10-05 · **Durum:** Yürürlükte
+
+Faz 3'te kart `VELOCITY_CMD`'yi işler: `NORMAL`'de araç kanalına `DRIVE` olarak aynen
+aktarır, `HOLD`'da aktarmaz (20 Hz sıfır hız sürer). Kırpma (LIMIT, RULES §3.2) Faz 4'te
+kalır.
+
+**Neden:** Faz 3'ün "bitti sayılır" ölçütü "kartın kablosu çekilince araç duruyor". Nav2
+aracı doğrudan sürerse kart onu durduramaz. Hız yolu Nav2 → köprü → kart → köprü →
+simülasyon olmalı. `VELOCITY_CMD` işleme Faz 4'e bırakılmıştı (STATUS "Sırada"); asgari
+kısmı öne alındı.
+
+**Bedeli:** Faz 3'te kart hız komutunu denetlemeden geçirir; yalnızca durum makinesi
+(`HOLD`) ve kalp atışı korur.

@@ -320,12 +320,25 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
 - [ ] **Besleme varsayılana (Esra, donanım):** USB'leri çıkar, JP5'i 5V_STLK'e al, CN7 pin 6'daki
       E5V telini çıkar
 - [x] **Faz 3 öncesi kararlar:** Gazebo Fortress + TurtleBot 4 (K-027), disk engeli kalktı (K-028)
-- [ ] **Faz 3:** RTAB-Map ile harita, Nav2, köprü (`guard_bridge`). Köprü `tools/link_test.py`
-      ve `decision_test.py`'deki `Link` mantığını kullanabilir (`docs/protocol.md` §10).
-      Haritadan `site_data.c` ve Nav2 yasak bölge maskesi aynı dosyadan üretilmeli
+- [ ] **Faz 3** (plan onaylandı, 2026-10-05):
+  - [x] **3.0 Kurulum** (K-030): `ros-gzharmonic` kaldırıldı, Fortress + TurtleBot 4 simülatörü
+        kuruldu, `warehouse` dünyası açılıyor (ilk açılışta bir süre siyah ekran, sonra düzeldi).
+        Konular: `/oakd/rgb/preview/image_raw` (320×240), `/oakd/rgb/preview/depth` (32FC1),
+        `/oakd/rgb/preview/camera_info` (çerçeve `oakd_rgb_camera_optical_frame`), `/scan`
+        (~28 Hz), `/odom`, `/tf`, `/clock`, aracın hız girişi `/cmd_vel`. Dünyalar: `warehouse`,
+        `depot`, `maze`
+  - [ ] **3.1 Harita:** RTAB-Map RGB-D, klavyeyle gezdirme, harita `ros2_ws/src/ika_nav/maps/`.
+        Bitti: Nav2'nin okuyacağı `.pgm`/`.yaml` depoda
+  - [ ] **3.2 Saha tanımı ve Nav2:** izinli alan, yasak bölgeler, güvenli noktalar tek dosyada;
+        `site_data.c` ve Nav2 yasak bölge maskesi ondan üretilir (yeri o adımda kararlaştırılacak).
+        Bitti: RViz "2D Goal Pose" ile araç hedefe gidiyor, maske Nav2'de, kart aynı bölgeleri biliyor
+  - [ ] **3.3 Köprü (`guard_bridge`):** `docs/protocol.md` §10. `tools/`'taki `Link` mantığı
+        kullanılır. Kartta asgari `VELOCITY_CMD` → `DRIVE` aktarması (K-031). Bitti (plan
+        belgesi): RViz hedefi karttan geçip araca ulaşıyor, izinli bölge dışındaki hedef
+        reddediliyor, kartın kablosu çekilince araç duruyor
 - [ ] Faz 4'e kalanlar (bilerek): FRESHNESS (zaman eşitlemesi), LIMIT, CONSISTENCY,
       RECOVERY durumu (üst üste 5 içerik reddi), `WAIT_CMD`/`SPEED_LIMIT_CMD`/`STOP_CMD`/
-      `VELOCITY_CMD` işleme, araç konumunun coğrafi sınır denetimi
+      `VELOCITY_CMD` kırpma (asgari aktarma Faz 3'te, K-031), araç konumunun coğrafi sınır denetimi
 - [ ] Ollama kurulumu (model seçimi Faz 4'te)
 
 ## Doğrulanmış testler
@@ -467,8 +480,8 @@ other.
   Intel iGPU kullanıyor, `nvidia-smi` yok. Faz 4'te yerel LLM için sürücü kurulmalı;
   kurulmazsa model CPU'da çok yavaş kalır ve API'ye geçmek gerekebilir.
 - **Gazebo sürüm çakışması.** Sistemde Harmonic (gz-sim8) var; TurtleBot 4'ün Humble
-  simülatörü Fortress'e bağımlı. Yan yana kurulabilirler ama `ign`/`gz` komutları ve
-  ortam değişkenleri karışabilir.
+  simülatörü Fortress'e bağımlı. Gazebo'nun iki sürümü yan yana durur ama ROS köprü
+  paketleri durmaz (K-030). `ign`/`gz` komutları ve ortam değişkenleri karışabilir.
 - **Kablo geri takılınca kart yeniden başlıyor** (K-029). Geri takma sonrası `HOLD` mandalı
   ve kopma sırasındaki ajan kanalı hata sayaçları fiziksel testte ölçülemiyor.
 
