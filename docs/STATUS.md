@@ -3,12 +3,39 @@
 > Bu dosya her çalışma oturumunun **başında okunur**, **sonunda güncellenir**.
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
-**Son güncelleme:** 2026-10-05
-**Bulunduğumuz faz:** Faz 3. 3.0 kurulum bitti, deney sahası (kendi dünyamız, K-032) yazılıyor: Blok 1–4 yazıldı, Blok 5 (yasak bölgeler) sırada
+**Son güncelleme:** 2026-10-06
+**Bulunduğumuz faz:** Faz 3. 3.0 kurulum bitti, deney sahası (K-032) Blok 1–5 bitti. Araç İKA'ya geçiyor (K-034): sırada modeli depoya almak, sahayı genişletmek, başlatma/köprü/`tf`; sonra 3.1 (harita)
 
 ---
 
 ## Şu an ne yapılıyor
+
+**Araç değişiyor: TurtleBot 4 → ORINIUM İKA modeli** (K-034, 2026-10-06). Deneme
+scratchpad'de yapıldı, depoya henüz bir şey alınmadı. Bulgular:
+- **Port üç mekanik değişiklik:** `<sdf version>` 1.11 → 1.9 (Fortress'in sdformat12'si en
+  çok 1.9 okur; model doğrulamadan geçti), mesh yolları `file:///home/esra/ugv_telemetry_new/...`
+  (artık yok) → `model://ika_arac/meshes/...`, eklentiler `gz-sim-*-system` / `gz::sim::` →
+  `ignition-gazebo-*-system` / `ignition::gazebo::`. `<gz_frame_id>` değişmedi: Fortress'in
+  ignition-sensors 6.9'u onu da tanıyor (kütüphanedeki dizgilerden doğrulandı).
+- **Dünyaya eklenecek sistemler:** Sensors (`<render_engine>ogre2`), Imu, Contact. Model
+  bunları getirmiyor (TurtleBot 4 getiriyordu).
+- **Boş dünyada doğrulandı:** lidar `/scan` 720 örnek, çerçeve `lidar_link`, kendi gövdesini
+  görmüyor (en yakın 2,50 m = kutu); `/camera/image` 640×480 RGB, `/camera/depth_image`
+  640×480 metre; kule kamerası çalışıyor; düz sürüş 0,5 m/s geri: gerçek 2,440 m, odom 2,441 m.
+- **Dönüşte odometri %14 fazla:** gerçek 123°, odom 140°, ~10 cm kayma. 12 tekerlek dönerken
+  kayıyor (paletli araç gibi); DiffDrive kaymayı bilmiyor. RTAB-Map'in düzelteceği hata.
+- **Hız:** `ika_saha` kopyasında İKA ile %100 (2 × 20 s, kule kamerası açık; tavan, çünkü
+  `real_time_factor` 1,0). TurtleBot 4 ile %46: yavaşlık sahneden değil TurtleBot 4'ten
+  (hangi parçası, ölçülmedi). İKA ölçümünde ROS köprüleri yoktu.
+- **Orijinal modelde:** `FRF` tekerleğinin görseli `BRF.STL`'i kullanıyor (tekerlekler aynı,
+  görünüşte fark yok). ORINIUM'un parkur dünyası `<dart><collision_detector>bullet` kullanıyor
+  ("dartsim varsayılanıyla RTF ~%7, bullet 4× hızlı" notu); bizde %100 çıktı, gerekmedi.
+- **Saha dar:** araç 1,15 m geniş; güney koridoru 1,5 m, kamyonet-konteyner 1,4 m, kazı
+  alanının kuzeyi 0,38 m. Geçitler ~3 m'ye çıkmalı.
+
+Deneme dosyaları (scratchpad, oturumla silinir; depoya alınırken yeniden üretilecek):
+`ika_deneme/models/ika_arac/` (çevrilmiş model + 21 STL), `ika_deneme.sdf` (boş dünya),
+`saha_ika_arac*.sdf` (`ika_saha` kopyası + İKA).
 
 **Faz 3: deney sahası `ika_saha` yazılıyor** (K-032). Hazır TurtleBot 4 dünyaları yerine
 sıfırdan, blok blok, Esra'nın onayıyla yazılan bir açık saha. Çalıştırmak için (depo
@@ -34,24 +61,38 @@ Bloklar:
 | 1 | Fizik (3 ms), 3 dünya eklentisi, sahne, güneş ışığı, 60 × 40 m zemin | ✅ simde görüldü; kamera, lidar, `/odom`, `/clock` veri veriyor |
 | 2 | `<sky>`, 15 Jersey Barrier (kuzey/güney 5'er, merkezler 4 m arayla; batı 3; doğu 2), doğuda kapı | ✅ simde görüldü |
 | 3 | Doku üreteci, saha yüzeyi (yalnız `visual`, zeminden 2 mm yukarıda, `albedo_map`) | ✅ simde görüldü: çatlaklar, lekeler, zemin numaraları |
-| 4 | Konteyner (kendi kutumuz, 6,06 × 2,44 × 2,59 m, merkez (6, 2,6)), kamyonet (Fuel Pickup, (13,4, 4,3)), çöp konteyneri (kendi kutumuz, 1,4 × 2,0 × 1,3 m, (−1,8, 4,5)) | ⚠️ ilk hâli simde görüldü; aşağıdaki düzeltmeler **simde henüz görülmedi** |
-| 5 | Yasak bölgeler: zemin boyaları (`yasak.jpg`, yalnız `visual`), kazı alanı köşelerine koniler, personel alanına masalar, yakıt alanına silindir tanklar | sırada |
+| 4 | Konteyner (kendi kutumuz, 6,06 × 2,44 × 2,59 m, merkez (6, 2,6)), kamyonet (Fuel Pickup, (13,4, 4,3)), çöp konteyneri (kendi kutumuz, 1,4 × 2,0 × 1,3 m, (−1,8, 4,5)) | ✅ düzeltilmiş hâli simde görüldü (2026-10-06) |
+| 5 | Yasak bölgeler: 3 zemin boyası (`yasak.jpg`, yalnız `visual`, z = 0,004), kazı alanı köşelerine 4 koni (Fuel Construction Cone, `<static>` include'da eklendi), personel alanına 2 masa (Fuel Table), yakıt alanına 2 tank (kendi silindirimiz) | ✅ simde görüldü (2026-10-06); hıza etkisi ~1 puan (aşağıda) |
 
-Blok 4'ün ilk hâlinde iki sorun çıktı, düzeltildi, **doğrulanması gerekiyor**:
+Blok 4'ün ilk hâlinde iki sorun çıktı, düzeltildi ve simde doğrulandı:
 - Kamyonet konteynere 18 cm giriyordu. Kamyonet modeli inç biriminde, 5,66 m ve simetrik
   değil (DAE'den ölçüldü). Konteyner x 8 → 6, kamyonet 13,8 → 13,4: arada 1,4 m, kamyonetle
   bariyer arasında 0,5 m.
 - Fuel'deki Dumpster simsiyah göründü ve simülasyon hızı **%0,67**'ye düştü (10 s'de
   simülasyon saati ilerlemedi, Gazebo sunucusu bir çekirdeği doldurdu). Model statik değil,
   çarpışma şekli mesh, malzemesi eski tür. Yerine kendi statik kutumuz (`cop.jpg`).
-- Denetlenecek: hız oranı %28–33'e döndü mü, kamyonet ile konteyner arasında boşluk var mı,
-  çöp konteyneri yeşil mi.
+- Doğrulandı (2026-10-06): hız oranı **%36–38** (öncekinden biraz yüksek), kamyonet ile
+  konteyner arasında boşluk görülüyor, çöp konteyneri yeşil ve "ATIK" yazısı okunuyor.
+- Bilinen, düzeltilmeyecek: konteynerin üst yüzünde doku uzuyor (kutunun 6 yüzüne aynı
+  resim). Robotun kamerası ~0,3 m yüksekte, üst yüzü görmez; sonuç tablosuna satır eklemez.
+
+Blok 5'te ekrandaki hız %24 göründü. Ölçüldü, düşüş çıkmadı (kontrol deneyi: aynı
+çalışan simden Blok 5'in 11 modeli `/world/ika_saha/remove` servisiyle silindi, tek değişken):
+
+| Durum | 20 s ölçüm 1 | 20 s ölçüm 2 | Ortalama |
+|---|---|---|---|
+| Blok 5 var | %46,9 | %45,9 | **%46,4** |
+| Blok 5 yok | %47,2 | %47,5 | **%47,4** |
+
+Fark iki ölçümün kendi arasındaki oynamayla aynı boyda. Kazı alanı başlangıçtan kapıya
+giden düz yolu kesiyor; kuzeyinde konteynere 0,38 m kalıyor (robot 0,34 m). Yol ya güneydeki
+1,5 m'lik koridordan (y −2,5…−1) ya konteynerin arkasından geçer.
 
 Taslak yerleşim (Blok 5 ve 3.2 için; saha 1 m batıya kaydırıldıktan sonraki hâli):
 - İzinli alan: bariyerlerin içi. Bariyerin tabanı 0,81 m geniş (çizgiden 0,405 m içeri
   taşar); izinli çokgen bariyer çizgisinden en az ~0,9 m içeride tanımlanmalı (3.2).
 - Yasak 1, personel alanı: x 2…6, y −5,5…−2,5. Yasak 2, kazı alanı: x 9…11, y −1…1.
-  Yasak 3, yakıt alanı: x 11,5…16, y −5,5…−2,5 (kesin değerler Blok 5'te).
+  Yasak 3, yakıt alanı: x 11,5…16, y −5,5…−2,5 (Blok 5'te bu değerlerle yazıldı).
 - Yer adı / güvenli nokta adayları: şarj istasyonu (0, 0), kapı önü (~16, 0), konteyner
   arkası (~6, 4,9), konteyner önü (~6, 0,5), batı köşe (~1, 3,5).
 
@@ -67,7 +108,19 @@ Taslak yerleşim (Blok 5 ve 3.2 için; saha 1 m batıya kaydırıldıktan sonrak
 - **Modeli ölçmeden yerleştirme.** Kamyonetin boyu tahminden 0,66 m uzun çıktı. Mesh'in
   sınırları DAE'deki köşe listesinden ve `<unit meter>`'dan hesaplanabilir.
 - **HMI'daki pil %0 yanıltıcı:** `/battery_state` `percentage: 1.0` (0–1 arası, yani %100).
-- **Simülasyon gerçek zamanın ~%30'u hızında** (Intel iGPU, NVIDIA sürücüsü yok). Harita ve
+- **Ekrandaki hız yüzdesi ölçüm değil.** Anlık değer saniyeler içinde %28–%65 arası oynuyor
+  (bir kez %0 → %119: sim takılıp açığı kapattı). Ölçüm: `/world/ika_saha/stats`'ı 20 s
+  kaydet, `sim_time` ve `real_time`'ın ilerlemesini böl. Ölçerken GUI'de kamera oynatılmaz
+  (ekranı çizmek de aynı iGPU'yu kullanıyor). Önceki "%30" ve "%36–38" ekrandan okunmuştu.
+- **Modeli dosyaya dokunmadan simden çıkarmak:** `ign service -s /world/ika_saha/remove
+  --reqtype ignition.msgs.Entity --reptype ignition.msgs.Boolean --req 'name: "<ad>" type: MODEL'`.
+  Sim yeniden açılınca geri gelir. Kontrol deneyi için uygun.
+- **Kendi ayrıştırma betiğine güvenme.** İKA'nın odometrisi dönüşte "0°" çıktı: awk `pose`
+  bloğundan sonra `twist`'teki `z: 0`'ı da okuyordu. Doğru bloktan okununca 140°.
+- **Test sürüşünde engele olan uzaklığı önce hesapla.** İlk İKA sürüşü 3,9 m gitmeye
+  çalıştı, burnu 3,5 m'deki kutuya dayandı; odometri dönen tekerlekleri saymaya devam etti
+  (gerçek 2,71 m, odom 4,44 m). O sürüş karşılaştırmada kullanılmadı.
+- **Simülasyon gerçek zamanın ~%46'sı hızında** (ölçüldü, 2026-10-06; Intel iGPU, NVIDIA sürücüsü yok). Harita ve
   Nav2 `/clock`'u kullandığı için etkilenmez, yalnızca uzun sürer. Kart ise gerçek zamanda
   çalışır (kalp atışı 500 ms): 3.3'te köprü tasarlanırken hesaba katılmalı.
 
@@ -388,10 +441,16 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
         `/oakd/rgb/preview/camera_info` (çerçeve `oakd_rgb_camera_optical_frame`), `/scan`
         (~28 Hz), `/odom`, `/tf`, `/clock`, aracın hız girişi `/cmd_vel`. Dünyalar: `warehouse`,
         `depot`, `maze`
-  - [ ] **Deney sahası `ika_saha`** (K-032, yukarıda): Blok 1–3 ✅, Blok 4 yazıldı (düzeltmeleri
-        simde doğrulanacak), Blok 5 yasak bölgeler sırada. Bitti: saha simde açılıyor, hız oranı
-        hazır dünyalarınkine yakın, yasak bölgeler zeminde görünüyor
-  - [ ] **3.1 Harita:** `ika_saha`'da RTAB-Map, kamera + lidar (K-033), klavyeyle gezdirme,
+  - [x] **Deney sahası `ika_saha`** (K-032, yukarıda): Blok 1–5 ✅ (2026-10-06). Saha simde
+        açılıyor, yasak bölgeler zeminde görünüyor, hız ölçülen %46 (hazır dünyalar ekrandan
+        ~%30 okunmuştu, aynı yöntemle ölçülmedi)
+  - [ ] **Araç İKA'ya geçiyor** (K-034):
+    - [ ] a. Model depoya: `ika_sim/models/ika_arac/` (Fortress'e çevrilmiş, ORINIUM kaynağı belirtilir)
+    - [ ] b. Saha araca göre genişletilir (geçitler ~3 m; Blok 2–5 koordinatları)
+    - [ ] c. Başlatma dosyası: dünyaya Sensors/Imu/Contact, İKA spawn, `ros_gz_bridge`
+          (`/scan`, `/camera/*`, `/odom`, `/imu`, `/cmd_vel`, `/clock`), `tf`. Hız köprüyle
+          yeniden ölçülür. Bitti: RViz'de lidar ve kamera görünüyor, klavyeyle sürülüyor
+  - [ ] **3.1 Harita:** `ika_saha`'da RTAB-Map, kamera + lidar (K-033), İKA ile klavyeyle gezdirme,
         harita `ros2_ws/src/ika_nav/maps/`. Bitti: Nav2'nin okuyacağı `.pgm`/`.yaml` depoda
   - [ ] **3.2 Saha tanımı ve Nav2:** izinli alan, yasak bölgeler, güvenli noktalar tek dosyada;
         `site_data.c` ve Nav2 yasak bölge maskesi ondan üretilir (yeri o adımda kararlaştırılacak).

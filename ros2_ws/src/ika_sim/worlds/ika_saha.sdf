@@ -13,6 +13,7 @@
      Blok 2: gökyüzü, çevre bariyerleri, doğuda kapı.
      Blok 3: asfalt doku (textures/, tools/gen_textures.py ile üretilir).
      Blok 4: nesneler. Konteyner, kamyonet, çöp konteyneri.
+     Blok 5: yasak bölgeler. Zemin boyaları (yalnız visual), koniler, masalar, tanklar.
 
      Hazır (Fuel) model kullanmadan önce dosyasında üç şeye bakılır: <static> var mı,
      çarpışma şekli basit mi (binlerce üçgenli mesh fiziği yavaşlatır), malzemesi
@@ -277,6 +278,199 @@
                 <roughness>0.8</roughness>
               </metal>
             </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Yasak bölgeler (K-032): yalnızca visual, collision yok. Lidar ve fizik onları
+         görmez, robot fiziksel olarak girebilir; onu yalnızca kurallar (Nav2 maskesi,
+         kartın coğrafi sınırı) durdurur. Deneyin ölçtüğü şey bu.
+         Asfaltın 2 mm üstünde (z = 0,004): aynı yükseklikte titrerdi (z-fighting).
+         yasak.jpg kare; düzlem onu kendi boyutuna gerer, 4 × 3 m'de çizgiler yatıklaşır.
+         Bölgelerdeki nesneler içeride durur, kenarların ortası boş: robotu bölgenin
+         kenarında bir engel değil kural durdurmalı.
+         Kazı alanı başlangıçtan kapıya giden düz yolu keser; kuzeyinde konteynere
+         0,38 m kalır (robot 0,34 m). Yol ya güneydeki 1,5 m'lik koridordan
+         (y −2,5…−1) ya konteynerin arkasından geçer -->
+
+    <!-- Yasak 1, personel alanı: x 2…6, y −5,5…−2,5 -->
+    <model name="forbidden_personnel">
+      <static>true</static>
+      <pose>4 -4 0.004 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>4 3</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>textures/yasak.jpg</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Yasak 2, kazı alanı: x 9…11, y −1…1 -->
+    <model name="forbidden_excavation">
+      <static>true</static>
+      <pose>10 0 0.004 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>2 2</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>textures/yasak.jpg</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Yasak 3, yakıt alanı: x 11,5…16, y −5,5…−2,5 -->
+    <model name="forbidden_fuel">
+      <static>true</static>
+      <pose>13.75 -4 0.004 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>4.5 3</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>textures/yasak.jpg</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>0.9</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Kazı alanının köşelerinde koniler: Fuel (CC0). Model statik değil, çarpışma
+         şekli mesh (~500 üçgen); <static> burada eklenir ki fizik onu her adımda
+         hesaplamasın. Mesh inç biriminde, ölçeği 10: boy 1,09 m, taban çapı 0,5 m.
+         Köşeden 0,3 m içeride, tabanı bölgenin içinde kalır -->
+    <include>
+      <name>cone_0</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Construction Cone</uri>
+      <static>true</static>
+      <pose>9.3 -0.7 0 0 0 0</pose>
+    </include>
+    <include>
+      <name>cone_1</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Construction Cone</uri>
+      <static>true</static>
+      <pose>9.3 0.7 0 0 0 0</pose>
+    </include>
+    <include>
+      <name>cone_2</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Construction Cone</uri>
+      <static>true</static>
+      <pose>10.7 -0.7 0 0 0 0</pose>
+    </include>
+    <include>
+      <name>cone_3</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Construction Cone</uri>
+      <static>true</static>
+      <pose>10.7 0.7 0 0 0 0</pose>
+    </include>
+
+    <!-- Personel alanında masalar: Fuel (CC0), statik, çarpışma şekli kutu ve
+         silindirler. 1,5 × 0,8 m, boy 1 m. 90° döndürülmüş: uzun kenar kuzey-güney.
+         x 2,6…3,4 ve 4,6…5,4, y −4,75…−3,25: bölge kenarına en az 0,6 m -->
+    <include>
+      <name>table_0</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Table</uri>
+      <pose>3 -4 0 0 0 1.5708</pose>
+    </include>
+    <include>
+      <name>table_1</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Table</uri>
+      <pose>5 -4 0 0 0 1.5708</pose>
+    </include>
+
+    <!-- Yakıt alanında dik tanklar: kendi modelimiz, silindir (r 0,6 m, boy 1,8 m),
+         düz renk. Silindirin merkezi ortasındadır: z = boyun yarısı.
+         x 12,15…13,35 ve 14,15…15,35, y −4,6…−3,4: bölge kenarına en az 0,65 m -->
+    <model name="fuel_tank_0">
+      <static>true</static>
+      <pose>12.75 -4 0.9 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>0.6</radius>
+              <length>1.8</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>0.6</radius>
+              <length>1.8</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.85 0.85 0.8 1</ambient>
+            <diffuse>0.85 0.85 0.8 1</diffuse>
+            <specular>0.3 0.3 0.3 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="fuel_tank_1">
+      <static>true</static>
+      <pose>14.75 -4 0.9 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>0.6</radius>
+              <length>1.8</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>0.6</radius>
+              <length>1.8</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.85 0.85 0.8 1</ambient>
+            <diffuse>0.85 0.85 0.8 1</diffuse>
+            <specular>0.3 0.3 0.3 1</specular>
           </material>
         </visual>
       </link>

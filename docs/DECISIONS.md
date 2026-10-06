@@ -791,3 +791,35 @@ haritası için. TurtleBot 4 simülatörünün kamerası 320×240; derinlikten �
 gürültülü olabilir.
 
 **Bedeli:** vSLAM çalışmasındaki salt kamera düzeninden ayrılır; tezde gerekçesiyle yazılır.
+
+---
+
+## K-034 · Faz 3 aracı: ORINIUM İKA modeli (K-027'nin araç kısmını değiştirir)
+**Tarih:** 2026-10-06 · **Durum:** Yürürlükte
+
+Faz 3–5 simülasyonunda araç TurtleBot 4 değil, ORINIUM takımının İKA modeli
+(`ika_arac`, SolidWorks çıktısı `URDF_icin.SLDASM`). Simülatör Gazebo Fortress kalır
+(K-027'nin simülatör kısmı geçerli).
+
+- **Kaynak ve port:** `~/Documents/ORINIUM/ugv_telemetry_new/sim/models/ika_arac/`,
+  Harmonic için yazılmış. Depoya `ros2_ws/src/ika_sim/models/ika_arac/` olarak Fortress'e
+  çevrilmiş hâli alınır. Üç değişiklik: SDF 1.11 → 1.9, mesh yolları `model://`, eklenti
+  adları `gz-sim-*` → `ignition-gazebo-*`. Kaynak ve takım tezde belirtilir.
+- **Araç:** gövde 1,51 × 1,15 m, 6 salıncakta 12 tekerlek, DiffDrive (`/cmd_vel`, `/odom`),
+  lidar (`/scan`, 720 örnek, 8 m, 10 Hz), RGB-D kamera (`/camera/image`,
+  `/camera/depth_image`, 640×480, 10 Hz), IMU (`/imu`), kule kamerası.
+- **Saha (K-032) araca göre genişletilir:** geçitler ~3 m. Koordinat ilkesi (araç (0, 0)'da
+  doğuya bakarak başlar) aynen kalır. Şarj istasyonu yok.
+- **Elle kurulacaklar:** spawn, ROS köprüsü (`ros_gz_bridge`), `tf`. TurtleBot 4'ün hazır
+  parçalarının yerine geçer.
+
+**Neden:** Esra gerçekçi bir İKA görünümü istedi. Ölçüm de lehine çıktı (2026-10-06,
+`ika_saha`'nın kopyası, 2 × 20 s): İKA ile hız oranı **%100**, TurtleBot 4 ile %46. İKA
+ölçümünde ROS köprüleri yoktu, sonuç biraz iyimser. Boş dünyada lidar, kamera ve sürüş
+doğrulandı.
+
+**Bedeli:** Sahanın Blok 2–5 koordinatları yeniden yazılır. Köprü ve `tf` işi gelir.
+Dönüşte odometri %14 fazla sayıyor (12 tekerleğin kayması). Bu, RTAB-Map'in düzelteceği
+hata, tezde yazılır. K-033'teki "kamera 320×240" gerekçesi artık geçersiz (kamera
+640×480), lidar kullanma kararı yine geçerli. Model takımın ortak işi: kaynağı belirtilir,
+takımdan onay alınır.
