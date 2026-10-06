@@ -30,6 +30,8 @@ experiments/runs/
 *.bag
 *.db3
 *.pgm
+# İstisna: Nav2'nin kullandığı harita depoda (3.1 ölçütü, K-036)
+!ros2_ws/src/ika_nav/maps/*.pgm
 
 # --- Haritalar (büyük ikili dosyalar; hangi haritanın kullanıldığı DECISIONS'ta yazar) ---
 *.rtabmap
