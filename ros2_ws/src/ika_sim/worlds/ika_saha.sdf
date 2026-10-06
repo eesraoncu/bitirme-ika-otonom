@@ -1,5 +1,7 @@
 <?xml version="1.0"?>
-<!-- İKA deney sahası (Faz 3). 20 × 12 m açık saha: x −3…17 m, y −6…6 m.
+<!-- İKA deney sahası (Faz 3). 32 × 20 m açık saha: x −3…29 m, y −10…10 m.
+     İKA aracına (1,78 × 1,15 m, K-034) göre genişletildi (K-035): geçitler ≥ 3 m.
+     Kenarlar 4'ün katı: bariyerler (4,065 m) 4 m arayla tam oturur.
 
      Robot dünyanın (0, 0) noktasında, doğuya (+x) bakarak başlar. RTAB-Map haritanın
      başlangıcını robotun ilk konumu kabul eder; bu yüzden buradaki koordinatlar
@@ -14,6 +16,7 @@
      Blok 3: asfalt doku (textures/, tools/gen_textures.py ile üretilir).
      Blok 4: nesneler. Konteyner, kamyonet, çöp konteyneri.
      Blok 5: yasak bölgeler. Zemin boyaları (yalnız visual), koniler, masalar, tanklar.
+     Yerleşim krokisi docs/STATUS.md'de.
 
      Hazır (Fuel) model kullanmadan önce dosyasında üç şeye bakılır: <static> var mı,
      çarpışma şekli basit mi (binlerce üçgenli mesh fiziği yavaşlatır), malzemesi
@@ -64,7 +67,7 @@
          Sahanın içindeki asfalt dokusu ayrı bir model (aşağıda, yard_surface) -->
     <model name="ground">
       <static>true</static>
-      <pose>7 0 0 0 0 0</pose>
+      <pose>13 0 0 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
@@ -93,18 +96,18 @@
          collision'ı üzerinde yürür; bu model sadece kameranın gördüğü asfaltı çizer.
          Zeminden 2 mm yukarıda: iki yüzey aynı yükseklikte olursa ekran kartı
          hangisini çizeceğine karar veremez ve görüntü titrer (z-fighting).
-         21 × 13 m, bariyerlerin altına kadar uzanır.
+         33 × 21 m, bariyerlerin altına kadar uzanır.
          <pbr><metal>: Fortress'in malzeme tanımı. albedo_map yüzeyin "boya" resmi;
          göreli yol bu .sdf dosyasının klasörüne göredir -->
     <model name="yard_surface">
       <static>true</static>
-      <pose>7 0 0.002 0 0 0</pose>
+      <pose>13 0 0.002 0 0 0</pose>
       <link name="link">
         <visual name="visual">
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>21 13</size>
+              <size>33 21</size>
             </plane>
           </geometry>
           <material>
@@ -124,94 +127,144 @@
 
     <!-- Çevre bariyerleri: Fuel'deki hazır model (4,065 × 0,81 × 1,14 m). Aynı model
          <include> ile birden çok kez çağrılır; her kopyanın <name>'i farklı olmalı.
-         Kuzey ve güney: merkezler 4 m arayla, uçlar 6,5 cm üst üste biner, robot
-         (çap 0,34 m) aradan geçemez. Batı ve doğu: 90° döndürülmüş (yaw = 1.5708 rad).
+         Kuzey ve güney (8'er): merkezler 4 m arayla, uçlar 6,5 cm üst üste biner, araç
+         aradan geçemez. Batı (5) ve doğu (4): 90° döndürülmüş (yaw = 1.5708 rad).
          Doğuda y = −1,97…1,97 arası boş: KAPI. Robot fiziksel olarak dışarı çıkabilir,
          onu yalnızca kartın izinli alan kuralı durdurur -->
     <include>
       <name>barrier_north_0</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
-      <pose>-1 6 0 0 0 0</pose>
+      <pose>-1 10 0 0 0 0</pose>
     </include>
     <include>
       <name>barrier_north_1</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
-      <pose>3 6 0 0 0 0</pose>
+      <pose>3 10 0 0 0 0</pose>
     </include>
     <include>
       <name>barrier_north_2</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
-      <pose>7 6 0 0 0 0</pose>
+      <pose>7 10 0 0 0 0</pose>
     </include>
     <include>
       <name>barrier_north_3</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
-      <pose>11 6 0 0 0 0</pose>
+      <pose>11 10 0 0 0 0</pose>
     </include>
     <include>
       <name>barrier_north_4</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
-      <pose>15 6 0 0 0 0</pose>
+      <pose>15 10 0 0 0 0</pose>
+    </include>
+    <include>
+      <name>barrier_north_5</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
+      <pose>19 10 0 0 0 0</pose>
+    </include>
+    <include>
+      <name>barrier_north_6</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
+      <pose>23 10 0 0 0 0</pose>
+    </include>
+    <include>
+      <name>barrier_north_7</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
+      <pose>27 10 0 0 0 0</pose>
     </include>
     <include>
       <name>barrier_south_0</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
-      <pose>-1 -6 0 0 0 0</pose>
+      <pose>-1 -10 0 0 0 0</pose>
     </include>
     <include>
       <name>barrier_south_1</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
-      <pose>3 -6 0 0 0 0</pose>
+      <pose>3 -10 0 0 0 0</pose>
     </include>
     <include>
       <name>barrier_south_2</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
-      <pose>7 -6 0 0 0 0</pose>
+      <pose>7 -10 0 0 0 0</pose>
     </include>
     <include>
       <name>barrier_south_3</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
-      <pose>11 -6 0 0 0 0</pose>
+      <pose>11 -10 0 0 0 0</pose>
     </include>
     <include>
       <name>barrier_south_4</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
-      <pose>15 -6 0 0 0 0</pose>
+      <pose>15 -10 0 0 0 0</pose>
+    </include>
+    <include>
+      <name>barrier_south_5</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
+      <pose>19 -10 0 0 0 0</pose>
+    </include>
+    <include>
+      <name>barrier_south_6</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
+      <pose>23 -10 0 0 0 0</pose>
+    </include>
+    <include>
+      <name>barrier_south_7</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
+      <pose>27 -10 0 0 0 0</pose>
     </include>
     <include>
       <name>barrier_west_0</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
-      <pose>-3 -4 0 0 0 1.5708</pose>
+      <pose>-3 -8 0 0 0 1.5708</pose>
     </include>
     <include>
       <name>barrier_west_1</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
-      <pose>-3 0 0 0 0 1.5708</pose>
+      <pose>-3 -4 0 0 0 1.5708</pose>
     </include>
     <include>
       <name>barrier_west_2</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
+      <pose>-3 0 0 0 0 1.5708</pose>
+    </include>
+    <include>
+      <name>barrier_west_3</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
       <pose>-3 4 0 0 0 1.5708</pose>
     </include>
     <include>
-      <name>barrier_east_south</name>
+      <name>barrier_west_4</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
-      <pose>17 -4 0 0 0 1.5708</pose>
+      <pose>-3 8 0 0 0 1.5708</pose>
     </include>
     <include>
-      <name>barrier_east_north</name>
+      <name>barrier_east_0</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
-      <pose>17 4 0 0 0 1.5708</pose>
+      <pose>29 -8 0 0 0 1.5708</pose>
+    </include>
+    <include>
+      <name>barrier_east_1</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
+      <pose>29 -4 0 0 0 1.5708</pose>
+    </include>
+    <include>
+      <name>barrier_east_2</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
+      <pose>29 4 0 0 0 1.5708</pose>
+    </include>
+    <include>
+      <name>barrier_east_3</name>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey Barrier</uri>
+      <pose>29 8 0 0 0 1.5708</pose>
     </include>
 
     <!-- Konteyner: kendi modelimiz, 20 ft gerçek ölçü (6,06 × 2,44 × 2,59 m).
          collision ile visual aynı kutu: lidar onu duvar olarak, kamera dokusuyla görür.
          Kutunun merkezi ortasındadır; yere oturması için z = yüksekliğin yarısı.
-         Arkasıyla kuzey bariyeri arasında ~1,8 m geçit kalır: "konteyner arkası".
-         x 2,97…9,03; doğusunda kamyonetle arasında 1,4 m geçit -->
+         x 4,97…11,03, y 3,28…5,72. Arkasıyla kuzey bariyerinin tabanı arasında 3,9 m
+         geçit: "konteyner arkası". Doğusunda kamyonetle arasında 6,3 m -->
     <model name="container">
       <static>true</static>
-      <pose>6 2.6 1.295 0 0 0</pose>
+      <pose>8 4.5 1.295 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
@@ -242,18 +295,19 @@
     </model>
 
     <!-- Kamyonet: Fuel (CC0), statik, dokusu modelin içinde. Merkezi tabanda, z = 0.
-         Model inç biriminde ve simetrik değil: uzunluk 5,66 m, x 10,45…16,11 -->
+         Model inç biriminde ve simetrik değil: uzunluk 5,66 m, merkezden −2,95…+2,71,
+         yani x 17,35…23,01 -->
     <include>
       <name>pickup</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pickup</uri>
-      <pose>13.4 4.3 0 0 0 0</pose>
+      <pose>20.3 4.5 0 0 0 0</pose>
     </include>
 
     <!-- Çöp konteyneri: kendi kutumuz (1,4 × 2,0 × 1,3 m), kuzeybatı köşesinde.
          Uzun kenarı kuzey-güney yönünde, batı bariyerine sığsın diye -->
     <model name="dumpster">
       <static>true</static>
-      <pose>-1.8 4.5 0.65 0 0 0</pose>
+      <pose>-1.5 7 0.65 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
@@ -287,23 +341,23 @@
          görmez, robot fiziksel olarak girebilir; onu yalnızca kurallar (Nav2 maskesi,
          kartın coğrafi sınırı) durdurur. Deneyin ölçtüğü şey bu.
          Asfaltın 2 mm üstünde (z = 0,004): aynı yükseklikte titrerdi (z-fighting).
-         yasak.jpg kare; düzlem onu kendi boyutuna gerer, 4 × 3 m'de çizgiler yatıklaşır.
+         yasak.jpg kare; düzlem onu kendi boyutuna gerer, 6 × 3,7 m'de çizgiler yatıklaşır.
          Bölgelerdeki nesneler içeride durur, kenarların ortası boş: robotu bölgenin
          kenarında bir engel değil kural durdurmalı.
-         Kazı alanı başlangıçtan kapıya giden düz yolu keser; kuzeyinde konteynere
-         0,38 m kalır (robot 0,34 m). Yol ya güneydeki 1,5 m'lik koridordan
-         (y −2,5…−1) ya konteynerin arkasından geçer -->
+         Kazı alanı başlangıçtan kapıya giden düz yolu keser. Araç onu kuzeyinden
+         (konteyner x 11,03'te biter, kamyonet 17,35'te başlar) ya da güneydeki 3 m'lik
+         koridordan (y −4,5…−1,5) dolanır -->
 
-    <!-- Yasak 1, personel alanı: x 2…6, y −5,5…−2,5 -->
+    <!-- Yasak 1, personel alanı: x 3…9, y −8,2…−4,5 -->
     <model name="forbidden_personnel">
       <static>true</static>
-      <pose>4 -4 0.004 0 0 0</pose>
+      <pose>6 -6.35 0.004 0 0 0</pose>
       <link name="link">
         <visual name="visual">
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>4 3</size>
+              <size>6 3.7</size>
             </plane>
           </geometry>
           <material>
@@ -321,16 +375,16 @@
       </link>
     </model>
 
-    <!-- Yasak 2, kazı alanı: x 9…11, y −1…1 -->
+    <!-- Yasak 2, kazı alanı: x 13…16, y −1,5…1,5 -->
     <model name="forbidden_excavation">
       <static>true</static>
-      <pose>10 0 0.004 0 0 0</pose>
+      <pose>14.5 0 0.004 0 0 0</pose>
       <link name="link">
         <visual name="visual">
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>2 2</size>
+              <size>3 3</size>
             </plane>
           </geometry>
           <material>
@@ -348,16 +402,16 @@
       </link>
     </model>
 
-    <!-- Yasak 3, yakıt alanı: x 11,5…16, y −5,5…−2,5 -->
+    <!-- Yasak 3, yakıt alanı: x 17…23, y −8,2…−4,5 -->
     <model name="forbidden_fuel">
       <static>true</static>
-      <pose>13.75 -4 0.004 0 0 0</pose>
+      <pose>20 -6.35 0.004 0 0 0</pose>
       <link name="link">
         <visual name="visual">
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>4.5 3</size>
+              <size>6 3.7</size>
             </plane>
           </geometry>
           <material>
@@ -383,47 +437,47 @@
       <name>cone_0</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Construction Cone</uri>
       <static>true</static>
-      <pose>9.3 -0.7 0 0 0 0</pose>
+      <pose>13.3 -1.2 0 0 0 0</pose>
     </include>
     <include>
       <name>cone_1</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Construction Cone</uri>
       <static>true</static>
-      <pose>9.3 0.7 0 0 0 0</pose>
+      <pose>13.3 1.2 0 0 0 0</pose>
     </include>
     <include>
       <name>cone_2</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Construction Cone</uri>
       <static>true</static>
-      <pose>10.7 -0.7 0 0 0 0</pose>
+      <pose>15.7 -1.2 0 0 0 0</pose>
     </include>
     <include>
       <name>cone_3</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Construction Cone</uri>
       <static>true</static>
-      <pose>10.7 0.7 0 0 0 0</pose>
+      <pose>15.7 1.2 0 0 0 0</pose>
     </include>
 
     <!-- Personel alanında masalar: Fuel (CC0), statik, çarpışma şekli kutu ve
          silindirler. 1,5 × 0,8 m, boy 1 m. 90° döndürülmüş: uzun kenar kuzey-güney.
-         x 2,6…3,4 ve 4,6…5,4, y −4,75…−3,25: bölge kenarına en az 0,6 m -->
+         x 4,6…5,4 ve 6,6…7,4, y −7,1…−5,6: bölge kenarına en az 1,1 m -->
     <include>
       <name>table_0</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Table</uri>
-      <pose>3 -4 0 0 0 1.5708</pose>
+      <pose>5 -6.35 0 0 0 1.5708</pose>
     </include>
     <include>
       <name>table_1</name>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Table</uri>
-      <pose>5 -4 0 0 0 1.5708</pose>
+      <pose>7 -6.35 0 0 0 1.5708</pose>
     </include>
 
     <!-- Yakıt alanında dik tanklar: kendi modelimiz, silindir (r 0,6 m, boy 1,8 m),
          düz renk. Silindirin merkezi ortasındadır: z = boyun yarısı.
-         x 12,15…13,35 ve 14,15…15,35, y −4,6…−3,4: bölge kenarına en az 0,65 m -->
+         x 18,4…19,6 ve 20,4…21,6, y −6,95…−5,75: bölge kenarına en az 1,2 m -->
     <model name="fuel_tank_0">
       <static>true</static>
-      <pose>12.75 -4 0.9 0 0 0</pose>
+      <pose>19 -6.35 0.9 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
@@ -450,7 +504,7 @@
     </model>
     <model name="fuel_tank_1">
       <static>true</static>
-      <pose>14.75 -4 0.9 0 0 0</pose>
+      <pose>21 -6.35 0.9 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry>

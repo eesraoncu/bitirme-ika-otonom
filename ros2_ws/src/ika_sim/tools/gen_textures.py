@@ -5,7 +5,7 @@ Kullanım (depo kökünden):
     python3 ros2_ws/src/ika_sim/tools/gen_textures.py
 
 Çıktı ros2_ws/src/ika_sim/worlds/textures/ altına:
-    asfalt.jpg    saha zemini, 21 × 13 m, 2 cm/piksel
+    asfalt.jpg    saha zemini, 33 × 21 m, 2 cm/piksel
     konteyner.jpg konteynerin yan yüzü: oluklu metal, pas, etiketler
     yasak.jpg     yasak bölge boyası: sarı-siyah çizgi, aşınmış
     cop.jpg       çöp konteynerinin yüzü: yeşil boyalı metal, ezik, yazı
@@ -43,14 +43,16 @@ def font(size):
 
 
 def asfalt(rng):
-    w, h = 1050, 650   # 21 × 13 m, 2 cm/piksel
+    w, h = 1650, 1050   # 33 × 21 m, 2 cm/piksel (K-035)
+    # Sayılar metrekare başına yoğunluğu korur: saha 21 × 13'ten 33 × 21'e büyüdü
+    # (alan 2,54 kat), leke, çatlak, tane ve işaret sayıları da o kadar arttı
     g = 0.30 + 0.12 * noise(rng, w, h, [(64, 0.5), (16, 0.3), (4, 0.15), (1, 0.4)])
     img = Image.fromarray((np.clip(g, 0, 1) * 255).astype(np.uint8)).convert('RGB')
     d = ImageDraw.Draw(img, 'RGBA')
     # Yağ lekeleri: koyu, yumuşak kenarlı elipsler
     stains = Image.new('L', (w, h), 0)
     ds = ImageDraw.Draw(stains)
-    for _ in range(45):
+    for _ in range(114):
         x, y = rng.integers(0, w), rng.integers(0, h)
         rx, ry = rng.integers(8, 40), rng.integers(6, 30)
         ds.ellipse([x - rx, y - ry, x + rx, y + ry], fill=int(rng.integers(40, 110)))
@@ -58,7 +60,7 @@ def asfalt(rng):
     img = Image.composite(Image.new('RGB', (w, h), (25, 25, 28)), img, stains)
     d = ImageDraw.Draw(img, 'RGBA')
     # Çatlaklar: rastgele yürüyüş çizgileri
-    for _ in range(30):
+    for _ in range(76):
         x, y = float(rng.integers(0, w)), float(rng.integers(0, h))
         ang = rng.random() * 2 * np.pi
         pts = [(x, y)]
@@ -68,13 +70,13 @@ def asfalt(rng):
             pts.append((x, y))
         d.line(pts, fill=(20, 20, 20, 200), width=int(rng.integers(1, 3)))
     # Açık renk taneler (agrega)
-    for _ in range(6000):
+    for _ in range(15200):
         x, y = rng.integers(0, w), rng.integers(0, h)
         c = int(rng.integers(120, 190))
         d.point((x, y), fill=(c, c, c, 255))
     # Silik zemin işaretleri: birkaç beyaz çizgi parçası ve numara, yer tanımaya yardım eder
     placed = []
-    while len(placed) < 8:
+    while len(placed) < 20:
         x, y = rng.integers(40, w - 140), rng.integers(40, h - 40)
         if any(abs(x - px) < 170 and abs(y - py) < 60 for px, py in placed):
             continue   # üst üste binmesin

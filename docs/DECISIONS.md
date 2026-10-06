@@ -823,3 +823,22 @@ Dönüşte odometri %14 fazla sayıyor (12 tekerleğin kayması). Bu, RTAB-Map'i
 hata, tezde yazılır. K-033'teki "kamera 320×240" gerekçesi artık geçersiz (kamera
 640×480), lidar kullanma kararı yine geçerli. Model takımın ortak işi: kaynağı belirtilir,
 takımdan onay alınır.
+
+---
+
+## K-035 · Deney sahası İKA'ya göre 32 × 20 m (K-032'ye ek)
+**Tarih:** 2026-10-06 · **Durum:** Yürürlükte
+
+K-032'deki 20 × 12 m saha İKA (K-034) için 32 × 20 m'ye büyütülür: x −3…29, y −10…10,
+doğuda kapı y −1,97…1,97. Kenarlar 4'ün katı, Jersey Barrier (4,065 m) 4 m arayla tam
+oturur (25 bariyer). Nesneler gerçek boyutlarında, aralarındaki geçitler ≥ 3 m. Yasak
+bölgeler: personel x 3…9, y −8,2…−4,5; kazı x 13…16, y −1,5…1,5; yakıt x 17…23,
+y −8,2…−4,5. Koordinat ilkesi ve "yasak bölgeler yalnızca visual" kuralı aynen geçerli.
+
+**Neden:** Araç 1,78 × 1,15 m, yerinde dönerken ~2,3 m çaplı alan ister, Nav2 bir de
+güvenlik payı bırakır. 30 × 18 m bariyer ölçüsüne oturmadı: üst üste binen bariyerler
+titrer, köşede 1,6 m'lik delik kalır. Lidar 8 m'ye kadar görüyor, ama sahanın ortasındaki
+konteyner ve koniler sayesinde her noktadan bir nesne görünür.
+
+**Bedeli:** Dokular yeniden üretildi (henüz harita olmadığı için kayıp yok). Bariyer
+sayısı 15'ten 25'e çıktı. TurtleBot 4 ile hız ~%44, değişmedi.

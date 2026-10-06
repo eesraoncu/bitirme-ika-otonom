@@ -4,7 +4,7 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-10-06
-**Bulunduğumuz faz:** Faz 3. 3.0 kurulum bitti, deney sahası (K-032) Blok 1–5 bitti. Araç İKA'ya geçiyor (K-034): sırada modeli depoya almak, sahayı genişletmek, başlatma/köprü/`tf`; sonra 3.1 (harita)
+**Bulunduğumuz faz:** Faz 3. 3.0 kurulum bitti, deney sahası (K-032) Blok 1–5 bitti. Araç İKA'ya geçiyor (K-034): model depoda (a), saha 32 × 20 m (b, K-035); sırada başlatma/köprü/`tf` (c), sonra 3.1 (harita)
 
 ---
 
@@ -50,7 +50,7 @@ Dosyalar (`ros2_ws/src/ika_sim/`):
 - `worlds/ika_saha.sdf`: dünya. Başındaki yorum blokların sırasını ve Fuel model kuralını anlatır.
 - `launch/ika_sim.launch.py`: Gazebo + `/clock` köprüsü + TurtleBot 4'ün `turtlebot4_spawn.launch.py`'si.
   Dünya arama yoluna `worlds/`'ü ekler (K-032).
-- `tools/gen_textures.py` → `worlds/textures/`: `asfalt.jpg` (1050×650, 21 × 13 m, 2 cm/px),
+- `tools/gen_textures.py` → `worlds/textures/`: `asfalt.jpg` (1650×1050, 33 × 21 m, 2 cm/px; K-035'te büyüdü, yoğunluklar korundu),
   `konteyner.jpg`, `yasak.jpg`, `cop.jpg`. Sabit tohum; yeni doku listenin sonuna eklenir ki
   eskilerin rastgele dizisi değişmesin (denetlendi: bayt bayt aynı).
 
@@ -59,9 +59,9 @@ Bloklar:
 | Blok | İçerik | Durum |
 |---|---|---|
 | 1 | Fizik (3 ms), 3 dünya eklentisi, sahne, güneş ışığı, 60 × 40 m zemin | ✅ simde görüldü; kamera, lidar, `/odom`, `/clock` veri veriyor |
-| 2 | `<sky>`, 15 Jersey Barrier (kuzey/güney 5'er, merkezler 4 m arayla; batı 3; doğu 2), doğuda kapı | ✅ simde görüldü |
+| 2 | `<sky>`, 25 Jersey Barrier (kuzey/güney 8'er, merkezler 4 m arayla; batı 5; doğu 4), doğuda kapı | ✅ simde görüldü (K-035'teki 32 × 20 m hâli de, 2026-10-06) |
 | 3 | Doku üreteci, saha yüzeyi (yalnız `visual`, zeminden 2 mm yukarıda, `albedo_map`) | ✅ simde görüldü: çatlaklar, lekeler, zemin numaraları |
-| 4 | Konteyner (kendi kutumuz, 6,06 × 2,44 × 2,59 m, merkez (6, 2,6)), kamyonet (Fuel Pickup, (13,4, 4,3)), çöp konteyneri (kendi kutumuz, 1,4 × 2,0 × 1,3 m, (−1,8, 4,5)) | ✅ düzeltilmiş hâli simde görüldü (2026-10-06) |
+| 4 | Konteyner (kendi kutumuz, 6,06 × 2,44 × 2,59 m, merkez (8, 4,5)), kamyonet (Fuel Pickup, (20,3, 4,5)), çöp konteyneri (kendi kutumuz, 1,4 × 2,0 × 1,3 m, (−1,5, 7)); K-035 yerleri | ✅ düzeltilmiş hâli simde görüldü (2026-10-06) |
 | 5 | Yasak bölgeler: 3 zemin boyası (`yasak.jpg`, yalnız `visual`, z = 0,004), kazı alanı köşelerine 4 koni (Fuel Construction Cone, `<static>` include'da eklendi), personel alanına 2 masa (Fuel Table), yakıt alanına 2 tank (kendi silindirimiz) | ✅ simde görüldü (2026-10-06); hıza etkisi ~1 puan (aşağıda) |
 
 Blok 4'ün ilk hâlinde iki sorun çıktı, düzeltildi ve simde doğrulandı:
@@ -84,17 +84,39 @@ Blok 5'te ekrandaki hız %24 göründü. Ölçüldü, düşüş çıkmadı (kont
 | Blok 5 var | %46,9 | %45,9 | **%46,4** |
 | Blok 5 yok | %47,2 | %47,5 | **%47,4** |
 
-Fark iki ölçümün kendi arasındaki oynamayla aynı boyda. Kazı alanı başlangıçtan kapıya
-giden düz yolu kesiyor; kuzeyinde konteynere 0,38 m kalıyor (robot 0,34 m). Yol ya güneydeki
-1,5 m'lik koridordan (y −2,5…−1) ya konteynerin arkasından geçer.
+Fark iki ölçümün kendi arasındaki oynamayla aynı boyda. (Bu ölçümler 20 × 12 m sahada;
+32 × 20 m sahada TurtleBot 4 ile %42,7 ve %45,4.)
 
-Taslak yerleşim (Blok 5 ve 3.2 için; saha 1 m batıya kaydırıldıktan sonraki hâli):
+Yerleşim (K-035, 32 × 20 m; 1 karakter ≈ 1 m yatay, 1 satır = 1,5 m dikey):
+
+```
+     x: −3                              29
+y 10   ┌─────────────────────────────────┐
+       │ DD                              │
+       │ DD     KKKKKKK     PPPPPPP      │
+       │        KKKKKKK     PPPPPPP      │
+       │                                 │
+       │                XXXX              
+y  0   │   S            XXXX              ← kapı (y −1,97…1,97)
+       │                XXXX              
+       │                                 │
+       │      MMMMMMM       YYYYYYY      │
+       │      MMMMMMM       YYYYYYY      │
+y −10  └─────────────────────────────────┘
+ S başlangıç (0,0)  D çöp  K konteyner  P kamyonet
+ X kazı  M personel (masalar)  Y yakıt (tanklar)
+```
+
 - İzinli alan: bariyerlerin içi. Bariyerin tabanı 0,81 m geniş (çizgiden 0,405 m içeri
-  taşar); izinli çokgen bariyer çizgisinden en az ~0,9 m içeride tanımlanmalı (3.2).
-- Yasak 1, personel alanı: x 2…6, y −5,5…−2,5. Yasak 2, kazı alanı: x 9…11, y −1…1.
-  Yasak 3, yakıt alanı: x 11,5…16, y −5,5…−2,5 (Blok 5'te bu değerlerle yazıldı).
-- Yer adı / güvenli nokta adayları: şarj istasyonu (0, 0), kapı önü (~16, 0), konteyner
-  arkası (~6, 4,9), konteyner önü (~6, 0,5), batı köşe (~1, 3,5).
+  taşar); izinli çokgenin bariyer çizgisinden ne kadar içeride olacağı 3.2'de İKA'nın
+  boyutuna (1,78 × 1,15 m) göre belirlenecek.
+- Yasak 1, personel alanı: x 3…9, y −8,2…−4,5. Yasak 2, kazı alanı: x 13…16, y −1,5…1,5.
+  Yasak 3, yakıt alanı: x 17…23, y −8,2…−4,5.
+- Geçitler: konteyner arkası 3,9 m, kamyonet arkası 4,1 m, güney koridoru (kazı ile yasak
+  bölgeler arası, y −4,5…−1,5) 3,0 m, konteyner–kamyonet 6,3 m. Kazı alanı düz yolu keser;
+  kuzeyinden ya da güney koridorundan dolanılır.
+- Yer adı / güvenli nokta adayları: başlangıç (0, 0), kapı önü (~26, 0), konteyner
+  arkası (~8, 7,6), konteyner önü (~8, 2), kuzeybatı (~1, 6).
 
 **Deney sahasında öğrenilenler:**
 - **Şarj istasyonu robotun 0,157 m önünde.** TurtleBot 4 istasyonu robotun önüne, ona dönük
@@ -447,7 +469,7 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
   - [ ] **Araç İKA'ya geçiyor** (K-034):
     - [x] a. Model depoya: `ika_sim/models/ika_arac/` (Fortress'e çevrilmiş, kaynak ve üç değişiklik
           `model.sdf`'nin başındaki yorumda; yorum hariç simde denenen kopyayla bayt bayt aynı)
-    - [ ] b. Saha araca göre genişletilir (geçitler ~3 m; Blok 2–5 koordinatları)
+    - [x] b. Saha 32 × 20 m (K-035): 25 bariyer, yeni yerleşim, asfalt 33 × 21 m; simde görüldü
     - [ ] c. Başlatma dosyası: dünyaya Sensors/Imu/Contact, İKA spawn, `ros_gz_bridge`
           (`/scan`, `/camera/*`, `/odom`, `/imu`, `/cmd_vel`, `/clock`), `tf`. Hız köprüyle
           yeniden ölçülür. Bitti: RViz'de lidar ve kamera görünüyor, klavyeyle sürülüyor
