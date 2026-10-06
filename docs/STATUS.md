@@ -11,7 +11,7 @@
 ## Şu an ne yapılıyor
 
 **Araç değişiyor: TurtleBot 4 → ORINIUM İKA modeli** (K-034, 2026-10-06). Deneme
-scratchpad'de yapıldı, depoya henüz bir şey alınmadı. Bulgular:
+scratchpad'de yapıldı; model depoya alındı (adım a), henüz başlatma dosyasına bağlı değil. Bulgular:
 - **Port üç mekanik değişiklik:** `<sdf version>` 1.11 → 1.9 (Fortress'in sdformat12'si en
   çok 1.9 okur; model doğrulamadan geçti), mesh yolları `file:///home/esra/ugv_telemetry_new/...`
   (artık yok) → `model://ika_arac/meshes/...`, eklentiler `gz-sim-*-system` / `gz::sim::` →
@@ -445,7 +445,8 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
         açılıyor, yasak bölgeler zeminde görünüyor, hız ölçülen %46 (hazır dünyalar ekrandan
         ~%30 okunmuştu, aynı yöntemle ölçülmedi)
   - [ ] **Araç İKA'ya geçiyor** (K-034):
-    - [ ] a. Model depoya: `ika_sim/models/ika_arac/` (Fortress'e çevrilmiş, ORINIUM kaynağı belirtilir)
+    - [x] a. Model depoya: `ika_sim/models/ika_arac/` (Fortress'e çevrilmiş, kaynak ve üç değişiklik
+          `model.sdf`'nin başındaki yorumda; yorum hariç simde denenen kopyayla bayt bayt aynı)
     - [ ] b. Saha araca göre genişletilir (geçitler ~3 m; Blok 2–5 koordinatları)
     - [ ] c. Başlatma dosyası: dünyaya Sensors/Imu/Contact, İKA spawn, `ros_gz_bridge`
           (`/scan`, `/camera/*`, `/odom`, `/imu`, `/cmd_vel`, `/clock`), `tf`. Hız köprüyle

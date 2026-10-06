@@ -1,0 +1,978 @@
+<!-- İKA aracı (K-034). Kaynak: ORINIUM takımı, ugv_telemetry_new deposu,
+     sim/models/ika_arac/model.sdf (commit 6e6f136, 2026-07-28) ve
+     URDF_icin.SLDASM/meshes/ (SolidWorks çıktısı). Gazebo Harmonic için yazılmıştı.
+
+     Fortress'e çevirmek için yalnızca üç değişiklik yapıldı, gerisi kaynakla aynı:
+       1. <sdf version> 1.11 → 1.9 (Fortress'in sdformat12'si en çok 1.9 okur)
+       2. Mesh yolları file:///home/esra/ugv_telemetry_new/URDF_icin.SLDASM/meshes/
+          → model://ika_arac/meshes/ (21 dosya, 23 yer)
+       3. Eklentiler gz-sim-*-system / gz::sim::systems:: →
+          ignition-gazebo-*-system / ignition::gazebo::systems:: (3 eklenti)
+     <gz_frame_id> değişmedi: Fortress'in sensör kütüphanesi onu da tanır.
+     Kaynak güncellenirse aynı üç değişiklik yeniden uygulanır.
+
+     Dünyanın Sensors, Imu ve Contact sistemlerini yüklemesi gerekir; model
+     kendi sensör sistemini getirmez.
+     Bilinen: FRF tekerleğinin görseli BRF.STL'i kullanır (kaynakta da böyle;
+     tekerlekler aynı olduğu için görünüşte fark yok). -->
+<sdf version='1.9'>
+  <model name='ika_arac'>
+    <link name='base_link'>
+      <inertial>
+        <pose>-0.0877091399435425 -0.00042395192922272681 -0.051111119560399973 0 0 0</pose>
+        <mass>10.86441675333495</mass>
+        <inertia>
+          <ixx>0.92814093757096028</ixx>
+          <ixy>-5.470854315566486e-05</ixy>
+          <ixz>-0.0030349577547475822</ixz>
+          <iyy>0.82124401159044058</iyy>
+          <iyz>-3.9590002254733149e-05</iyz>
+          <izz>1.699025064333934</izz>
+        </inertia>
+      </inertial>
+      <collision name='base_link_collision'><!-- ORINIUM_COLLISION_BOX --><pose>-0.202 -0.001 -0.058 0 0 0</pose><geometry><box><size>1.51 1.15 0.39</size></box></geometry></collision><collision name='palet_burnu_collision'><pose>0.68 0 -0.265 0 -0.6435 0</pose><geometry><box><size>0.25 0.9 0.02</size></box></geometry><surface><friction><ode><mu>0.2</mu><mu2>0.2</mu2></ode></friction></surface></collision><visual name='palet_burnu_visual'><pose>0.68 0 -0.265 0 -0.6435 0</pose><geometry><box><size>0.25 0.9 0.02</size></box></geometry><material><diffuse>0.35 0.35 0.35 1</diffuse><ambient>0.35 0.35 0.35 1</ambient></material></visual><sensor name='temas' type='contact'><always_on>true</always_on><update_rate>30</update_rate><contact><collision>base_link_collision</collision></contact></sensor>
+      
+      
+      
+      
+      
+      
+      <visual name='base_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/base_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+      <visual name='base_link_fixed_joint_lump__BL_salıncak_visual_1'>
+        <pose>-0.57050999999999996 0.49213000000000001 -0.23405999999999999 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/BL_salıncak.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+      <visual name='base_link_fixed_joint_lump__BR_salıncak_visual_2'>
+        <pose>-0.57050999999999996 -0.49386999999999998 -0.23405999999999999 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/BR_salıncak.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+      <visual name='base_link_fixed_joint_lump__FL_salıncak_visual_3'>
+        <pose>0.19949 0.49213000000000001 -0.23405999999999999 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/FL_salıncak.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+      <visual name='base_link_fixed_joint_lump__FR_salıncak_visual_4'>
+        <pose>0.19949 -0.49386999999999998 -0.23405999999999999 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/FR_salıncak.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+      <visual name='base_link_fixed_joint_lump__ML_salıncak_visual_5'>
+        <pose>-0.18551000000000001 0.49213000000000001 -0.23405999999999999 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/ML_salıncak.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+      <visual name='base_link_fixed_joint_lump__MR_salıncak_visual_6'>
+        <pose>-0.18551000000000001 -0.49386999999999998 -0.23405999999999999 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/MR_salıncak.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='BLB_joint' type='revolute'>
+      <pose relative_to='base_link'>-0.66432799999999992 0.51212999999999997 -0.24006 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>BLB</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='BLB'>
+      <pose relative_to='BLB_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 -0.01 0 0 0 0</pose>
+        <mass>0.34749755780714098</mass>
+        <inertia>
+          <ixx>0.00050845303425500299</ixx>
+          <ixy>-8.5336049642705501e-20</ixy>
+          <ixz>1.3678900903790201e-35</ixz>
+          <iyy>0.00099373956465619701</iyy>
+          <iyz>-6.1231397501933402e-21</iyz>
+          <izz>0.00050845303425500299</izz>
+        </inertia>
+      </inertial>
+      <collision name='BLB_collision'><pose>0 -0.01 0 1.5708 0 0</pose><geometry><cylinder><radius>0.16</radius><length>0.04</length></cylinder></geometry><surface><friction><ode><mu>1.4</mu><mu2>1.4</mu2></ode></friction></surface></collision>
+      <visual name='BLB_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/BLB.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='BLF_joint' type='revolute'>
+      <pose relative_to='base_link'>-0.47438999999999998 0.51212999999999997 -0.24006 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>BLF</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='BLF'>
+      <pose relative_to='BLF_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 -0.01 0 0 0 0</pose>
+        <mass>0.34749755780714098</mass>
+        <inertia>
+          <ixx>0.00050845303425500299</ixx>
+          <ixy>-8.5336049642705802e-20</ixy>
+          <ixz>3.0814879110195801e-33</ixz>
+          <iyy>0.00099373956465619701</iyy>
+          <iyz>-6.1231397501892897e-21</iyz>
+          <izz>0.00050845303425500299</izz>
+        </inertia>
+      </inertial>
+      <collision name='BLF_collision'><pose>0 -0.01 0 1.5708 0 0</pose><geometry><cylinder><radius>0.16</radius><length>0.04</length></cylinder></geometry><surface><friction><ode><mu>1.4</mu><mu2>1.4</mu2></ode></friction></surface></collision>
+      <visual name='BLF_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/BLF.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='BRB_joint' type='revolute'>
+      <pose relative_to='base_link'>-0.66148999999999991 -0.51386999999999994 -0.24006 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>BRB</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='BRB'>
+      <pose relative_to='BRB_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>-0.0023432072537191199 0.010000000000000101 0.0042764241088971101 0 0 0</pose>
+        <mass>0.34749755780714098</mass>
+        <inertia>
+          <ixx>0.00050845303425500299</ixx>
+          <ixy>-8.5336049642705802e-20</ixy>
+          <ixz>6.1629758220391499e-33</ixz>
+          <iyy>0.00099373956465619701</iyy>
+          <iyz>-6.1231397501892897e-21</iyz>
+          <izz>0.00050845303425500299</izz>
+        </inertia>
+      </inertial>
+      <collision name='BRB_collision'><pose>0 0.01 0 1.5708 0 0</pose><geometry><cylinder><radius>0.16</radius><length>0.04</length></cylinder></geometry><surface><friction><ode><mu>1.4</mu><mu2>1.4</mu2></ode></friction></surface></collision>
+      <visual name='BRB_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/BRB.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='BRF_joint' type='revolute'>
+      <pose relative_to='base_link'>-0.47213399999999989 -0.51386999999999994 -0.24006 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>BRF</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='BRF'>
+      <pose relative_to='BRF_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>-0.0018223064500676499 0.010000000000000101 -0.00452301034655878 0 0 0</pose>
+        <mass>0.34749755780714098</mass>
+        <inertia>
+          <ixx>0.00050845303425500299</ixx>
+          <ixy>-8.5336049642705802e-20</ixy>
+          <ixz>6.1629758220391499e-33</ixz>
+          <iyy>0.00099373956465619701</iyy>
+          <iyz>-6.1231397501892897e-21</iyz>
+          <izz>0.00050845303425500299</izz>
+        </inertia>
+      </inertial>
+      <collision name='BRF_collision'><pose>0 0.01 0 1.5708 0 0</pose><geometry><cylinder><radius>0.16</radius><length>0.04</length></cylinder></geometry><surface><friction><ode><mu>1.4</mu><mu2>1.4</mu2></ode></friction></surface></collision>
+      <visual name='BRF_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/BRF.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='FLB_joint' type='revolute'>
+      <pose relative_to='base_link'>0.108529 0.51212999999999997 -0.24006 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>FLB</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='FLB'>
+      <pose relative_to='FLB_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 -0.01 0 0 0 0</pose>
+        <mass>0.34749755780714098</mass>
+        <inertia>
+          <ixx>0.00050845303425500299</ixx>
+          <ixy>-8.6592317316601599e-20</ixy>
+          <ixz>-1.8673464464951201e-20</ixz>
+          <iyy>0.00099373956465619701</iyy>
+          <iyz>-3.9577064809616001e-21</iyz>
+          <izz>0.00050845303425500299</izz>
+        </inertia>
+      </inertial>
+      <collision name='FLB_collision'><pose>0 -0.01 0 1.5708 0 0</pose><geometry><cylinder><radius>0.16</radius><length>0.04</length></cylinder></geometry><surface><friction><ode><mu>1.4</mu><mu2>1.4</mu2></ode></friction></surface></collision>
+      <visual name='FLB_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/FLB.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='FLF_joint' type='revolute'>
+      <pose relative_to='base_link'>0.29787999999999998 0.51212999999999997 -0.24006 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>FLF</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='FLF'>
+      <pose relative_to='FLF_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>-1.11022302462516e-16 -0.01 0 0 0 0</pose>
+        <mass>0.34749755780714098</mass>
+        <inertia>
+          <ixx>0.00050845303425500299</ixx>
+          <ixy>-8.6426787426684906e-20</ixy>
+          <ixz>9.6416861516366299e-20</ixz>
+          <iyy>0.00099373956465619701</iyy>
+          <iyz>-3.0508087588895299e-21</iyz>
+          <izz>0.00050845303425500299</izz>
+        </inertia>
+      </inertial>
+      <collision name='FLF_collision'><pose>0 -0.01 0 1.5708 0 0</pose><geometry><cylinder><radius>0.16</radius><length>0.04</length></cylinder></geometry><surface><friction><ode><mu>1.4</mu><mu2>1.4</mu2></ode></friction></surface></collision>
+      <visual name='FLF_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/FLF.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='FRB_joint' type='revolute'>
+      <pose relative_to='base_link'>0.10424899999999999 -0.51386999999999994 -0.24006 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>FRB</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='FRB'>
+      <pose relative_to='FRB_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0.010000000000000101 0 0 0 0</pose>
+        <mass>0.34749755780714098</mass>
+        <inertia>
+          <ixx>0.00050845303425500299</ixx>
+          <ixy>-8.5336049642705899e-20</ixy>
+          <ixz>6.1629758220391499e-33</ixz>
+          <iyy>0.00099373956465619701</iyy>
+          <iyz>-6.12313975018784e-21</iyz>
+          <izz>0.00050845303425500299</izz>
+        </inertia>
+      </inertial>
+      <collision name='FRB_collision'><pose>0 0.01 0 1.5708 0 0</pose><geometry><cylinder><radius>0.16</radius><length>0.04</length></cylinder></geometry><surface><friction><ode><mu>1.4</mu><mu2>1.4</mu2></ode></friction></surface></collision>
+      <visual name='FRB_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/FRB.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='FRF_joint' type='revolute'>
+      <pose relative_to='base_link'>0.29424600000000001 -0.51386999999999994 -0.24006 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>FRF</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='FRF'>
+      <pose relative_to='FRF_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0.01 0 0 0 0</pose>
+        <mass>0.34749755780714098</mass>
+        <inertia>
+          <ixx>0.00050845303425500299</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.00099373956465619701</iyy>
+          <iyz>0</iyz>
+          <izz>0.00050845303425500299</izz>
+        </inertia>
+      </inertial>
+      <collision name='FRF_collision'><pose>0 0.01 0 1.5708 0 0</pose><geometry><cylinder><radius>0.16</radius><length>0.04</length></cylinder></geometry><surface><friction><ode><mu>1.4</mu><mu2>1.4</mu2></ode></friction></surface></collision>
+      <visual name='FRF_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/BRF.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>1 1 1 1</diffuse>
+          <ambient>1 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='KULE_ALT_joint' type='revolute'>
+      <pose relative_to='base_link'>0.13835 0 0.20000000000000001 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>KULE_ALT</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='KULE_ALT'>
+      <pose relative_to='KULE_ALT_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>1.7661042295280502e-08 1.33215175612822e-07 -0.096823998722679203 0 0 0</pose>
+        <mass>1.7228013231202399</mass>
+        <inertia>
+          <ixx>0.0080181453014450607</ixx>
+          <ixy>-1.2608311766663299e-05</ixy>
+          <ixz>-3.3219107961878699e-09</ixz>
+          <iyy>0.0072332964081278503</iyy>
+          <iyz>-7.2336315393516002e-09</iyz>
+          <izz>0.0028890860065807298</izz>
+        </inertia>
+      </inertial>
+      <collision name='KULE_ALT_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/KULE_ALT.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='KULE_ALT_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/KULE_ALT.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='KULE_UST_joint' type='revolute'>
+      <pose relative_to='KULE_ALT'>-0.00080292000000000004 -0.049993999999999997 0.067559999999999995 0 0 0</pose>
+      <parent>KULE_ALT</parent>
+      <child>KULE_UST</child>
+      <axis>
+        <xyz>0.016057999999999999 0.99987000000000004 0</xyz>
+        <limit>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='KULE_UST'>
+      <pose relative_to='KULE_UST_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0.00080291816438227105 0.049993552808549203 -7.2164496600635205e-16 0 0 0</pose>
+        <mass>0.11090113723983699</mass>
+        <inertia>
+          <ixx>0.000111813749657115</ixx>
+          <ixy>-1.17215197452736e-06</ixy>
+          <ixz>-1.4087674961551601e-20</ixz>
+          <iyy>3.88487463900815e-05</iyy>
+          <iyz>8.2845859121498297e-20</iyz>
+          <izz>0.00011183257492675199</izz>
+        </inertia>
+      </inertial>
+      <collision name='KULE_UST_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/KULE_UST.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='KULE_UST_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/KULE_UST.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+    
+      <sensor name='turret_camera' type='camera'>
+        <pose>0.06 0.05 0.04 0 0 0</pose>
+        <topic>/turret/camera</topic>
+        <!-- 3 FPS: taret algilama sim'de varsayilan KAPALI (turret_detect:=true);
+             render butcesini ON kameraya birak (RTF -> koni algilama). -->
+        <update_rate>3</update_rate>
+        <always_on>1</always_on>
+        <camera>
+          <horizontal_fov>0.8</horizontal_fov>
+          <image><width>640</width><height>480</height></image>
+          <clip><near>0.1</near><far>30.0</far></clip>
+        </camera>
+        <gz_frame_id>KULE_UST</gz_frame_id>
+      </sensor>
+</link>
+    <joint name='MLB_joint' type='revolute'>
+      <pose relative_to='base_link'>-0.27932800000000002 0.51212999999999997 -0.24006 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>MLB</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='MLB'>
+      <pose relative_to='MLB_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 -0.01 0 0 0 0</pose>
+        <mass>0.34749755780714098</mass>
+        <inertia>
+          <ixx>0.00050845303425500299</ixx>
+          <ixy>-8.5336049642705899e-20</ixy>
+          <ixz>0</ixz>
+          <iyy>0.00099373956465619701</iyy>
+          <iyz>-6.1231397501884599e-21</iyz>
+          <izz>0.00050845303425500299</izz>
+        </inertia>
+      </inertial>
+      <collision name='MLB_collision'><pose>0 -0.01 0 1.5708 0 0</pose><geometry><cylinder><radius>0.16</radius><length>0.04</length></cylinder></geometry><surface><friction><ode><mu>1.4</mu><mu2>1.4</mu2></ode></friction></surface></collision>
+      <visual name='MLB_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/MLB.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='MLF_joint' type='revolute'>
+      <pose relative_to='base_link'>-0.089390000000000011 0.51212999999999997 -0.24006 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>MLF</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='MLF'>
+      <pose relative_to='MLF_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>1.38777878078145e-17 -0.01 0 0 0 0</pose>
+        <mass>0.34749755780714098</mass>
+        <inertia>
+          <ixx>0.00050845303425500299</ixx>
+          <ixy>-8.5336049642705899e-20</ixy>
+          <ixz>0</ixz>
+          <iyy>0.00099373956465619701</iyy>
+          <iyz>-6.1231397501884599e-21</iyz>
+          <izz>0.00050845303425500299</izz>
+        </inertia>
+      </inertial>
+      <collision name='MLF_collision'><pose>0 -0.01 0 1.5708 0 0</pose><geometry><cylinder><radius>0.16</radius><length>0.04</length></cylinder></geometry><surface><friction><ode><mu>1.4</mu><mu2>1.4</mu2></ode></friction></surface></collision>
+      <visual name='MLF_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/MLF.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='MRB_joint' type='revolute'>
+      <pose relative_to='base_link'>-0.28231499999999998 -0.51386999999999994 -0.24006 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>MRB</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='MRB'>
+      <pose relative_to='MRB_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>-1.38777878078145e-17 0.01 0 0 0 0</pose>
+        <mass>0.34749755780714098</mass>
+        <inertia>
+          <ixx>0.00050845303425500299</ixx>
+          <ixy>-8.5336049642705802e-20</ixy>
+          <ixz>0</ixz>
+          <iyy>0.00099373956465619701</iyy>
+          <iyz>-6.1231397501892897e-21</iyz>
+          <izz>0.00050845303425500299</izz>
+        </inertia>
+      </inertial>
+      <collision name='MRB_collision'><pose>0 0.01 0 1.5708 0 0</pose><geometry><cylinder><radius>0.16</radius><length>0.04</length></cylinder></geometry><surface><friction><ode><mu>1.4</mu><mu2>1.4</mu2></ode></friction></surface></collision>
+      <visual name='MRB_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/MRB.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.990196109 1 1 1</diffuse>
+          <ambient>0.990196109 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='MRF_joint' type='revolute'>
+      <pose relative_to='base_link'>-0.09248300000000001 -0.51386999999999994 -0.24006 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>MRF</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='MRF'>
+      <pose relative_to='MRF_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0.01 0 0 0 0</pose>
+        <mass>0.34749755780714098</mass>
+        <inertia>
+          <ixx>0.00050845303425500299</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.00099373956465619701</iyy>
+          <iyz>0</iyz>
+          <izz>0.00050845303425500299</izz>
+        </inertia>
+      </inertial>
+      <collision name='MRF_collision'><pose>0 0.01 0 1.5708 0 0</pose><geometry><cylinder><radius>0.16</radius><length>0.04</length></cylinder></geometry><surface><friction><ode><mu>1.4</mu><mu2>1.4</mu2></ode></friction></surface></collision>
+      <visual name='MRF_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://ika_arac/meshes/BRF.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>1 1 1 1</diffuse>
+          <ambient>1 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <frame name='BL_salıncak_joint' attached_to='base_link'>
+      <pose>-0.57050999999999996 0.49213000000000001 -0.23405999999999999 0 0 0</pose>
+    </frame>
+    <frame name='BL_salıncak' attached_to='BL_salıncak_joint'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+    <frame name='BR_salıncak_joint' attached_to='base_link'>
+      <pose>-0.57050999999999996 -0.49386999999999998 -0.23405999999999999 0 0 0</pose>
+    </frame>
+    <frame name='BR_salıncak' attached_to='BR_salıncak_joint'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+    <frame name='FL_salıncak_joint' attached_to='base_link'>
+      <pose>0.19949 0.49213000000000001 -0.23405999999999999 0 0 0</pose>
+    </frame>
+    <frame name='FL_salıncak' attached_to='FL_salıncak_joint'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+    <frame name='FR_salıncak_joint' attached_to='base_link'>
+      <pose>0.19949 -0.49386999999999998 -0.23405999999999999 0 0 0</pose>
+    </frame>
+    <frame name='FR_salıncak' attached_to='FR_salıncak_joint'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+    <frame name='ML_salıncak_joint' attached_to='base_link'>
+      <pose>-0.18551000000000001 0.49213000000000001 -0.23405999999999999 0 0 0</pose>
+    </frame>
+    <frame name='ML_salıncak' attached_to='ML_salıncak_joint'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+    <frame name='MR_salıncak_joint' attached_to='base_link'>
+      <pose>-0.18551000000000001 -0.49386999999999998 -0.23405999999999999 0 0 0</pose>
+    </frame>
+    <frame name='MR_salıncak' attached_to='MR_salıncak_joint'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+  
+    <plugin filename="ignition-gazebo-diff-drive-system" name="ignition::gazebo::systems::DiffDrive">
+      <left_joint>BLB_joint</left_joint>
+      <left_joint>BLF_joint</left_joint>
+      <left_joint>MLB_joint</left_joint>
+      <left_joint>MLF_joint</left_joint>
+      <left_joint>FLB_joint</left_joint>
+      <left_joint>FLF_joint</left_joint>
+      <right_joint>BRB_joint</right_joint>
+      <right_joint>BRF_joint</right_joint>
+      <right_joint>MRB_joint</right_joint>
+      <right_joint>MRF_joint</right_joint>
+      <right_joint>FRB_joint</right_joint>
+      <right_joint>FRF_joint</right_joint>
+      <wheel_separation>1.026</wheel_separation>
+      <wheel_radius>0.16</wheel_radius>
+      <topic>/cmd_vel</topic>
+      <odom_topic>/odom</odom_topic>
+      <frame_id>odom</frame_id>
+      <child_frame_id>base_link</child_frame_id>
+    </plugin>
+
+  
+    <!-- ORINIUM_SENSORS -->
+    <!-- ================= LiDAR (YDLidar X2, 2D) ================= -->
+    <link name="lidar_link">
+      <!-- Kule ustunde (kule tepesi ~0.30): 360 lidar kendi govdesini gormesin.
+           YUKSEKLIK SINIRI: bariyerler 0.80 m; buyuk tekerlerle base_link yerden
+           ~0.44'te. Lidar duzlemi 0.44+0.34=0.78 < 0.80 olmali ki koridor
+           bariyerleri taramada GORUNSUN (0.45'te duzlem 0.89'a cikip barierlerin
+           ustunden bakiyordu). -->
+      <pose relative_to="base_link">0.0 0.0 0.34 0 0 0</pose>
+      <inertial><mass>0.1</mass>
+        <inertia><ixx>1e-4</ixx><iyy>1e-4</iyy><izz>1e-4</izz>
+        <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <visual name="lidar_visual">
+        <geometry><cylinder><radius>0.04</radius><length>0.05</length></cylinder></geometry>
+        <material><diffuse>0.1 0.1 0.1 1</diffuse><ambient>0.1 0.1 0.1 1</ambient></material>
+      </visual>
+      <sensor name="lidar" type="gpu_lidar">
+        <topic>/scan</topic>
+        <update_rate>10</update_rate>
+        <always_on>1</always_on>
+        <visualize>true</visualize>
+        <lidar>
+          <scan><horizontal>
+            <samples>720</samples><resolution>1</resolution>
+            <min_angle>-3.14159</min_angle><max_angle>3.14159</max_angle>
+          </horizontal></scan>
+          <range><min>0.12</min><max>8.0</max><resolution>0.01</resolution></range>
+        </lidar>
+        <gz_frame_id>lidar_link</gz_frame_id>
+      </sensor>
+    </link>
+    <joint name="lidar_joint" type="fixed">
+      <parent>base_link</parent><child>lidar_link</child>
+    </joint>
+
+    <!-- ================= IMU (BNO055) ================= -->
+    <link name="imu_link">
+      <pose relative_to="base_link">0.0 0.0 0.05 0 0 0</pose>
+      <inertial><mass>0.05</mass>
+        <inertia><ixx>1e-5</ixx><iyy>1e-5</iyy><izz>1e-5</izz>
+        <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <sensor name="imu" type="imu">
+        <topic>/imu</topic>
+        <update_rate>100</update_rate>
+        <always_on>1</always_on>
+        <gz_frame_id>imu_link</gz_frame_id>
+      </sensor>
+    </link>
+    <joint name="imu_joint" type="fixed">
+      <parent>base_link</parent><child>imu_link</child>
+    </joint>
+
+    <!-- ================= On Derinlik Kamera (RealSense D456) ================= -->
+    <link name="camera_link">
+      <pose relative_to="base_link">0.58 0.0 0.05 0 0 0</pose>
+      <inertial><mass>0.05</mass>
+        <inertia><ixx>1e-5</ixx><iyy>1e-5</iyy><izz>1e-5</izz>
+        <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <visual name="camera_visual">
+        <geometry><box><size>0.03 0.09 0.03</size></box></geometry>
+        <material><diffuse>0.2 0.2 0.7 1</diffuse><ambient>0.2 0.2 0.7 1</ambient></material>
+      </visual>
+      <sensor name="front_camera" type="rgbd_camera">
+        <!-- rgbd_camera: /camera base topic'ine gz /camera/image (RGB) +
+             /camera/depth_image (32FC1, metre) + /camera/points yayinlar.
+             Kopru /camera/image -> /camera/color/image_raw,
+             /camera/depth_image -> /camera/depth/image_rect_raw esler.
+             DERINLIK KONI ALGILAMA icin gerekli (object_detection depth_m'i
+             doldurup koni bulutunu costmap'e basar; 2026-07-20). 10 FPS:
+             YOLO 2.5 Hz isledigi icin yeterli, RTF yuku minimumda kalir. -->
+        <topic>/camera</topic>
+        <update_rate>10</update_rate>
+        <always_on>1</always_on>
+        <camera>
+          <horizontal_fov>1.204</horizontal_fov>
+          <image><width>640</width><height>480</height></image>
+          <clip><near>0.1</near><far>15.0</far></clip>
+        </camera>
+        <gz_frame_id>camera_link</gz_frame_id>
+      </sensor>
+    </link>
+    <joint name="camera_joint" type="fixed">
+      <parent>base_link</parent><child>camera_link</child>
+    </joint>
+
+    <!-- ================= Geri Kamera ================= -->
+    <link name="camera_rear_link">
+      <pose relative_to="base_link">-0.99 0.0 0.05 0 0 3.14159</pose>
+      <inertial><mass>0.05</mass>
+        <inertia><ixx>1e-5</ixx><iyy>1e-5</iyy><izz>1e-5</izz>
+        <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <visual name="camera_rear_visual">
+        <geometry><box><size>0.03 0.09 0.03</size></box></geometry>
+        <material><diffuse>0.2 0.2 0.7 1</diffuse><ambient>0.2 0.2 0.7 1</ambient></material>
+      </visual>
+      <!-- ARKA KAMERA SENSORU KAPALI (istek: sim'i yavaslatiyordu). Arka kamera
+           otonomide KULLANILMAZ (yalniz GCS "GERI" goruntu); kamera sensoru her
+           karede tam sahne render'i yapip RTF'i dusuruyordu. Kaldirildi -> render
+           butcesi ON kameraya (koni algilama) + fizige kalir. Geri istenirse
+           <sensor name="rear_camera" type="camera"> blogunu buraya geri ekle. -->
+    </link>
+    <joint name="camera_rear_joint" type="fixed">
+      <parent>base_link</parent><child>camera_rear_link</child>
+    </joint>
+
+    <!-- ================= TARET (CAD kulesi: KULE_ALT yaw + KULE_UST pitch) ===== -->
+    <!-- Nisan kamerasi write_model() icinde dogrudan KULE_UST linkine gomulur:
+         hiz komutlu ekleme kaynakli (fixed joint) ayri link baglamak dartsim'de
+         fizik patlamasina yol acti; sensorun dinamigi olmadigindan linke gommek
+         guvenli. Kule eklem konum kontrolculeri (radyan komut): -->
+    <plugin filename="ignition-gazebo-joint-position-controller-system" name="ignition::gazebo::systems::JointPositionController">
+      <joint_name>KULE_ALT_joint</joint_name>
+      <topic>/turret/yaw</topic>
+      <use_velocity_commands>true</use_velocity_commands><p_gain>5.0</p_gain>
+    </plugin>
+    <plugin filename="ignition-gazebo-joint-position-controller-system" name="ignition::gazebo::systems::JointPositionController">
+      <joint_name>KULE_UST_joint</joint_name>
+      <topic>/turret/pitch</topic>
+      <use_velocity_commands>true</use_velocity_commands><p_gain>5.0</p_gain>
+    </plugin>
+
+  </model>
+</sdf>
