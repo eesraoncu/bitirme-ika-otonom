@@ -842,3 +842,20 @@ konteyner ve koniler sayesinde her noktadan bir nesne görünür.
 
 **Bedeli:** Dokular yeniden üretildi (henüz harita olmadığı için kayıp yok). Bariyer
 sayısı 15'ten 25'e çıktı. TurtleBot 4 ile hız ~%44, değişmedi.
+
+---
+
+## K-036 · İlk harita kabul edilir, 3.2'de ≥ 1 m güvenlik payı (K-032'ye ek)
+**Tarih:** 2026-10-06 · **Durum:** Yürürlükte
+
+3.1'in ilk haritası (`ros2_ws/src/ika_nav/maps/ika_saha.pgm`/`.yaml`) Nav2 ve 3.2 için
+kullanılır. K-032'nin "harita koordinatı = dünya koordinatı" varsayımı ölçüldü: harita
+başlangıç etrafında ~2° dönmüş, hata uzak uçta en çok ~0,8 m (konteyner +0,55 m x,
+−0,25 m y; tanklar 0,7–0,8 m güneyde). 3.2'de yasak bölgeler ve izinli alan dünya
+koordinatından yazılırken en az 1 m güvenlik payı bırakılır.
+
+**Neden:** Haritanın şekli ve boyutları doğru, hata ölçülmüş ve sınırlı. Yeniden
+haritalama yerine pay bırakmak Esra'nın tercihi.
+
+**Bedeli:** İzinli alan küçülür, yasak bölgeler büyür; dar geçitler (güney koridoru 3 m)
+daralır. Hata tezde ölçüm olarak yazılır. Haritalama tekrarlanırsa hata yeniden ölçülmeli.

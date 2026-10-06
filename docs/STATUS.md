@@ -4,7 +4,7 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-10-06
-**Bulunduğumuz faz:** Faz 3. 3.0 kurulum bitti, deney sahası (K-032) Blok 1–5 bitti. Araç İKA (K-034): model, 32 × 20 m saha (K-035), köprü ve `tf` hazır, simde sürüldü. Sırada 3.1 (harita)
+**Bulunduğumuz faz:** Faz 3. 3.0 kurulum bitti, deney sahası (K-032) Blok 1–5 bitti. Araç İKA (K-034), saha 32 × 20 m (K-035). 3.1 harita bitti (K-036, hata ≤ 0,8 m). Sırada 3.2 (saha tanımı ve Nav2)
 
 ---
 
@@ -487,8 +487,18 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
           kamera, derinlik 10 Hz; IMU 100 Hz; odom, `/tf` ~48 Hz), çerçeve etiketleri doğru,
           `tf` ağacı `odom → base_link → {lidar_link, imu_link, camera_link → camera_optical_frame}`,
           hız köprüyle %100 (2 × 20 s), klavyeyle sürüldü, RViz'de lidar ve kamera görüldü
-  - [ ] **3.1 Harita:** `ika_saha`'da RTAB-Map, kamera + lidar (K-033), İKA ile klavyeyle gezdirme,
-        harita `ros2_ws/src/ika_nav/maps/`. Bitti: Nav2'nin okuyacağı `.pgm`/`.yaml` depoda
+  - [x] **3.1 Harita** (2026-10-06, K-036): `ika_nav/launch/mapping.launch.py` (RTAB-Map, kamera +
+        lidar, tekerlek odometrisi, `Grid/Sensor 0`, `Reg/Strategy 1`, `RGBD/NeighborLinkRefining`,
+        `Reg/Force3DoF`), harita `ika_nav/maps/ika_saha.pgm`/`.yaml` (5 cm, 34,6 × 22,7 m,
+        köşe (−4,38, −12)). Klavyeyle ~80 m'lik tur, başlangıçta bitti. Sonuçlar:
+        - Rota ortasında konum hatası RTAB-Map 1,9 m / 22°, yalnız odometri 11,0 m / 78°.
+          Başlangıca dönünce RTAB-Map 0,10 m / 7,6°, odometri 13,8 m / 80°.
+        - Graf (rota ortasında): 129 düğüm, 86 komşuluk, 7 döngü kapatma, 35 yakınlık bağı.
+        - Koordinat denetimi: konteyner boyu doğru (gerçek 6,06 × 2,44, haritada 6,15 × 2,55), ama
+          +0,55 m x, −0,25 m y kaymış; tanklar 0,7–0,8 m güneyde. Harita başlangıç etrafında
+          ~2° dönmüş (20 m'de ~0,7 m). "Harita = dünya" (K-032) en çok ~0,8 m hatayla tutuyor.
+        - Kaydetme: `map_saver_cli -t /rtabmap/map` (konu `/map` değil).
+        - Karar (K-036): harita kabul; 3.2'de yasak bölgelere ve izinli alana ≥ 1 m pay.
   - [ ] **3.2 Saha tanımı ve Nav2:** izinli alan, yasak bölgeler, güvenli noktalar tek dosyada;
         `site_data.c` ve Nav2 yasak bölge maskesi ondan üretilir (yeri o adımda kararlaştırılacak).
         Bitti: RViz "2D Goal Pose" ile araç hedefe gidiyor, maske Nav2'de, kart aynı bölgeleri biliyor
