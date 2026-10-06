@@ -2,14 +2,19 @@
      sim/models/ika_arac/model.sdf (commit 6e6f136, 2026-07-28) ve
      URDF_icin.SLDASM/meshes/ (SolidWorks çıktısı). Gazebo Harmonic için yazılmıştı.
 
-     Fortress'e çevirmek için yalnızca üç değişiklik yapıldı, gerisi kaynakla aynı:
+     Fortress'e çevirmek için üç değişiklik yapıldı, ROS için bir tane daha (4);
+     gerisi kaynakla aynı:
        1. <sdf version> 1.11 → 1.9 (Fortress'in sdformat12'si en çok 1.9 okur)
        2. Mesh yolları file:///home/esra/ugv_telemetry_new/URDF_icin.SLDASM/meshes/
           → model://ika_arac/meshes/ (21 dosya, 23 yer)
        3. Eklentiler gz-sim-*-system / gz::sim::systems:: →
           ignition-gazebo-*-system / ignition::gazebo::systems:: (3 eklenti)
-     <gz_frame_id> değişmedi: Fortress'in sensör kütüphanesi onu da tanır.
-     Kaynak güncellenirse aynı üç değişiklik yeniden uygulanır.
+       4. Ön kameranın <gz_frame_id>'si camera_link → camera_optical_frame. Görüntü
+          eksenleri "z ileri, x sağa, y aşağı"dır (optik çerçeve); araç eksenleri
+          "x ileri, y sola, z yukarı". camera_link etiketiyle RTAB-Map derinliği yanlış
+          yöne çevirirdi. camera_link → camera_optical_frame dönüşü başlatma dosyasında.
+     <gz_frame_id> öğesi kaldı: Fortress'in sensör kütüphanesi onu da tanır.
+     Kaynak güncellenirse aynı dört değişiklik yeniden uygulanır.
 
      Dünyanın Sensors, Imu ve Contact sistemlerini yüklemesi gerekir; model
      kendi sensör sistemini getirmez.
@@ -930,7 +935,7 @@
           <image><width>640</width><height>480</height></image>
           <clip><near>0.1</near><far>15.0</far></clip>
         </camera>
-        <gz_frame_id>camera_link</gz_frame_id>
+        <gz_frame_id>camera_optical_frame</gz_frame_id>
       </sensor>
     </link>
     <joint name="camera_joint" type="fixed">

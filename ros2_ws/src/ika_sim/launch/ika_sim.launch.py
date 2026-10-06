@@ -1,77 +1,71 @@
-"""İKA deney sahasını TurtleBot 4 ile açar (Faz 3).
+"""İKA deney sahasını İKA aracıyla açar (Faz 3, K-034).
 
 Kullanım (depo kökünden):
     ros2 launch ros2_ws/src/ika_sim/launch/ika_sim.launch.py
 
-TurtleBot 4'ün turtlebot4_ignition.launch.py'si dünya arama yolunu
-(IGN_GAZEBO_RESOURCE_PATH) baştan yazar; bizim worlds/ klasörümüz yolda kalmaz.
-Bu dosya onun ignition.launch.py'sinin yaptığını tekrarlar ve yola worlds/'ü de
-ekler. Robotu yine TurtleBot 4'ün turtlebot4_spawn.launch.py'si (0, 0)'a koyar.
+Araç dünyanın içinde (ika_saha.sdf'nin sonunda <include>). Bu dosya üç şey yapar:
+Gazebo'yu açar (dünya ve model arama yoluna worlds/ ile models/ eklenir), ROS
+köprüsünü config/bridge.yaml ile başlatır ve aracın sabit tf'lerini yayınlar.
 """
-import os
 from pathlib import Path
 
-from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
 
-WORLDS_DIR = Path(__file__).resolve().parent.parent / 'worlds'
+PKG_DIR = Path(__file__).resolve().parent.parent
+WORLDS_DIR = PKG_DIR / 'worlds'
+MODELS_DIR = PKG_DIR / 'models'
+BRIDGE_CONFIG = PKG_DIR / 'config' / 'bridge.yaml'
+
+# Aracın sabit dönüşümleri: (ebeveyn, çocuk, x, y, z, roll, pitch, yaw).
+# Konumlar models/ika_arac/model.sdf'deki <link> pozlarıyla aynı olmalı (lidar_link,
+# imu_link, camera_link). camera_optical_frame: görüntü eksenleri (z ileri, x sağa,
+# y aşağı); kameranın görüntüleri bu çerçeveyle etiketli (model.sdf, değişiklik 4).
+# odom → base_link bunlardan değil, köprüden gelir (DiffDrive, /tf)
+STATIC_TFS = [
+    ('base_link', 'lidar_link', 0.0, 0.0, 0.34, 0.0, 0.0, 0.0),
+    ('base_link', 'imu_link', 0.0, 0.0, 0.05, 0.0, 0.0, 0.0),
+    ('base_link', 'camera_link', 0.58, 0.0, 0.05, 0.0, 0.0, 0.0),
+    ('camera_link', 'camera_optical_frame', 0.0, 0.0, 0.0, -1.5708, 0.0, -1.5708),
+]
 
 ARGUMENTS = [
     DeclareLaunchArgument('world', default_value='ika_saha',
                           description='worlds/ altındaki dünya, uzantısız'),
-    DeclareLaunchArgument('model', default_value='standard', choices=['standard', 'lite'],
-                          description='TurtleBot 4 modeli'),
-    DeclareLaunchArgument('rviz', default_value='false', choices=['true', 'false'],
-                          description='RViz açılsın mı'),
 ]
 
 
+def static_tf(parent, child, x, y, z, roll, pitch, yaw):
+    return Node(package='tf2_ros', executable='static_transform_publisher',
+                name=f'tf_{child}', output='log',
+                arguments=['--x', str(x), '--y', str(y), '--z', str(z),
+                           '--roll', str(roll), '--pitch', str(pitch), '--yaw', str(yaw),
+                           '--frame-id', parent, '--child-frame-id', child])
+
+
 def generate_launch_description():
-    share = get_package_share_directory
-    tb4_bringup = share('turtlebot4_ignition_bringup')
+    # Gazebo dünyayı worlds/'te, araç modelini (model://ika_arac) models/'te arar.
+    # Fuel modelleri (bariyer, kamyonet...) adresle gelir, yola gerekmez
+    resource_path = ':'.join([str(WORLDS_DIR), str(MODELS_DIR)])
 
-    # Dünyalar, robot modelleri ve TurtleBot 4'ün kendi dünyaları; ilk sırada bizimki
-    resource_path = ':'.join([
-        str(WORLDS_DIR),
-        os.path.join(tb4_bringup, 'worlds'),
-        os.path.join(share('irobot_create_ignition_bringup'), 'worlds'),
-        str(Path(share('turtlebot4_description')).parent.resolve()),
-        str(Path(share('irobot_create_description')).parent.resolve()),
-    ])
-    # TurtleBot 4'ün arayüz eklentileri (sağdaki HMI paneli)
-    gui_plugin_path = ':'.join([
-        os.path.join(share('turtlebot4_ignition_gui_plugins'), 'lib'),
-        os.path.join(share('irobot_create_ignition_plugins'), 'lib'),
-    ])
-
+    # -r: açılır açılmaz çalıştır. -v 4: ayrıntılı günlük
     gazebo = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(share('ros_ign_gazebo'), 'launch', 'ign_gazebo.launch.py')),
-        launch_arguments=[('ign_args', [
-            LaunchConfiguration('world'), '.sdf -r -v 4 --gui-config ',
-            PathJoinSubstitution([tb4_bringup, 'gui', LaunchConfiguration('model'), 'gui.config']),
-        ])])
+        PythonLaunchDescriptionSource(str(
+            Path(get_package_share_directory('ros_gz_sim')) / 'launch' / 'gz_sim.launch.py')),
+        launch_arguments=[('gz_args', [LaunchConfiguration('world'), '.sdf -r -v 4'])])
 
-    # Simülasyon saati ROS'a: use_sim_time ile çalışan her düğüm buna bakar
-    clock_bridge = Node(package='ros_gz_bridge', executable='parameter_bridge',
-                        name='clock_bridge', output='screen',
-                        arguments=['/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock'])
-
-    # Robot, şarj istasyonu ve ROS köprüleri. 'world' adını buradan alır:
-    # köprü konuları /world/<ad>/... olduğu için .sdf'deki <world name> ile aynı olmalı
-    spawn = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(tb4_bringup, 'launch', 'turtlebot4_spawn.launch.py')),
-        launch_arguments=[('rviz', LaunchConfiguration('rviz'))])
+    # Konu listesi ve yönleri config/bridge.yaml'da
+    bridge = Node(package='ros_gz_bridge', executable='parameter_bridge',
+                  name='ika_bridge', output='screen',
+                  parameters=[{'config_file': str(BRIDGE_CONFIG)}])
 
     return LaunchDescription(ARGUMENTS + [
         SetEnvironmentVariable('IGN_GAZEBO_RESOURCE_PATH', resource_path),
-        SetEnvironmentVariable('IGN_GUI_PLUGIN_PATH', gui_plugin_path),
         gazebo,
-        clock_bridge,
-        spawn,
+        bridge,
+        *[static_tf(*t) for t in STATIC_TFS],
     ])

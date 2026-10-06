@@ -4,7 +4,7 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-10-06
-**Bulunduğumuz faz:** Faz 3. 3.0 kurulum bitti, deney sahası (K-032) Blok 1–5 bitti. Araç İKA'ya geçiyor (K-034): model depoda (a), saha 32 × 20 m (b, K-035); sırada başlatma/köprü/`tf` (c), sonra 3.1 (harita)
+**Bulunduğumuz faz:** Faz 3. 3.0 kurulum bitti, deney sahası (K-032) Blok 1–5 bitti. Araç İKA (K-034): model, 32 × 20 m saha (K-035), köprü ve `tf` hazır, simde sürüldü. Sırada 3.1 (harita)
 
 ---
 
@@ -46,10 +46,12 @@ ros2 launch ros2_ws/src/ika_sim/launch/ika_sim.launch.py
 python3 ros2_ws/src/ika_sim/tools/gen_textures.py   # dokular değişecekse; çıktı aynı kalır
 ```
 
-Dosyalar (`ros2_ws/src/ika_sim/`):
+Dosyalar (`ros2_ws/src/ika_sim/`; İKA ile, K-034):
+- `models/ika_arac/`: İKA modeli (Fortress'e çevrilmiş, 21 STL). Başındaki yorum kaynağı ve 4 değişikliği anlatır.
+- `config/bridge.yaml`: ROS ↔ Gazebo köprüsünün 9 konusu.
 - `worlds/ika_saha.sdf`: dünya. Başındaki yorum blokların sırasını ve Fuel model kuralını anlatır.
-- `launch/ika_sim.launch.py`: Gazebo + `/clock` köprüsü + TurtleBot 4'ün `turtlebot4_spawn.launch.py`'si.
-  Dünya arama yoluna `worlds/`'ü ekler (K-032).
+- `launch/ika_sim.launch.py`: Gazebo (`ros_gz_sim`, Fortress) + köprü (`config/bridge.yaml`) +
+  4 sabit `tf`. Arama yoluna `worlds/` ve `models/`'i ekler. Araç dünyanın içinde (`<include>`).
 - `tools/gen_textures.py` → `worlds/textures/`: `asfalt.jpg` (1650×1050, 33 × 21 m, 2 cm/px; K-035'te büyüdü, yoğunluklar korundu),
   `konteyner.jpg`, `yasak.jpg`, `cop.jpg`. Sabit tohum; yeni doku listenin sonuna eklenir ki
   eskilerin rastgele dizisi değişmesin (denetlendi: bayt bayt aynı).
@@ -137,6 +139,15 @@ y −10  └──────────────────────�
 - **Modeli dosyaya dokunmadan simden çıkarmak:** `ign service -s /world/ika_saha/remove
   --reqtype ignition.msgs.Entity --reptype ignition.msgs.Boolean --req 'name: "<ad>" type: MODEL'`.
   Sim yeniden açılınca geri gelir. Kontrol deneyi için uygun.
+- **Odometri patinajı göremez.** İKA kuzey bariyerine dayanmışken klavyeyle ileri sürüldü:
+  gerçek (4,3, 9,0) / 90°, odometri (33,6, 21,4) / ~35° (29 m, 55° sapma). Tekerlekler
+  yerinde döndü, DiffDrive her turu ilerleme saydı. RViz `odom` çerçevesinde bunu gösterir;
+  3.1'de RTAB-Map'in `map → odom` düzeltmesi bu hatayı kapatmalı.
+- **Kamera görüntüsü optik çerçeveyle etiketlenmeli** (z ileri, x sağa, y aşağı). Araç
+  çerçevesiyle etiketlenirse derinlik yanlış yöne çevrilir. Modelde `<gz_frame_id>`
+  `camera_optical_frame`, `camera_link`'ten dönüşü (−90°, 0, −90°) başlatma dosyasında.
+- **RViz'de `use_sim_time:=true`:** mesaj damgaları sim saatinde; RViz duvar saatiyle
+  çalışırsa mesajları eski sayabilir. Doğrulama: Time panelinde ROS Time küçük bir sayı.
 - **Kendi ayrıştırma betiğine güvenme.** İKA'nın odometrisi dönüşte "0°" çıktı: awk `pose`
   bloğundan sonra `twist`'teki `z: 0`'ı da okuyordu. Doğru bloktan okununca 140°.
 - **Test sürüşünde engele olan uzaklığı önce hesapla.** İlk İKA sürüşü 3,9 m gitmeye
@@ -470,9 +481,12 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
     - [x] a. Model depoya: `ika_sim/models/ika_arac/` (Fortress'e çevrilmiş, kaynak ve üç değişiklik
           `model.sdf`'nin başındaki yorumda; yorum hariç simde denenen kopyayla bayt bayt aynı)
     - [x] b. Saha 32 × 20 m (K-035): 25 bariyer, yeni yerleşim, asfalt 33 × 21 m; simde görüldü
-    - [ ] c. Başlatma dosyası: dünyaya Sensors/Imu/Contact, İKA spawn, `ros_gz_bridge`
-          (`/scan`, `/camera/*`, `/odom`, `/imu`, `/cmd_vel`, `/clock`), `tf`. Hız köprüyle
-          yeniden ölçülür. Bitti: RViz'de lidar ve kamera görünüyor, klavyeyle sürülüyor
+    - [x] c. İKA simde (2026-10-06): dünyaya Sensors/Imu/Contact ve İKA `<include>`'u,
+          `config/bridge.yaml` (9 konu), başlatma dosyasında 4 sabit `tf`, modelde 4.
+          değişiklik (kamera `camera_optical_frame`). Denetlendi: konular akıyor (lidar,
+          kamera, derinlik 10 Hz; IMU 100 Hz; odom, `/tf` ~48 Hz), çerçeve etiketleri doğru,
+          `tf` ağacı `odom → base_link → {lidar_link, imu_link, camera_link → camera_optical_frame}`,
+          hız köprüyle %100 (2 × 20 s), klavyeyle sürüldü, RViz'de lidar ve kamera görüldü
   - [ ] **3.1 Harita:** `ika_saha`'da RTAB-Map, kamera + lidar (K-033), İKA ile klavyeyle gezdirme,
         harita `ros2_ws/src/ika_nav/maps/`. Bitti: Nav2'nin okuyacağı `.pgm`/`.yaml` depoda
   - [ ] **3.2 Saha tanımı ve Nav2:** izinli alan, yasak bölgeler, güvenli noktalar tek dosyada;

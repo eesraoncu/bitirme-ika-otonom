@@ -3,13 +3,13 @@
      İKA aracına (1,78 × 1,15 m, K-034) göre genişletildi (K-035): geçitler ≥ 3 m.
      Kenarlar 4'ün katı: bariyerler (4,065 m) 4 m arayla tam oturur.
 
-     Robot dünyanın (0, 0) noktasında, doğuya (+x) bakarak başlar. RTAB-Map haritanın
-     başlangıcını robotun ilk konumu kabul eder; bu yüzden buradaki koordinatlar
+     Araç (İKA, models/ika_arac, K-034) dünyanın (0, 0) noktasında, doğuya (+x) bakarak
+     başlar; dosyanın sonunda <include> ile konur. RTAB-Map haritanın
+     başlangıcını aracın ilk konumu kabul eder; bu yüzden buradaki koordinatlar
      haritadaki koordinatlarla örtüşür ve kartın coğrafi sınırı doğrudan bunlarla
      tanımlanabilir.
 
-     Şarj istasyonunu TurtleBot 4 robotun 0,157 m önüne koyar; robot istasyondan geri
-     geri, batıya çıkar. Batı bariyeri bu yüzden başlangıçtan 3 m uzakta.
+     Aracın arkası x −0,99'da; batı bariyerinin tabanı −2,6'da.
 
      Blok 1: iskelet. Fizik, eklentiler, ışık, zemin.
      Blok 2: gökyüzü, çevre bariyerleri, doğuda kapı.
@@ -17,6 +17,7 @@
      Blok 4: nesneler. Konteyner, kamyonet, çöp konteyneri.
      Blok 5: yasak bölgeler. Zemin boyaları (yalnız visual), koniler, masalar, tanklar.
      Yerleşim krokisi docs/STATUS.md'de.
+     Araç: İKA (K-034). Sensör sistemleri yukarıda, araç dosyanın sonunda.
 
      Hazır (Fuel) model kullanmadan önce dosyasında üç şeye bakılır: <static> var mı,
      çarpışma şekli basit mi (binlerce üçgenli mesh fiziği yavaşlatır), malzemesi
@@ -32,14 +33,23 @@
       <real_time_factor>1.0</real_time_factor>
     </physics>
 
-    <!-- Dünyanın kendi sistemleri. Robotun algılayıcı sistemlerini (kamera, lidar)
-         TurtleBot 4'ün modeli getirir, burada gerekmez -->
+    <!-- Dünyanın kendi sistemleri. Sensors: kamera ve lidar görüntüsünü çizer
+         (ogre2, GUI ile aynı çizim motoru). Imu ve Contact: aracın IMU'su ve temas
+         sensörü. İKA modeli bunları kendisi getirmez (TurtleBot 4 getiriyordu) -->
     <plugin filename="libignition-gazebo-physics-system.so"
             name="ignition::gazebo::systems::Physics"/>
     <plugin filename="libignition-gazebo-user-commands-system.so"
             name="ignition::gazebo::systems::UserCommands"/>
     <plugin filename="libignition-gazebo-scene-broadcaster-system.so"
             name="ignition::gazebo::systems::SceneBroadcaster"/>
+    <plugin filename="libignition-gazebo-sensors-system.so"
+            name="ignition::gazebo::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="libignition-gazebo-imu-system.so"
+            name="ignition::gazebo::systems::Imu"/>
+    <plugin filename="libignition-gazebo-contact-system.so"
+            name="ignition::gazebo::systems::Contact"/>
 
     <!-- Sahne: ortam ışığı ve gökyüzü rengi. Gölge kapalı: hem hız için hem de
          kameranın gölgeyi yer işareti sanmaması için -->
@@ -529,6 +539,15 @@
         </visual>
       </link>
     </model>
+
+    <!-- Araç: İKA (K-034). Tekerlekler base_link'in 0,24 m altında, yarıçap 0,16:
+         taban −0,40. 5 cm yukarıdan bırakılır, yere düşüp oturur (z ≈ 0,40).
+         Model aramada models/ klasöründen bulunur (başlatma dosyası yola ekler) -->
+    <include>
+      <uri>model://ika_arac</uri>
+      <name>ika_arac</name>
+      <pose>0 0 0.45 0 0 0</pose>
+    </include>
 
   </world>
 </sdf>
