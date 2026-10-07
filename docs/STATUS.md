@@ -4,7 +4,7 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-10-07
-**Bulunduğumuz faz:** Faz 3. 3.0 kurulum bitti, deney sahası (K-032) Blok 1–5 bitti. Araç İKA (K-034), saha 32 × 20 m (K-035). 3.1 harita bitti (K-036). 3.2a saha tanımı bitti (K-037). Sırada 3.2b (Nav2), sonra 3.2c (kart)
+**Bulunduğumuz faz:** Faz 3. 3.0 kurulum bitti, deney sahası (K-032) Blok 1–5 bitti. Araç İKA (K-034), saha 32 × 20 m (K-035). 3.1 harita bitti (K-036). 3.2a saha tanımı bitti (K-037). 3.2b Nav2 çalışıyor (K-038): deneme 1 ve 2 geçti, sırada deneme 3, sonra 3.2c (kart)
 
 ---
 
@@ -119,6 +119,46 @@ y −10  └──────────────────────�
   kuzeyinden ya da güney koridorundan dolanılır.
 - Yer adı / güvenli nokta adayları: başlangıç (0, 0), kapı önü (~26, 0), konteyner
   arkası (~8, 7,6), konteyner önü (~8, 2), kuzeybatı (~1, 6).
+
+**3.2b'de öğrenilenler (Nav2, 2026-10-07):** sıra, deneme 2 geçene kadar yapılanlar.
+1. **Nav2'nin açılışında servis cevabı kaybolabilir.** `lifecycle_manager_navigation` planlayıcıyı
+   yapılandırdı ama cevabı alamadı (`failed to send response ... timeout`), gezinme düğümleri
+   açılmadı. Yeniden başlatınca düzeldi; bir daha görülmedi.
+2. **Nav2 "Goal succeeded" diyebilir ve araç kıpırdamaz.** Controller hedefi `map`'ten `odom`'a
+   çeviremeyince (tf bayat) hedef (0, 0)'da kalıyor, araç da (0, 0)'da olduğu için "vardım"
+   diyor (`nav_2d_utils::transformPose`'un dönüş değeri yok sayılıyor). Konum hatası varken
+   başarı mesajına güvenilmemeli.
+3. **Costmap'lerin tf tamponu donuyordu; sebep lidar katmanı (ölçüldü).** Belirti: controller'ın
+   `map → odom`'u (sonra bütün tf'si) bir anda bayatlıyor, süreç Ctrl+C'ye cevap vermiyor.
+   - İlk hipotez FastDDS idi; CycloneDDS'e geçildi (`~/.bashrc`: `RMW_IMPLEMENTATION`), sorun
+     sürdü: **hipotez yanlıştı**. Ölçmeden sistem değişikliği önerildi; ders: önce tetikleyiciyi bul.
+   - AMCL yayın yapıyordu (9 Hz), ayrı bir dinleyici 250 s hiç donmadı: sorun controller'a özgü.
+   - RViz kapalıyken 130 s donma yok, RViz açılınca ~50 s sonra donma: tetikleyici yük.
+   - Komut satırından costmap aboneliğiyle aynı yük: lidar katmanı olan local costmap ~75–130 s'de
+     dondu, lidar katmanı çıkarılan global costmap 4 dk donmadı (Deney A). İki costmap'te de
+     lidar katmanı yokken aynı yük altında 4 dk donma yok, düğümler normal kapanıyor.
+   - Mekanizma kanıtlanmadı (tf2 `MessageFilter` kilitlenmesi şüphesi; `gdb` `sudo` istiyor).
+   - Sonuç: iki costmap'te de lidar katmanı yok, yakın çevre statik haritadan. Bedeli: haritada
+     olmayan yeni engel görülmez.
+4. **Keepout filtresi şişirmeden SONRA uygulanıyor.** Planlayıcı yasak bölgelerin dibinden
+   (1 m'lik güney koridoru) plan yaptı, controller gövdenin taşacağını görüp durdu. Keepout maskesi
+   şişirmeden önce okunan bir `StaticLayer` yapıldı; `costmap_filter_info_server` kalktı.
+5. **Konum bulucuyu araç başka yerdeyken yeniden başlatmak.** Nav2 yeniden açılınca AMCL aracı
+   (0, 0)'da sanıyor. Düzeltme: `/initialpose` (RViz'de "2D Pose Estimate"). Yasak payının içinde
+   kalan araç her yönde "çarpışma" görüp kurtulamadı; simde `/world/ika_saha/set_pose` ile
+   başlangıca alındı.
+6. **Konteyner ile kazı arasında 1,24 m'lik darboğaz** (konteyner köşesi (11,03, 3,28), kazının
+   paylı köşesi (12, 2,5)). Araç 1,15 m: planlayıcı geçilebilir saydı, harita ~0,5 m kaymış ve
+   lidar katmanı yok, araç gerçek konteynere sürtündü. İze 0,3 m pay (`footprint_padding`).
+   K-035'te "kazı kuzeyden dolanılır" derken bu darboğaz hesaplanmamıştı.
+7. **`use_maximum` Humble'da costmap düzeyinde.** Katmana yazılınca yok sayıldı ve keepout katmanı
+   haritayı ezdi: konteyner costmap'ten silinmişti. Ayarın düğümde tanımlı olduğu
+   `ros2 param list` ile denetlenmeli; kütüphanede adın geçmesi yetmez.
+8. **Şişirme yarıçapı iç yarıçaptan büyük olmalı.** Pay iç yarıçapı 0,875 m'ye çıkardı, şişirme
+   0,8'de kalınca kademeli şerit kayboldu. 1,5 m.
+- RViz: Map ekranlarında Durability "Transient Local" olmalı (Nav2 haritaları bir kez yayınlar).
+- Her ayar değişikliğinden sonra hedef vermeden önce costmap ölçülmeli (konteyner var mı,
+  darboğaz kapalı mı): `/global_costmap/costmap`'ten hücre değerleri.
 
 **Deney sahasında öğrenilenler:**
 - **Şarj istasyonu robotun 0,157 m önünde.** TurtleBot 4 istasyonu robotun önüne, ona dönük
@@ -513,8 +553,19 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
           tanklardan). Kart orada ulaşılamaz hedef kabul edebilir, Nav2 reddeder.
           **Uyarı:** `site_data.c` değişti; `tools/decision_test.py` hâlâ eski deneme sahasını
           bekliyor, kartta eski derleme var (3.2c).
-    - [ ] b. Nav2: AMCL + `ika_saha.pgm`, NavFn, Regulated Pure Pursuit, araç izi 1,78 × 1,15 m,
-          keepout filtresi, `ika_nav/config/nav2_params.yaml`, `ika_nav/launch/navigation.launch.py`
+    - [ ] b. Nav2 (2026-10-07, K-038): `ika_nav/config/nav2_params.yaml`,
+          `ika_nav/launch/navigation.launch.py`. AMCL + `ika_saha.pgm`, NavFn, Regulated Pure Pursuit,
+          araç izi 1,78 × 1,15 m + 0,3 m pay. Costmap'ler: statik harita + keepout katmanı +
+          şişirme (1,5 m); lidar katmanı yok. Ara katman CycloneDDS (`~/.bashrc`).
+          - Deneme 1 (konteyner arkası (8, 7,6)): geçti. AMCL hedefe 0,28 m; AMCL'nin gerçeğe göre
+            hatası 0,36 m / 3,9°.
+          - Deneme 2 (kazının doğusu (25,9, −2,65)): geçti, konteynerin ARKASINDAN dolandı (güney
+            koridoru ve konteyner–kazı darboğazı kapalı). AMCL hedefe 0,23 m; gerçek konum AMCL'den
+            1,4 m kuzeyde (haritanın 2°'lik dönmesi, uzak uçta; K-037'deki ~1,2 m ile tutarlı).
+          - Sırada deneme 3: yasak bölgenin içine hedef → Nav2 plan bulamamalı.
+          - Yapılacak: `ika_sim` başlatma dosyasındaki 4 sabit `tf` yayıncısına `use_sim_time`
+            (bilgisayar saatiyle damgalı; sebep değil ama tutarsızlık).
+          Bu sonuca gelene kadar değişenler ve nedenleri: aşağıda "3.2b'de öğrenilenler".
     - [ ] c. Kart: firmware derlenir, `decision_test.py` YAML'dan okur, karta yükleme (onayla)
   - [ ] **3.3 Köprü (`guard_bridge`):** `docs/protocol.md` §10. `tools/`'taki `Link` mantığı
         kullanılır. Kartta asgari `VELOCITY_CMD` → `DRIVE` aktarması (K-031). Bitti (plan

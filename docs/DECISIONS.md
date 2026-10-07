@@ -884,3 +884,35 @@ AMCL'de harita depoda, tekrarlanabilir. Keepout maskesiyle aynı ızgarayı kull
 izinli alanın ~0,25 m içinde: kart orada ulaşılamayacak bir hedefi kabul edebilir
 (Nav2 reddeder, güvenlik açısından zararsız). Hata en uzak köşede ~1,2 m. Konum
 yalnızca lidarla bulunur, kamera gezinmede kullanılmaz.
+
+---
+
+## K-038 · Nav2 düzeni: costmap'lerde lidar katmanı yok, keepout bir katman, ize 0,3 m pay
+**Tarih:** 2026-10-07 · **Durum:** Yürürlükte
+
+`ros2_ws/src/ika_nav/config/nav2_params.yaml`:
+- **İki costmap'te de katmanlar:** statik harita → keepout (maskeyi okuyan ikinci `StaticLayer`)
+  → şişirme (1,5 m). Lidar katmanı (`obstacle_layer`) **yok**. `use_maximum: true` costmap
+  düzeyinde: harita ile keepout birleşir, biri ötekini ezmez.
+- **Araç izi:** 1,78 × 1,15 m, her yönde `footprint_padding` 0,3 m.
+- **Ara katman:** CycloneDDS (`RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`, `~/.bashrc`).
+
+**Neden:**
+- **Lidar katmanı:** lidar katmanı olan costmap'in tf tamponu yük altında (RViz ekranları,
+  costmap aboneliği) 75–190 s içinde kalıcı olarak donuyordu; controller bayat konumla "vardım"
+  diyor ya da yanlış yöne sürüyordu. Aynı yük altında lidar katmanı olmayan costmap donmadı
+  (Deney A, STATUS). Mekanizma kanıtlanmadı. Sahadaki engellerin hepsi sabit ve haritada.
+- **Keepout katman:** Nav2'de filtreler şişirmeden sonra uygulanıyor; planlayıcı aracı yasak
+  bölgenin dibinden geçirmeye çalıştı. Katman olunca yasak bölgeler de şişirilir.
+- **Pay:** harita konteyner civarında ~0,5 m kaymış (K-036), AMCL ~0,3 m yanılıyor ve lidar
+  katmanı yok. Pay olmadan planlayıcı konteyner ile kazı arasındaki 1,24 m'lik darboğazı seçti,
+  araç gerçek konteynere sürtündü. Payla darboğaz kapalı, diğer geçitler (≥ 3,9 m) açık.
+- **CycloneDDS:** tf donmasının sebebi sanıldı, değildi. Nav2'nin Humble için önerdiği ara
+  katman, zararsız; kalıyor (Esra'nın kararı).
+
+**Bedeli:**
+- Nav2 haritada olmayan yeni engeli görmez (hareketli engelden kaçınma kapsam dışı). Bu,
+  tezde kartın varlık nedenini destekleyen bir gözlem: planlayıcının kendi güvenlik önlemleri
+  altındaki katman bozulunca sessizce devre dışı kaldı; kart bu katmandan bağımsız.
+- Araç engellere ve yasak bölgelere en az 0,875 m (iç yarıçap) yaklaşır; dar yerlerde temkinli.
+- Haritanın 2°'lik dönmesi uzak uçta Nav2'nin konumunu gerçekten ~1,4 m ayırıyor (deneme 2).
