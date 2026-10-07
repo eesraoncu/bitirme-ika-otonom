@@ -10,6 +10,51 @@
 
 ## Şu an ne yapılıyor
 
+**Esra yokken yapılanlar: `oto/faz3` dalı (2026-10-07), `main`'e alınmadı, push edilmedi.**
+Esra her commit'i inceleyip onaylarsa `main`'e birleştirilir. Karta hiçbir şey yüklenmedi.
+1. `46a8391` · **Deneme 3** (3.2b): yasak bölgelerin içine (kazı, yakıt, personel) ve kapının
+   dışına 4 hedef, dördü de reddedildi (`GridBased: failed to create plan with tolerance 0.00`).
+   **Bulgu:** ret sırasında Nav2'nin kurtarma hareketleri aracı 0,4 m'ye kadar oynattı; kartın
+   reddi `GOAL` göndermediği için araç kıpırdamaz (tezde iki katmanın farkı).
+   Aynı commit: sabit `tf`'lere `use_sim_time` (doğrulandı: "gecikme" −1,79e9 s → 0,4 s);
+   **3.2c (yüklemesiz):** `gen_site.py`'ye `nearest_safe` (kartın `site_nearest_safe` eşi) ve
+   `load_site`; `shared/site/tests` ipucunu kartın C koduyla 5 000+ noktada karşılaştırıyor
+   (eşitlik kuralı bozulunca 7 noktada yakaladı); `decision_test.py` hedefleri ve ipuçlarını
+   sahadan hesaplıyor (izinli (800, 200); kazı (1450, 0) → ipucu (800, 200); dış (5000, 0) ve
+   kenar (2759, 0) → (2600, 0)). Firmware Debug ve Release 0 uyarı.
+2. `7261c49` · **3.3 kart tarafı (K-031):** `guard_velocity`: `VELOCITY_CMD` `NORMAL`'de `DRIVE`
+   olarak aynen CAN'e, başka durumda gitmez, `VERDICT` yok. 2 test, kasıtlı 3 hatanın 3'ü
+   yakalandı. PC testleri 232. Debug text 39 724 B, Release 21 332 B, 0 uyarı.
+3. **Karta yükleme bekliyor (Esra'nın onayı):** yeni `site_data.c` + `guard_velocity`. Sonra
+   `python3 tools/decision_test.py` (yeni sahayla) ve `tools/link_test.py`.
+
+**Esra'nın vermesi gereken kararlar:**
+- **Hız sınırı çelişkisi:** RULES §3.2 ±0,30 m/s, ±1,2 rad/s; Nav2'ye 0,5 m/s verildi. Faz 4'te
+  kırpma devreye girince Nav2 sürekli kırpılır. Nav2 0,3'e mi insin, RULES İKA'ya göre mi
+  güncellensin?
+- **3.3 köprü (`guard_bridge`) tasarımı:** öneri aşağıda, onay bekliyor.
+
+**3.3 köprü tasarım önerisi** (protocol §10, K-031):
+```
+RViz /goal_pose ─→ [köprü, ajan tarafı] ─GOTO_CMD→ kart ─GOAL (CAN)→ [köprü, araç tarafı] ─→ Nav2 NavigateToPose
+Nav2 /cmd_vel_nav ─→ [köprü, ajan] ─VELOCITY_CMD→ kart ─DRIVE (CAN)→ [köprü, araç] ─→ /cmd_vel ─→ Gazebo
+AMCL map→base_link ─→ [köprü, araç] ─TELEMETRY 20 Hz→ kart
+[köprü, ajan] ─HEARTBEAT 100 ms→ kart; VERDICT → /guard/verdict (ROS konusu, ajan için)
+```
+- **Karar 1, Nav2'nin karttan kaçamaması:** `bt_navigator`'ın `goal_pose` aboneliği ve
+  controller/behavior'ın `cmd_vel` yayını yeniden adlandırılır (`/goal_pose` köprüye,
+  `/cmd_vel_nav` köprüye). Böylece RViz ya da Nav2 aracı karttan geçmeden süremez.
+- **Karar 2, tek düğüm mü iki mi:** öneri iki düğüm (`agent_bridge`, `vehicle_bridge`), çünkü
+  deney yapılandırmalarında (K-005: A–D) ajan tarafı değişiyor, araç tarafı değişmiyor; C'de
+  gerekçe gizleme (§7.3) yalnızca ajan tarafında.
+- **Karar 3, `Link` nerede:** `tools/link_test.py`'deki `Link` (oturum, imza, sayaç kilidi,
+  akış senkronu) `shared/protocol/python/ika_protocol/link.py`'ye taşınır; testler ve köprü
+  aynı kodu kullanır (bir kavram tek yerde). Bu `tools/`'a da dokunur.
+- **Karar 4, TELEMETRY'nin kaynağı:** AMCL'nin `map → base_link`'i (kartın coğrafi sınırı
+  harita çerçevesinde). `odom` değil.
+- Doğrulama: PC'de `Link` ve çeviri birim testleri; uçtan uca (RViz hedefi karttan geçiyor,
+  dışarıdaki hedef reddediliyor, kablo çekilince araç duruyor) kartla, Esra'yla.
+
 **Araç değişiyor: TurtleBot 4 → ORINIUM İKA modeli** (K-034, 2026-10-06). Deneme
 scratchpad'de yapıldı; model depoya alındı (adım a), henüz başlatma dosyasına bağlı değil. Bulgular:
 - **Port üç mekanik değişiklik:** `<sdf version>` 1.11 → 1.9 (Fortress'in sdformat12'si en
