@@ -81,6 +81,16 @@ void guard_reset(guard_t *g, uint32_t seq, bool heartbeat_alive, guard_decision_
     g->reject_streak = 0u;
 }
 
+bool guard_velocity(const guard_t *g, const proto_velocity_cmd_t *cmd, proto_drive_t *out)
+{
+    if (g->state != PROTO_BOARD_STATE_NORMAL) {
+        return false;
+    }
+    out->v_mm_s = cmd->v_mm_s;
+    out->w_mrad_s = cmd->w_mrad_s;
+    return true;
+}
+
 void guard_heartbeat_lost(guard_t *g)
 {
     g->state = PROTO_BOARD_STATE_HOLD;

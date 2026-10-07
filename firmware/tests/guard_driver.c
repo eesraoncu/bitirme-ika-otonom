@@ -9,6 +9,7 @@
  *   goto <seq> <x> <y> <yaw>   → karar
  *   reset <seq> <canlı 0|1>    → karar
  *   lost                       → "ok" (kalp atışı zaman aşımı)
+ *   vel <v> <w>                → "v,w" araca giden DRIVE ya da aktarılmıyorsa "-"
  *   nearest <0|1> <x> <y>      → "<x> <y>"; 0: güvenli noktasız harita
  * Karar satırı:
  *   <ref_seq> <result> <rule> <reason> <hint_x> <hint_y> <goal|-> <state> <streak>
@@ -70,6 +71,14 @@ int main(void)
         } else if (sscanf(line, "reset %lu %d", &seq, &alive) == 2) {
             guard_reset(&g, (uint32_t)seq, alive != 0, &d);
             print_decision(&d);
+        } else if (sscanf(line, "vel %d %d", &x, &y) == 2) {
+            proto_velocity_cmd_t cmd = { .v_mm_s = (int16_t)x, .w_mrad_s = (int16_t)y };
+            proto_drive_t drive;
+            if (guard_velocity(&g, &cmd, &drive)) {
+                printf("%d,%d\n", drive.v_mm_s, drive.w_mrad_s);
+            } else {
+                puts("-");
+            }
         } else if (strncmp(line, "lost", 4) == 0) {
             guard_heartbeat_lost(&g);
             puts("ok");

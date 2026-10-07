@@ -173,3 +173,24 @@ def test_reject_streak_saturates(guard):
 def test_nearest_safe(guard, which, p, expected):
     (out,) = guard.run([f"nearest {which} {p[0]} {p[1]}"])
     assert tuple(int(v) for v in out.split()) == expected
+
+
+# ---- Hız komutu (K-031, asgari aktarma) ----------------------------------------
+
+def test_velocity_forwarded_only_in_normal(guard):
+    out = guard.run(["vel 300 -500",            # HOLD'da açılır: aktarılmaz
+                     "reset 1 1",
+                     "vel 300 -500",            # NORMAL: aynen
+                     "vel -32768 32767",        # uç değerler, kırpma Faz 4'te
+                     "vel 0 0",
+                     "lost",
+                     "vel 300 -500"])           # kalp atışı kesildi: HOLD, aktarılmaz
+    assert out[0] == "-"
+    assert out[2:5] == ["300,-500", "-32768,32767", "0,0"]
+    assert out[6] == "-"
+
+
+def test_velocity_does_not_change_state_or_streak(guard):
+    d = guard.seq("reset 1 1", "goto 2 5000 0 0", "vel 100 100", "goto 3 5000 0 0")
+    assert (d[1].streak, d[2].streak) == (1, 2)   # aradaki hız komutu sayacı sıfırlamadı
+    assert d[2].state == NORMAL

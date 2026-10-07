@@ -323,8 +323,21 @@ static void on_agent_frame(channel_t *ch, const frame_t *f)
         guard_reset(&guard, f->seq, heartbeat_alive(), &d);
         send_decision(ch, &d);
         break;
+    case PROTO_ID_VELOCITY_CMD: {
+        /* K-031: NORMAL'de DRIVE olarak araca, VERDICT yok. */
+        proto_velocity_cmd_t cmd;
+        proto_drive_t drive;
+        if (!proto_velocity_cmd_decode(f->payload, f->payload_len, &cmd) ||
+            !guard_velocity(&guard, &cmd, &drive)) {
+            return;
+        }
+        uint8_t p[PROTO_SIZE_DRIVE];
+        proto_drive_encode(&drive, p);
+        guard_can_send(PROTO_CAN_ID_DRIVE, p, sizeof p);
+        break;
+    }
     default:
-        /* VELOCITY_CMD, WAIT_CMD, SPEED_LIMIT_CMD, STOP_CMD Faz 3-4'te. */
+        /* WAIT_CMD, SPEED_LIMIT_CMD, STOP_CMD Faz 4'te. */
         break;
     }
 }
