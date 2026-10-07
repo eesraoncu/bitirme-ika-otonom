@@ -149,6 +149,19 @@ def geofence_cm(allowed: Sequence[PtCm], forbidden: Sequence[Sequence[PtCm]], p:
     return OK
 
 
+def nearest_safe(safe: Sequence[PtCm], home: PtCm, p: PtCm) -> PtCm:
+    """site_nearest_safe()'in Python'daki eşi (RULES §5.3): p'ye en yakın güvenli nokta,
+    eşitlikte sıra numarası küçük olan; güvenli nokta yoksa home."""
+    if not safe:
+        return home
+    return min(safe, key=lambda s: (s[0] - p[0]) ** 2 + (s[1] - p[1]) ** 2)   # min ilk eşiti alır
+
+
+def load_site() -> Dict:
+    """Kaynağı oku ve kartın göreceği sahayı döndür (testler ve araçlar için)."""
+    return build(yaml.safe_load(SOURCE.read_text(encoding="utf-8")))
+
+
 # ---- yükle, uygula, denetle -------------------------------------------------
 
 def _poly(name: str, raw) -> List[Pt]:
@@ -310,7 +323,7 @@ def pgm_bytes(mask: np.ndarray) -> bytes:
 
 
 def outputs() -> Dict[Path, bytes]:
-    site = build(yaml.safe_load(SOURCE.read_text(encoding="utf-8")))
+    site = load_site()
     grid = load_map_grid()
     return {
         OUT_C: render_c(site).encode(),

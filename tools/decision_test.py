@@ -9,9 +9,9 @@ geçip araç kanalından çıkıyor, dışındaysa gerekçeyle ajan kanalına d�
 kalp atışı kesilince kart HOLD'a geçiyor.
 
 Betik iki kanala da bağlanır. Kalp atışını köprü gibi arka planda 100 ms'de
-bir gönderir ve gerektiğinde keser. Hedefler kartın deneme haritasına göre
-seçildi (firmware/app/site/site_data.c): ±10 m izinli kare, (3–5 m, 3–5 m)
-yasak kare, güvenli noktalar (−7, −7), (7, −7), (−7, 7) m.
+bir gönderir ve gerektiğinde keser. Hedefler ve beklenen ipuçları kartın
+sahasından hesaplanır: shared/site/ika_saha.yaml → tools/gen_site.py (K-037).
+Kartta aynı YAML'dan üretilmiş site_data.c yüklü olmalı.
 
 Kart TELEMETRY'yi araç kanalından alıp CAN'e koyar, bekçi düğümü CAN'den
 alır: telemetri yaşının düşmesi ters yöndeki CAN yolunu da gösterir.
@@ -27,8 +27,25 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from link_test import (AGENT_PORT, KEY_FILE, ROOT, VEHICLE_PORT, Link, Report,   # noqa: E402
                        fr, m)
+import gen_site as gs   # noqa: E402
 
-ALLOWED_GOAL = (100, -200, 1571)
+# Hedefler kartın sahasından (cm). İzinli hedef: konteynerin önü, kuzeye bakarak
+SITE = gs.load_site()
+_safe = list(SITE["safe"].values())
+_x, _y = SITE["safe"]["konteyner_onu"]
+ALLOWED_GOAL = (_x, _y, 1571)
+_kazi = SITE["forbidden"]["kazi"]
+FORBIDDEN_GOAL = (sum(p[0] for p in _kazi) // len(_kazi), sum(p[1] for p in _kazi) // len(_kazi))
+EDGE_GOAL = (max(p[0] for p in SITE["allowed"]), 0)          # izinli alanın doğu kenarı
+OUTSIDE_GOAL = (5000, 0)
+
+
+def hint(p):
+    """Kartın vermesi gereken ipucu: hedefe en yakın güvenli nokta (RULES §5.3)."""
+    return gs.nearest_safe(_safe, SITE["home"], p)
+
+
+assert gs.geofence_cm(SITE["allowed"], list(SITE["forbidden"].values()), ALLOWED_GOAL[:2]) == gs.OK
 VERDICT_WAIT_S = 0.5
 HEARTBEAT_PERIOD_S = 0.1
 
@@ -155,15 +172,16 @@ def run(agent: Link, vehicle: Link, hb: Heartbeat, rep: Report) -> None:
               and got[1].source == m.GoalSource.AGENT,
               "hedef CAN'den geçip araç kanalından çıktı", str(got[1]) if got else "gelmedi")
 
-    for (gx, gy), reason, hint, what in [
-        ((5000, 0), m.Reason.GOAL_OUTSIDE_ALLOWED, (700, -700), "izinli alanın dışı"),
-        ((400, 400), m.Reason.GOAL_IN_FORBIDDEN, (700, -700), "yasak bölge (ipucu eşitlikte ilki)"),
-        ((1000, 0), m.Reason.GOAL_OUTSIDE_ALLOWED, (700, -700), "izinli alanın kenarı"),
+    for (gx, gy), reason, what in [
+        (OUTSIDE_GOAL, m.Reason.GOAL_OUTSIDE_ALLOWED, "izinli alanın dışı"),
+        (FORBIDDEN_GOAL, m.Reason.GOAL_IN_FORBIDDEN, "kazı alanının ortası"),
+        (EDGE_GOAL, m.Reason.GOAL_OUTSIDE_ALLOWED, "izinli alanın kenarı"),
     ]:
+        expect = hint((gx, gy))
         v = send_cmd(agent, goto(gx, gy))
         ok = (v is not None and v.result == m.Result.REJECTED and v.rule == m.Rule.GEOFENCE
-              and v.reason == reason and (v.hint_x_cm, v.hint_y_cm) == hint)
-        rep.check(ok, f"{what} → GEOFENCE / {reason.name}, ipucu {hint}",
+              and v.reason == reason and (v.hint_x_cm, v.hint_y_cm) == expect)
+        rep.check(ok, f"{what} {gx, gy} → GEOFENCE / {reason.name}, ipucu {expect}",
                   "" if v is None else f"{v.reason.name}, ({v.hint_x_cm}, {v.hint_y_cm})")
     goals = [c for _, c in vehicle.receive(0.3) if c is m.Goal]
     rep.check(not goals, "reddedilen hedefler araca gitmedi", f"{len(goals)} GOAL")

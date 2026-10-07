@@ -40,8 +40,10 @@ ARGUMENTS = [
 
 
 def static_tf(parent, child, x, y, z, roll, pitch, yaw):
+    # use_sim_time: damga sim saatinden olsun (yoksa bilgisayar saati, tf2_monitor'de
+    # −1,79 milyar s "gecikme" görünüyordu)
     return Node(package='tf2_ros', executable='static_transform_publisher',
-                name=f'tf_{child}', output='log',
+                name=f'tf_{child}', output='log', parameters=[{'use_sim_time': True}],
                 arguments=['--x', str(x), '--y', str(y), '--z', str(z),
                            '--roll', str(roll), '--pitch', str(pitch), '--yaw', str(yaw),
                            '--frame-id', parent, '--child-frame-id', child])

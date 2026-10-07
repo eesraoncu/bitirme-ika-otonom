@@ -121,17 +121,24 @@ def card(tmp_path_factory):
         ["gcc", "-std=c11", "-Wall", "-Wextra", "-Wpedantic", "-Wconversion", "-Wsign-conversion",
          "-Werror", "-O1", "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
          "-I", str(APP), str(Path(__file__).parent / "site_driver.c"),
-         str(APP / "site" / "site_data.c"), str(APP / "rules" / "geofence" / "geofence.c"),
+         str(APP / "site" / "site_data.c"), str(APP / "site" / "site.c"),
+         str(APP / "rules" / "geofence" / "geofence.c"),
          "-o", str(exe)],
         capture_output=True, text=True)
     assert cc.returncode == 0, "Kartın C kodu katı uyarılarla derlenmedi:\n" + cc.stderr
 
-    def ask(points):
-        r = subprocess.run([str(exe)], input="".join(f"{x} {y}\n" for x, y in points),
-                           capture_output=True, text=True)
+    def run(lines):
+        r = subprocess.run([str(exe)], input="".join(lines), capture_output=True, text=True)
         assert r.returncode == 0, r.stderr
-        return np.array([int(v) for v in r.stdout.split()])
+        return r.stdout.splitlines()
 
+    def ask(points):                       # geofence kararları
+        return np.array([int(v) for v in run(f"g {x} {y}\n" for x, y in points)])
+
+    def nearest(points):                   # en yakın güvenli noktalar
+        return [tuple(int(v) for v in ln.split()) for ln in run(f"n {x} {y}\n" for x, y in points)]
+
+    ask.nearest = nearest
     return ask
 
 
@@ -153,3 +160,18 @@ def test_mask_matches_card_every_cell(card):
 def test_card_safe_points_ok(card, site):
     pts = [site["home"]] + list(site["safe"].values())
     assert list(card(pts)) == [gs.OK] * len(pts)
+
+
+def test_nearest_safe_matches_card(card, site):
+    """İpucu (RULES §5.3): üretecin Python eşi kartın site_nearest_safe'iyle aynı mı.
+    Izgara + eşitlik durumları (iki güvenli noktaya eşit uzak noktalar)."""
+    safe = list(site["safe"].values())
+    pts = [(x, y) for x in range(-500, 3300, 37) for y in range(-1100, 1100, 41)]
+    for i, a in enumerate(safe):                     # orta noktalar: eşitlikte ilki seçilmeli
+        for b in safe[i + 1:]:
+            if (a[0] + b[0]) % 2 == 0 and (a[1] + b[1]) % 2 == 0:
+                pts.append(((a[0] + b[0]) // 2, (a[1] + b[1]) // 2))
+    expected = [gs.nearest_safe(safe, site["home"], p) for p in pts]
+    got = card.nearest(pts)
+    diff = [(p, g, e) for p, g, e in zip(pts, got, expected) if g != e]
+    assert not diff, f"{len(diff)} noktada farklı, ilk 3 (nokta, kart, beklenen): {diff[:3]}"
