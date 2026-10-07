@@ -1,0 +1,12 @@
+# OTOMATİK ÜRETİLDİ. ELLE DÜZENLEMEYİN.
+# Kaynak: shared/site/ika_saha.yaml
+# Üretici: tools/gen_site.py
+# Nav2 keepout maskesi: siyah = kartın reddedeceği yer (yasak bölge ya da izinli
+# alanın dışı). Izgara ika_saha.yaml ile aynı.
+image: ika_saha_keepout.pgm
+mode: trinary
+resolution: 0.05
+origin: [-4.38, -12, 0]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.25

@@ -1,21 +1,31 @@
-/* DENEME VERİSİ. Gerçek koordinatlar Faz 3'te haritadan üretilecek
- * (docs/RULES.md §7). O zamana kadar bu değerler yalnızca kartın kararlarını
- * sınamak içindir: 20 m × 20 m izinli alan, içinde 2 m × 2 m yasak bölge,
- * üç güvenli nokta. tools/decision_test.py aynı değerleri kullanır. */
+/* OTOMATİK ÜRETİLDİ. ELLE DÜZENLEMEYİN.
+ * Kaynak: shared/site/ika_saha.yaml
+ * Üretici: tools/gen_site.py
+ *
+ * Koordinatlar cm, harita çerçevesi. Güvenlik payı 1 m uygulandı
+ * (K-036): izinli alan içeri çekildi, yasak bölgeler büyütüldü. */
 #include "site/site.h"
 
 const site_t site = {
     .fence = {
         .allowed = {
             .n = 4,
-            .v = { {-1000, -1000}, {1000, -1000}, {1000, 1000}, {-1000, 1000} },
+            .v = { {-159, -859}, {2759, -859}, {2759, 859}, {-159, 859} },
         },
-        .n_forbidden = 1,
+        .n_forbidden = 3,
         .forbidden = {
-            { .n = 4, .v = { {300, 300}, {500, 300}, {500, 500}, {300, 500} } },
+            { .n = 4, .v = { {200, -920}, {1000, -920}, {1000, -350}, {200, -350} } },   /* personel */
+            { .n = 4, .v = { {1200, -250}, {1700, -250}, {1700, 250}, {1200, 250} } },   /* kazi */
+            { .n = 4, .v = { {1600, -920}, {2400, -920}, {2400, -350}, {1600, -350} } },   /* yakit */
         },
     },
     .home = {0, 0},
-    .n_safe = 3,
-    .safe = { {-700, -700}, {700, -700}, {-700, 700} },
+    .n_safe = 5,
+    .safe = {
+        {0, 0},   /* baslangic */
+        {800, 760},   /* konteyner_arkasi */
+        {100, 600},   /* kuzeybati */
+        {800, 200},   /* konteyner_onu */
+        {2600, 0},   /* kapi_onu */
+    },
 };

@@ -859,3 +859,28 @@ haritalama yerine pay bırakmak Esra'nın tercihi.
 
 **Bedeli:** İzinli alan küçülür, yasak bölgeler büyür; dar geçitler (güney koridoru 3 m)
 daralır. Hata tezde ölçüm olarak yazılır. Haritalama tekrarlanırsa hata yeniden ölçülmeli.
+
+---
+
+## K-037 · Saha tek dosyada (`shared/site/ika_saha.yaml`), Nav2'de konum AMCL ile
+**Tarih:** 2026-10-07 · **Durum:** Yürürlükte
+
+- **Saha tanımı:** izinli alan, yasak bölgeler (gerçek sınırlar), `home` ve adlı güvenli
+  noktalar `shared/site/ika_saha.yaml`'da, dünya = harita çerçevesinde, metre.
+  `tools/gen_site.py` payı (`margin_m`, K-036) uygular, veriyi denetler ve kartın
+  `site_data.c`'sini ve Nav2'nin keepout maskesini üretir. Maske kartın kuralıyla
+  hesaplanır: izinli alanın dışı da kapalıdır. Yuvarlama güvenli tarafa yapılır.
+- **Konum bulma:** Nav2 ile gezinirken AMCL, depodaki `ika_saha.pgm` ve lidar.
+  RTAB-Map yalnızca haritalamada kullanıldı. Başlangıç konumu (0, 0, doğu) başlatma
+  dosyasında verilir.
+- **Payın sonucu:** güney koridoru kapanır, kazı yalnızca kuzeyden dolanılır
+  (Esra'nın kararı).
+
+**Neden:** Kart ve Nav2 aynı bölgeleri tek kaynaktan alır (bir kavram tek yerde).
+Testler maskenin her hücresini (314 622) kartın gerçek C koduyla karşılaştırıyor, fark 0.
+AMCL'de harita depoda, tekrarlanabilir. Keepout maskesiyle aynı ızgarayı kullanıyor.
+
+**Bedeli:** Haritanın 2°'lik dönmesi yüzünden kuzeydoğu köşesinde haritadaki bariyer
+izinli alanın ~0,25 m içinde: kart orada ulaşılamayacak bir hedefi kabul edebilir
+(Nav2 reddeder, güvenlik açısından zararsız). Hata en uzak köşede ~1,2 m. Konum
+yalnızca lidarla bulunur, kamera gezinmede kullanılmaz.

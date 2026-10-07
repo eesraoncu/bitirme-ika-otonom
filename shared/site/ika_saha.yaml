@@ -1,0 +1,33 @@
+# İKA deney sahası: coğrafi sınır ve güvenli noktalar (Faz 3.2, K-037).
+#
+# Tek kaynak: tools/gen_site.py buradan kartın site_data.c'sini ve Nav2'nin
+# yasak bölge maskesini (ros2_ws/src/ika_nav/maps/ika_saha_keepout.*) üretir.
+# Başka hiçbir yerde koordinat elle yazılmaz. Değişiklikten sonra:
+#     python3 tools/gen_site.py
+#
+# Koordinatlar dünya = harita çerçevesi (K-032), metre. Bölgeler GERÇEK sınırlar:
+# ika_saha.sdf'deki zemin boyaları ve bariyerlerin iç yüzü. Güvenlik payı üreteçte
+# uygulanır: izinli alan margin_m kadar içeri çekilir, yasak bölgeler o kadar büyür.
+# Çokgenler dışbükey olmalı (pay böyle hesaplanıyor; üreteç denetler).
+
+margin_m: 1.0          # K-036: haritanın dünyaya göre hatası ≤ 0,8 m
+
+allowed:               # bariyerlerin iç yüzü (bariyer çizgisi ± 0,405 m)
+  - [-2.595, -9.595]
+  - [28.595, -9.595]
+  - [28.595, 9.595]
+  - [-2.595, 9.595]
+
+forbidden:             # en çok 4 bölge, her biri en çok 8 köşe (RULES §3.1)
+  personel: [[3, -8.2], [9, -8.2], [9, -4.5], [3, -4.5]]
+  kazi:     [[13, -1.5], [16, -1.5], [16, 1.5], [13, 1.5]]
+  yakit:    [[17, -8.2], [23, -8.2], [23, -4.5], [17, -4.5]]
+
+home: [0, 0]           # aracın başlangıcı: (0, 0), doğuya bakar (K-032)
+
+safe_points:           # sıra önemli: eşitlikte sıra numarası küçük olan seçilir (RULES §5.3)
+  baslangic:        [0, 0]
+  konteyner_arkasi: [8, 7.6]
+  kuzeybati:        [1, 6]
+  konteyner_onu:    [8, 2]
+  kapi_onu:         [26, 0]

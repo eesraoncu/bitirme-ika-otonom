@@ -3,8 +3,8 @@
 > Bu dosya her çalışma oturumunun **başında okunur**, **sonunda güncellenir**.
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
-**Son güncelleme:** 2026-10-06
-**Bulunduğumuz faz:** Faz 3. 3.0 kurulum bitti, deney sahası (K-032) Blok 1–5 bitti. Araç İKA (K-034), saha 32 × 20 m (K-035). 3.1 harita bitti (K-036, hata ≤ 0,8 m). Sırada 3.2 (saha tanımı ve Nav2)
+**Son güncelleme:** 2026-10-07
+**Bulunduğumuz faz:** Faz 3. 3.0 kurulum bitti, deney sahası (K-032) Blok 1–5 bitti. Araç İKA (K-034), saha 32 × 20 m (K-035). 3.1 harita bitti (K-036). 3.2a saha tanımı bitti (K-037). Sırada 3.2b (Nav2), sonra 3.2c (kart)
 
 ---
 
@@ -211,7 +211,8 @@ ile (26 denetim, Debug ve Release'te, art arda çalıştırmalarda hepsi geçti)
   verisi), `rules/heartbeat/` (TIM6), `vehicle_node/` (FDCAN2, araç tarafı),
   `timing/timing` (pin). CubeMX'te TIM6 ve PA8, komut satırından (K-026). Protokole
   `NO_HEARTBEAT` gerekçesi eklendi, şema özeti `0xD9092C66` (`f7d9822`).
-- PC testleri: 210 (`python3 -m pytest shared/protocol/tests firmware/tests`). `guard`'a
+- PC testleri: 210 (`python3 -m pytest shared/protocol/tests firmware/tests`; 3.2a'dan sonra
+  `shared/site/tests` ile 229). `guard`'a
   kasıtlı hata konmuş 14 kopyanın 14'ü yakalandı.
 - **Kartta şu an Release derlemesi yüklü.**
 
@@ -499,9 +500,22 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
           ~2° dönmüş (20 m'de ~0,7 m). "Harita = dünya" (K-032) en çok ~0,8 m hatayla tutuyor.
         - Kaydetme: `map_saver_cli -t /rtabmap/map` (konu `/map` değil).
         - Karar (K-036): harita kabul; 3.2'de yasak bölgelere ve izinli alana ≥ 1 m pay.
-  - [ ] **3.2 Saha tanımı ve Nav2:** izinli alan, yasak bölgeler, güvenli noktalar tek dosyada;
-        `site_data.c` ve Nav2 yasak bölge maskesi ondan üretilir (yeri o adımda kararlaştırılacak).
-        Bitti: RViz "2D Goal Pose" ile araç hedefe gidiyor, maske Nav2'de, kart aynı bölgeleri biliyor
+  - [ ] **3.2 Saha tanımı ve Nav2** (K-037). Bitti: RViz "2D Goal Pose" ile araç hedefe gidiyor,
+        maske Nav2'de, kart aynı bölgeleri biliyor
+    - [x] a. Saha tek dosyada (2026-10-07): `shared/site/ika_saha.yaml` (gerçek sınırlar, `margin_m`
+          1,0, 3 yasak bölge, 5 adlı güvenli nokta) → `tools/gen_site.py` (`--check` var) →
+          `firmware/app/site/site_data.c` + `ika_nav/maps/ika_saha_keepout.pgm/.yaml`. Pay
+          güvenli tarafa yuvarlanır (izinli alan x −159…2759, y ±859 cm). Testler:
+          `shared/site/tests`, 19 test; maskenin 314 622 hücresi kartın gerçek C koduyla
+          karşılaştırıldı, fark 0. Kasıtlı 3 hatanın 3'ü yakalandı. Güney koridoru payla kapandı.
+          **Ölçüm:** haritanın 2°'lik dönmesi yüzünden kuzeydoğu köşesinde haritadaki bariyer
+          izinli alanın ~0,25 m içinde (hata orada ~1,2 m; K-036'nın 0,8 m'si konteyner ve
+          tanklardan). Kart orada ulaşılamaz hedef kabul edebilir, Nav2 reddeder.
+          **Uyarı:** `site_data.c` değişti; `tools/decision_test.py` hâlâ eski deneme sahasını
+          bekliyor, kartta eski derleme var (3.2c).
+    - [ ] b. Nav2: AMCL + `ika_saha.pgm`, NavFn, Regulated Pure Pursuit, araç izi 1,78 × 1,15 m,
+          keepout filtresi, `ika_nav/config/nav2_params.yaml`, `ika_nav/launch/navigation.launch.py`
+    - [ ] c. Kart: firmware derlenir, `decision_test.py` YAML'dan okur, karta yükleme (onayla)
   - [ ] **3.3 Köprü (`guard_bridge`):** `docs/protocol.md` §10. `tools/`'taki `Link` mantığı
         kullanılır. Kartta asgari `VELOCITY_CMD` → `DRIVE` aktarması (K-031). Bitti (plan
         belgesi): RViz hedefi karttan geçip araca ulaşıyor, izinli bölge dışındaki hedef
