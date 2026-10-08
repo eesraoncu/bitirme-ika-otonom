@@ -18,7 +18,6 @@ son komutla gitmeye devam ederdi. Gerçek araçta bunu STM32 yapar (KTR §5).
 from __future__ import annotations
 
 import sys
-import time
 from pathlib import Path
 
 import rclpy
@@ -99,12 +98,8 @@ class VehicleBridge(Node):
                                f"kaynak {g.source.name}")
 
     def on_hello(self, f, hello: m.Hello) -> None:
-        # Kart yeniden başladıysa yeni oturum: sayaç ve saat ondan devam eder (protocol §5)
-        if hello.session_id != self.link.session_id:
-            with self.link.lock:
-                self.link.session_id = hello.session_id
-                self.link.seq = hello.last_rx_seq
-                self.link.board_ms_at = (f.ts_ms, time.monotonic())
+        # Kart yeniden başladıysa yeni oturuma geçilir (protocol §5)
+        if self.link.adopt_hello(f, hello):
             self.get_logger().warn(f"yeni oturum 0x{hello.session_id:08X} (kart yeniden başladı)")
 
     # -- karta ---------------------------------------------------------------

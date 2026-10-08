@@ -35,7 +35,12 @@ incelendi ve `main`'e birleştirildi (fast-forward, push edilmedi). Karta hiçbi
    20,1 Hz; sabit `map → base_link` → TELEMETRY, kartta yaş ≤ 44 ms; tek `DRIVE (0,3)`'ten
    0,5 s sonra bekçi köpeği sıfırladı (Gazebo DiffDrive son hızı süresiz uygular); 1200 DRIVE'da
    0 bozuk çerçeve. Denenmedi: GOAL → Nav2 (adım 6).
-   Kalan adımlar: 4 `agent_bridge`, 5 Nav2 yeniden adlandırma + launch, 6 uçtan uca test.
+   **Adım 4 bitti:** `agent_bridge.py` (+ `/guard/reset` servisi; `Link.adopt_hello`,
+   `Link.wire_seq`). Kartla simülasyonsuz, iki köprü birlikte: reset → NORMAL; izinli hedef
+   ACCEPTED ve GOAL araç köprüsüne ulaştı; kazı → GEOFENCE / GOAL_IN_FORBIDDEN, ipucu (8, 2) m
+   `/guard/verdict`'te; `odom` çerçeveli hedef gönderilmedi; `/cmd_vel_nav` 0,25 → `/cmd_vel`
+   0,25; ajan köprüsü durunca kart HOLD, `/cmd_vel`'e 20 Hz sıfır.
+   Kalan adımlar: 5 Nav2 yeniden adlandırma + launch, 6 uçtan uca test.
    Önceki plan: Nav2 konularının yeniden adlandırılması, `Link`'in
    `ika_protocol/link.py`'ye taşınması, `agent_bridge` ve `vehicle_bridge`. Doğrulama: PC'de
    `Link` ve çeviri birim testleri; uçtan uca (RViz hedefi karttan geçiyor, dışarıdaki hedef

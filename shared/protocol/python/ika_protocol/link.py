@@ -175,11 +175,24 @@ class Link:
             how = "HELLO_REQ cevabı"
         if got is None:
             raise RuntimeError("HELLO gelmedi")
-        f, hello = got
-        self.session_id = hello.session_id
-        self.seq = hello.last_rx_seq   # köprü bir fazlasından devam eder
-        self.board_ms_at = (f.ts_ms, time.monotonic())
-        return hello, how
+        self.adopt_hello(*got)
+        return got[1], how
+
+    def adopt_hello(self, f: fr.Frame, hello: m.Hello) -> bool:
+        """HELLO'daki oturuma geçer: sayaç ve saat ondan devam eder (protocol §5).
+        Oturum değiştiyse (kart yeniden başladı) True."""
+        with self.lock:
+            changed = hello.session_id != self.session_id
+            self.session_id = hello.session_id
+            self.seq = hello.last_rx_seq   # köprü bir fazlasından devam eder
+            self.board_ms_at = (f.ts_ms, time.monotonic())
+        return changed
+
+    @staticmethod
+    def wire_seq(wire: bytes) -> int:
+        """Gönderilmiş çerçevenin sayacı (VERDICT.ref_seq ile eşleştirmek için).
+        Kalp atışı başka iş parçacığından gittiği için self.seq'e bakılamaz."""
+        return int.from_bytes(fr.cobs_decode(wire[:-1])[1:5], "little")
 
     def status(self) -> m.Status:
         got = self.wait_for(m.Status, STATUS_WAIT_S)
