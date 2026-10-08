@@ -61,11 +61,20 @@ incelendi ve `main`'e birleştirildi (fast-forward, push edilmedi). Karta hiçbi
      boyut/orijin değişince gider, gerisi `/local_costmap/costmap_updates`'e (1,67 Hz, canlı).
      Okunan "99" değerleri bekleyen eski tam haritadandı. Ders: bir konunun susması donma değildir,
      önce yayın biçimine bak. "Collision ahead" büyük olasılıkla AMCL kaybından (aşağıda). K-038 geçerli.
-   - **AMCL ~14 m kayboldu, araç personel yasak bölgesine girdi:** Gazebo (3,52, −5,95), AMCL
-     (12,64, 5,29). Kart konumu AMCL'den aldığı için (K-040 karar 4) fark edemedi. Tez için
-     bilinen sınır: kartın konuma dayanan kuralları konum kaynağı kadar güvenilir. Nasıl girdiği
-     bilinmiyor; muhtemelen donan yerel costmap ile aynı zincir. Araç `ign service
-     /world/ika_saha/set_pose` ile (0, 0)'a alındı.
+   - **AMCL ~14 m kayboldu, araç personel yasak bölgesine girdi → nedeni bulundu, önlendi (K-041):**
+     Gazebo (3,52, −5,95), AMCL (12,64, 5,29). Zincir ölçüldü (`tools/amcl_push_bench.py`):
+     araç konteynere dayanınca odometri 60 s'de 15 m "ilerledi", AMCL 5,7–14,1 m koptu ve
+     toparlanmadı. Dönüşte odometri ayrıca %16 fazla sayıyor (360° komut: gerçek 200°, odom 232°,
+     AMCL 209°); düz gidişte doğru. AMCL ayarı çözmedi (`alpha3` 0,8: 5,5 m; `recovery_alpha`:
+     5,6–5,8 m). **collision_monitor (approach)** eklendi: araç konteynere 0,36–0,58 m kala duruyor,
+     AMCL hatası ≤ 0,17 m; normal gezinme (kapı önü, konteyner arkası dar yol) etkilenmedi.
+     Tez için bilinen sınır: kartın konuma dayanan kuralları konum kaynağı kadar güvenilir.
+     Yan bulgu: komutu araç tam uygulamıyor (0,5 rad/s → gerçek 0,28; 2 m → 1,24 m).
+   - **Kart kabul eder, Nav2 ulaşamaz şeridi (~0,9 m):** (27,27, −1,34) kartın izinli alanında
+     (pay sonrası x ≤ 27,6), ama Nav2'de maliyet 99 (iç yarıçap 0,875 şişirmesi, merkez x ≲ 26,7).
+     Planlayıcı "tolerance 0.00" ile vazgeçti. Katmanlar farklı soru soruyor (yasak mı / sığar mı).
+   - **Çalışırken bozuk çerçeve:** bir oturumda ~58 000 çerçevede iki kanalda da 2'şer; köprü sayıp
+     geçti. Açılış düzeltmesi (`fbc20d1`) bunu açıklamıyor: seyrek akış içi bozulma da var.
    - **Reset'ten sonra Nav2 eski hedefe devam etti** (yeni hedef verilmeden). Kart o hedefi
      onaylamıştı, reset insan eylemi; açık değil ama HOLD'da Nav2 hedefinin iptali (HALT) Faz
      4'te karara bağlanmalı.

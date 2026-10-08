@@ -954,3 +954,22 @@ iddiası çöker. (2) Deney yapılandırmalarında (K-005: A–D) yalnız ajan t
 tarafı bir kez yazılıp sabit kalır. (3) Bir kavram tek yerde; testler köprünün gerçek kodunu
 sınar. (4) Saha harita çerçevesinde tanımlı; odometri zamanla kayar. AMCL sıçramalarının
 tutarlılık toleransında (RULES §3.4) kaldığı denemede ölçülecek.
+
+## K-041 · Nav2'ye çarpışma bekçisi (collision_monitor, approach)
+**Tarih:** 2026-10-08 · **Durum:** Yürürlükte
+
+Hız yolu: controller ve behavior → `/cmd_vel_raw` → `collision_monitor` → `/cmd_vel_nav` →
+kart (`ros2_ws/src/ika_nav`). Tür `approach`: aracın izi (yerel costmap'in yayımladığı, 0,3 m
+payla) gelen hızla 1 s ileri simüle edilir, çarpışacaksa hız kısılır. Kaynak `/scan`.
+
+**Neden:** Araç engele dayanınca tekerlekler boşa döner, odometri ilerleme sayar (60 s'de 15 m),
+AMCL metrelerce kopar (5,7–14 m); kart konumu AMCL'den aldığı için (K-040) o da yanılır.
+2026-10-08'de araç böyle personel yasak bölgesine girdi. AMCL ayarı çözmedi: `alpha3` 0,8 ile
+5,5 m, `recovery_alpha` ile 5,6–5,8 m. Monitörle aynı denemede araç konteynere 0,36–0,58 m
+kala durdu, AMCL hatası ≤ 0,17 m (`tools/amcl_push_bench.py`). Normal gezinmeye karışmadı
+(konteynerin arkasındaki dar yol dahil). `stop`/`slowdown` seçilmedi: her yöne durdurur, araç
+engelin dibinde kalıcı kilitlenir; `approach` yöne duyarlı.
+
+**Sınır:** Monitör Nav2'nin parçasıdır, kartın bağımsız katmanının yerini tutmaz; hızı yalnız
+azaltabilir, kartı atlatamaz. Haritada olmayan engelden kaçınma yine kapsam dışı (K-038).
+Kök neden (odometri patinajı görmüyor) duruyor; lidar odometrisi ya da EKF ileride ele alınabilir.

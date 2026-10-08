@@ -11,7 +11,8 @@ Hedef: RViz'de "2D Goal Pose". Ayarlar config/nav2_params.yaml'da.
 - gezinme: planner_server, controller_server, behavior_server, bt_navigator
 Nav2 karttan geçmeden süremez (K-040 karar 1): bt_navigator RViz'in /goal_pose'unu
 dinlemez, hedefi köprü kartın onayıyla NavigateToPose olarak verir; hız komutları
-/cmd_vel yerine /cmd_vel_nav'a gider, /cmd_vel'e yalnız köprünün araç tarafı yazar.
+/cmd_vel yerine /cmd_vel_raw → collision_monitor (K-041) → /cmd_vel_nav'a gider,
+/cmd_vel'e yalnız köprünün araç tarafı yazar.
 Köprüyü ayrıca başlatın: ros2_ws/src/guard_bridge/launch/bridge.launch.py
 """
 from pathlib import Path
@@ -25,14 +26,16 @@ MAP = str(PKG_DIR / 'maps' / 'ika_saha.yaml')
 KEEPOUT = str(PKG_DIR / 'maps' / 'ika_saha_keepout.yaml')   # tools/gen_site.py üretir
 
 LOCALIZATION = ['map_server', 'amcl', 'filter_mask_server']
-NAVIGATION = ['planner_server', 'controller_server', 'behavior_server', 'bt_navigator']
+NAVIGATION = ['planner_server', 'controller_server', 'behavior_server', 'bt_navigator',
+              'collision_monitor']
 
 
 # K-040 karar 1: Nav2'nin karta uğramadan kullanabileceği yol kalmasın
 TO_GUARD = {
     'bt_navigator': [('goal_pose', '/goal_pose_unused')],
-    'controller_server': [('cmd_vel', '/cmd_vel_nav')],
-    'behavior_server': [('cmd_vel', '/cmd_vel_nav')],
+    # Hız önce Nav2'nin çarpışma bekçisinden geçer (K-041): /cmd_vel_raw → /cmd_vel_nav
+    'controller_server': [('cmd_vel', '/cmd_vel_raw')],
+    'behavior_server': [('cmd_vel', '/cmd_vel_raw')],
 }
 
 
@@ -60,5 +63,6 @@ def generate_launch_description():
         nav2_node('nav2_controller', 'controller_server', 'controller_server'),
         nav2_node('nav2_behaviors', 'behavior_server', 'behavior_server'),
         nav2_node('nav2_bt_navigator', 'bt_navigator', 'bt_navigator'),
+        nav2_node('nav2_collision_monitor', 'collision_monitor', 'collision_monitor'),
         lifecycle_manager('lifecycle_manager_navigation', NAVIGATION),
     ])

@@ -123,7 +123,7 @@ planner_server:                    # global plan: haritada hedefe en ucuz yol
       use_astar: false
       allow_unknown: true          # haritada görülmemiş (gri) iç köşeler geçilebilir
 
-controller_server:                 # yolu izleyen hız komutları → /cmd_vel_nav → kart
+controller_server:                 # yolu izleyen hız komutları → /cmd_vel_raw → monitör → kart
   ros__parameters:
     use_sim_time: true
     controller_frequency: 20.0     # RULES §3.2 Nav2'nin 20 Hz olduğuna dayanır
@@ -267,3 +267,33 @@ local_costmap:
         inflation_radius: 1.5      # iç yarıçaptan (0,575 + 0,3 pay) büyük olmalı, yoksa
                                    # kademeli pahalı şerit oluşmaz
         cost_scaling_factor: 3.0
+
+collision_monitor:                 # Nav2'nin kendi çarpışma bekçisi (K-041): /cmd_vel_raw → /cmd_vel_nav
+  ros__parameters:
+    use_sim_time: true
+    base_frame_id: "base_link"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "/cmd_vel_raw"
+    cmd_vel_out_topic: "/cmd_vel_nav"   # → agent_bridge → kart
+    transform_tolerance: 0.5
+    source_timeout: 1.0            # lidar 1 s susarsa hız sıfırlanır
+    base_shift_correction: true
+    stop_pub_timeout: 2.0
+    # approach: gelen hızla izi 1 s ileri simüle eder, çarpışacaksa hızı kısar. Yöne
+    # duyarlı: engelden uzaklaşan hareket serbest (stop/slowdown dipte aracı kilitler).
+    # Neden: araç engele dayanınca odometri boşa döner, AMCL metrelerce kopar (STATUS).
+    polygons: ["FootprintApproach"]
+    FootprintApproach:
+      type: "polygon"
+      action_type: "approach"
+      footprint_topic: "/local_costmap/published_footprint"   # iz + footprint_padding 0,3
+      time_before_collision: 1.0
+      simulation_time_step: 0.1
+      max_points: 3                # 3'ten az lidar noktası gürültü sayılır
+      visualize: false
+      enabled: true
+    observation_sources: ["scan"]
+    scan:
+      type: "scan"
+      topic: "/scan"
+      enabled: true
