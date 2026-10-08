@@ -75,9 +75,9 @@ incelendi ve `main`'e birleştirildi (fast-forward, push edilmedi). Karta hiçbi
      Planlayıcı "tolerance 0.00" ile vazgeçti. Katmanlar farklı soru soruyor (yasak mı / sığar mı).
    - **Çalışırken bozuk çerçeve:** bir oturumda ~58 000 çerçevede iki kanalda da 2'şer; köprü sayıp
      geçti. Açılış düzeltmesi (`fbc20d1`) bunu açıklamıyor: seyrek akış içi bozulma da var.
-   - **Reset'ten sonra Nav2 eski hedefe devam etti** (yeni hedef verilmeden). Kart o hedefi
-     onaylamıştı, reset insan eylemi; açık değil ama HOLD'da Nav2 hedefinin iptali (HALT) Faz
-     4'te karara bağlanmalı.
+   - **Reset'ten sonra Nav2 eski hedefe devam etti** (yeni hedef verilmeden). **Karar verildi
+     (K-042):** HOLD'a geçişte kart `HALT(0)` gönderir, köprü Nav2 hedefini iptal eder (bağlantı
+     kopunca ve kart yeniden başlayınca da). Uygulama Faz 4'te, RULES §5 o zaman güncellenir.
    - Kart E5V'den beslenmediği için uçtan uca "kart açık, yalnız kalp atışı kesildi" denenmedi
      (`decision_test` bunu sınıyor: 523 ms). `tools/unplug_test.py` başlığında E5V kurulumu var.
    Önceki plan: Nav2 konularının yeniden adlandırılması, `Link`'in

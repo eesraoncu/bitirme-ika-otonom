@@ -973,3 +973,20 @@ engelin dibinde kalıcı kilitlenir; `approach` yöne duyarlı.
 **Sınır:** Monitör Nav2'nin parçasıdır, kartın bağımsız katmanının yerini tutmaz; hızı yalnız
 azaltabilir, kartı atlatamaz. Haritada olmayan engelden kaçınma yine kapsam dışı (K-038).
 Kök neden (odometri patinajı görmüyor) duruyor; lidar odometrisi ya da EKF ileride ele alınabilir.
+
+## K-042 · HOLD'a düşünce Nav2'nin hedefi iptal edilir
+**Tarih:** 2026-10-08 · **Durum:** Yürürlükte (uygulama Faz 4'te)
+
+Kart `NORMAL` ya da `RECOVERY`'den `HOLD`'a geçtiği anda araç kanalına bir kez `HALT(0)`
+gönderir. Araç köprüsü (`vehicle_bridge`) `HALT` gelince Nav2'nin hedefini iptal eder; kartla
+bağlantı koptuğunda ve kartın yeniden başladığını (yeni oturum) gördüğünde de iptal eder,
+çünkü o durumda kart `HALT` gönderemeden kapanmış olabilir. `SIFIRLA`'dan sonra araç, ajan
+yeni hedef verip kart onaylayana kadar kıpırdamaz.
+
+**Neden:** 2026-10-08'de reset'ten sonra Nav2, kartın HOLD'dan önce onayladığı hedefe
+kendiliğinden devam etti. (1) Her hareket taze onaydan geçmeli: HOLD süresince konum ve
+koşullar değişir, eski onay bayatlar; Faz 4'ün tutarlılık kuralı (CONSISTENCY) ajanın güncel
+konum inancıyla yeniden sınanmalı. (2) Reset "komut kabul et" demektir, "kalk git" değil; araç
+kendiliğinden kalkmamalı. (3) RECOVERY zaten Nav2'nin hedefini değiştiriyor; HOLD'da iptal aynı
+mantık. (4) Deney bölümleri HOLD'da temiz biter. Bedel: ajan reset sonrası hedefi yeniden verir.
+RULES §5 uygulamayla birlikte güncellenecek.
