@@ -4,7 +4,7 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-10-08
-**Bulunduğumuz faz:** Faz 3. 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor. Açık: yerel costmap donması, AMCL kaybı (aşağıda)
+**Bulunduğumuz faz:** Faz 3. 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor. Açık: AMCL kaybı (aşağıda)
 
 ---
 
@@ -56,10 +56,11 @@ incelendi ve `main`'e birleştirildi (fast-forward, push edilmedi). Karta hiçbi
      HOLD'da Nav2'nin hızları araca sıfır olarak gitti; reset → NORMAL, `VELOCITY_CMD` +705 =
      `DRIVE` +705, araç hedefi tamamladı.
    **Açık sorunlar (adım 6'da görüldü):**
-   - **Yerel costmap lidarsız da dondu:** `/local_costmap/costmap` 8 s'de 0 mesaj, genel costmap
-     güncel; denetleyici aracı eski yerinde sanıp "collision ahead" → "patience exceeded".
-     K-038'in "lidar katmanı yokken donmuyor" sonucu yanlış ya da eksik; tetikleyici bilinmiyor.
-     Belirti: `ros2 topic hz /local_costmap/costmap` boş. Geçici çare: Nav2'yi yeniden başlat.
+   - ~~Yerel costmap lidarsız da dondu~~ **YANLIŞ TEŞHİS (düzeltildi aynı gün):** `/local_costmap/costmap`
+     8 s'de 0 mesajdı, ama yerel costmap'te `always_send_full_costmap: false`: tam harita yalnız
+     boyut/orijin değişince gider, gerisi `/local_costmap/costmap_updates`'e (1,67 Hz, canlı).
+     Okunan "99" değerleri bekleyen eski tam haritadandı. Ders: bir konunun susması donma değildir,
+     önce yayın biçimine bak. "Collision ahead" büyük olasılıkla AMCL kaybından (aşağıda). K-038 geçerli.
    - **AMCL ~14 m kayboldu, araç personel yasak bölgesine girdi:** Gazebo (3,52, −5,95), AMCL
      (12,64, 5,29). Kart konumu AMCL'den aldığı için (K-040 karar 4) fark edemedi. Tez için
      bilinen sınır: kartın konuma dayanan kuralları konum kaynağı kadar güvenilir. Nasıl girdiği
