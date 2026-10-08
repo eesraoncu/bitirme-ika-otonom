@@ -9,7 +9,10 @@ Hedef: RViz'de "2D Goal Pose". Ayarlar config/nav2_params.yaml'da.
 - konum: map_server (ika_saha.pgm), amcl, filter_mask_server (keepout maskesi;
   costmap'lerde şişirmeden önce bir katman olarak okunur)
 - gezinme: planner_server, controller_server, behavior_server, bt_navigator
-Hız komutu doğrudan /cmd_vel'e gider; kartın araya girmesi 3.3'te (K-031).
+Nav2 karttan geçmeden süremez (K-040 karar 1): bt_navigator RViz'in /goal_pose'unu
+dinlemez, hedefi köprü kartın onayıyla NavigateToPose olarak verir; hız komutları
+/cmd_vel yerine /cmd_vel_nav'a gider, /cmd_vel'e yalnız köprünün araç tarafı yazar.
+Köprüyü ayrıca başlatın: ros2_ws/src/guard_bridge/launch/bridge.launch.py
 """
 from pathlib import Path
 
@@ -25,10 +28,18 @@ LOCALIZATION = ['map_server', 'amcl', 'filter_mask_server']
 NAVIGATION = ['planner_server', 'controller_server', 'behavior_server', 'bt_navigator']
 
 
+# K-040 karar 1: Nav2'nin karta uğramadan kullanabileceği yol kalmasın
+TO_GUARD = {
+    'bt_navigator': [('goal_pose', '/goal_pose_unused')],
+    'controller_server': [('cmd_vel', '/cmd_vel_nav')],
+    'behavior_server': [('cmd_vel', '/cmd_vel_nav')],
+}
+
+
 def nav2_node(package, executable, name, extra=None):
     params = [PARAMS] + ([extra] if extra else [])
     return Node(package=package, executable=executable, name=name,
-                output='screen', parameters=params)
+                output='screen', parameters=params, remappings=TO_GUARD.get(name, []))
 
 
 def lifecycle_manager(name, nodes):

@@ -123,7 +123,7 @@ planner_server:                    # global plan: haritada hedefe en ucuz yol
       use_astar: false
       allow_unknown: true          # haritada görülmemiş (gri) iç köşeler geçilebilir
 
-controller_server:                 # yolu izleyen hız komutları → /cmd_vel
+controller_server:                 # yolu izleyen hız komutları → /cmd_vel_nav → kart
   ros__parameters:
     use_sim_time: true
     controller_frequency: 20.0     # RULES §3.2 Nav2'nin 20 Hz olduğuna dayanır
