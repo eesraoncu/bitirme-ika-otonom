@@ -5,7 +5,7 @@
 > Kararların gerekçe geçmişi: `docs/DECISIONS.md` K-010 … K-014. Protokol: `docs/protocol.md`.
 > Tüm değerler onaylandı (2026-09-24).
 
-**Son güncelleme:** 2026-09-24
+**Son güncelleme:** 2026-10-08 (§1 İKA'ya göre yeniden kuruldu, K-039)
 
 ---
 
@@ -13,12 +13,12 @@
 
 Bekçinin limiti **Nav2'nin kendi ayarının üstünde, platformun tavanının altında** durur (K-012).
 
-| | Nav2 (TB4 varsayılanı) | **Bekçi** | Platform (Create 3) |
+| | Nav2 (`ika_nav`) | **Bekçi** | İKA tavanı |
 |---|---|---|---|
-| Doğrusal hız | 0,26 m/s | **0,30 m/s** | 0,31 (güvenlik açık) · 0,46 (tavan) |
-| Açısal hız | 1,0 rad/s | **1,2 rad/s** | 1,9 rad/s |
-| Doğrusal ivme | 2,5 m/s² | **3,0 m/s²** | bilinmiyor |
-| Açısal ivme | 3,2 rad/s² | **3,8 rad/s²** | bilinmiyor |
+| Doğrusal hız | 0,5 m/s | **0,6 m/s** | 3,6 m/s (13 km/h) |
+| Açısal hız | 0,5 rad/s | **0,6 rad/s** | ~7 rad/s (hesap) |
+| Doğrusal ivme | sınır yok | **ölçülecek** | bilinmiyor |
+| Açısal ivme | 1,0 rad/s² | **1,2 rad/s²** | bilinmiyor |
 
 - **Nav2'nin üstünde, çünkü** normal çalışmada Nav2'nin ürettiği komutların hiçbiri
   kırpılmamalı. Aksi hâlde her komut "ihlal" sayılır ve yanlış alarm oranı (S1'in ikinci
@@ -26,13 +26,25 @@ Bekçinin limiti **Nav2'nin kendi ayarının üstünde, platformun tavanının a
 - **Platformun altında, çünkü** platform tavanında duran bir limit hiç tetiklenmez.
   Araç o hızı fiziksel olarak aşamaz. "Sınırları zorlayan talimatlar" senaryosunun
   (Faz 5) veri üretebilmesi için bekçinin bir yerde *hayır* diyebilmesi gerekir.
-- İvme değerleri aynı ilkeyle, Nav2 değerlerinin ~%20 üstüne konmuştur (hızlarda oran
-  0,30/0,26 ≈ 1,15 ve 1,2/1,0 = 1,2).
+- Bekçi değerleri Nav2'nin **1,2 katı**. İKA tavanın çok altında: araç 3,6 m/s
+  gidebilir, bekçi saha güvenliği için 0,6'da keser.
+- **Doğrusal ivme ölçülecek:** Nav2'nin denetleyicisinde (Regulated Pure Pursuit) doğrusal
+  ivme sınırı yok, hız yumuşatıcı da kullanılmıyor. Faz 4'ten önce bir denemede Nav2'nin
+  `/cmd_vel` çıktısı kaydedilir, en yüksek ivmenin 1,2 katı bekçinin sınırı olur.
+- **Açısal hız da aynı kayıtta doğrulanacak:** Nav2'nin 0,5 rad/s'si yalnız yerinde dönüş
+  ve kurtarma hareketlerinin sınırı. Yol takibinde Pure Pursuit `ω = v × eğrilik` üretir ve
+  bunu sınırlamaz; dar virajda 0,6'yı aşabilir. Aşıyorsa sınır Faz 4'ten önce güncellenir.
 
-**Kaynaklar:** Nav2 değerleri `turtlebot4/turtlebot4_navigation/config/nav2.yaml`
-(humble dalı; DWB denetleyici, 20 Hz, velocity_smoother 20 Hz), 2026-09-24'te okundu.
-Platform değerleri TurtleBot 4 kullanım kılavuzu (Create 3 tabanı).
-**K-008 (Gazebo kararı) TurtleBot 4 dışında bir modele giderse bu tablo yeniden kurulur.**
+**Kaynaklar:**
+- Nav2: `ros2_ws/src/ika_nav/config/nav2_params.yaml` (`desired_linear_vel`,
+  `rotate_to_heading_angular_vel`, behavior `max_rotational_vel`, `max_angular_accel`).
+- İKA doğrusal tavanı: Orinium UGV ÇGM, TEKNOFEST 2026 Kritik Tasarım Raporu, §3.1.4
+  Tablo-3 "Maksimum Hız 13 km/h". Aynı raporun Şekil 11'inde 15 km/h (düz yol) ve 30 km/h
+  da geçiyor; resmî özellik tablosu esas alındı. Sağlama: 2850 rpm, 12:1 redüksiyonla
+  13 km/h için ~29 cm palet dişlisi gerekir; makul.
+- İKA açısal tavanı: diferansiyel sürüşte ω = 2·v / iz. İz = 1200 − 180 mm (genişlik −
+  palet eni) ≈ 1,02 m (modelde 1,026). 2 × 3,6 / 1,02 ≈ 7 rad/s. Teorik üst sınır; paletin
+  yanal kayması gerçek değeri düşürür.
 
 ---
 
@@ -45,8 +57,8 @@ Platform değerleri TurtleBot 4 kullanım kılavuzu (Create 3 tabanı).
 |---|---|---|---|---|---|
 | Coğrafi sınır: hedef | `GEOFENCE` | görev (`git`) | izinli çokgen içinde, yasak çokgenlerin dışında | **Ret** | reddedilen hedef, en yakın kayıtlı güvenli nokta |
 | Coğrafi sınır: araç konumu | `GEOFENCE` | telemetri | aynı | **Kurtarma** (§5) | — |
-| Fiziksel limit: görev | `LIMIT` | görev (`hiz_siniri`) | 0 < değer ≤ 0,30 m/s | **Ret** | istenen değer, izinli aralık |
-| Fiziksel limit: hız | `LIMIT` | hız | \|v\| ≤ 0,30 · \|ω\| ≤ 1,2 · Δv, Δω sınırlı (§3.2) | **Kırp** | — (kayda geçer) |
+| Fiziksel limit: görev | `LIMIT` | görev (`hiz_siniri`) | 0 < değer ≤ 0,60 m/s | **Ret** | istenen değer, izinli aralık |
+| Fiziksel limit: hız | `LIMIT` | hız | \|v\| ≤ 0,60 · \|ω\| ≤ 0,6 · Δv, Δω sınırlı (§3.2) | **Kırp** | — (kayda geçer) |
 | Tazelik | `FRESHNESS` | her ikisi | **−50 ms ≤ yaş ≤ 200 ms** | **Ret** | komut yaşı, izinli aralık |
 | Kimlik | `AUTH` | her ikisi | HMAC etiketi doğru | **Sessiz ret** | gönderilmez, `STATUS` sayacı |
 | Tekrar | `REPLAY` | her ikisi | sayaç > son kabul edilen | **Sessiz ret** | gönderilmez, `STATUS` sayacı |
@@ -96,16 +108,16 @@ yönü boğmak için kullanılabilir hâle getirir (`docs/protocol.md` §4.7).
 
 ```
 v'  = clamp(v,  v_önceki − Δv_max,  v_önceki + Δv_max)
-v'' = clamp(v', −0,30,  +0,30)
-(açısal için aynısı: Δω_max ve ±1,2)
+v'' = clamp(v', −0,60,  +0,60)
+(açısal için aynısı: Δω_max ve ±0,6)
 ```
 
 - `v_önceki` = **son gönderilen (kırpılmış) komut**, son *alınan* değil. Aracın gerçekte
   ne duyduğuyla kıyaslanmalı. `BEKLE`'den çıkışta 0 kabul edilir.
 - **İvme, bölme yapmadan, komut başına hız farkı olarak denetlenir**:
-  `Δv_max = a_max × T = 3,0 × 0,05 = 0,15 m/s` ·
-  `Δω_max = 3,8 × 0,05 = 0,19 rad/s`, burada `T = 50 ms` Nav2'nin 20 Hz'lik periyodu.
-  Karşılaştırma için Nav2'nin kendi basamağı 0,125 m/s ve 0,16 rad/s.
+  `Δv_max = a_max × T` (a_max ölçülecek, §1) ·
+  `Δω_max = 1,2 × 0,05 = 0,06 rad/s`, burada `T = 50 ms` Nav2'nin 20 Hz'lik periyodu.
+  Karşılaştırma için Nav2'nin kendi açısal basamağı 1,0 × 0,05 = 0,05 rad/s.
 - **Neden ölçülen Δt değil sabit T:** gerçek varış aralıkları titrer. 50 ms yerine
   30 ms sonra gelen bir komut, ivmeyi olduğundan yüksek gösterir ve haksız kırpmaya
   yol açar. Sabit T bölme gerektirmez, titremeden etkilenmez ve süresi sabittir.
@@ -132,14 +144,14 @@ damgasını** taşır. Kart bunu en son telemetriyle kıyaslar:
 ```
 tol(Δt) = d₀ + v_max × Δt
 d₀    = 0,25 m   (konum gürültüsü payı)
-v_max = 0,30 m/s (bekçinin kendi hız limiti)
+v_max = 0,60 m/s (bekçinin kendi hız limiti)
 Δt    = şimdi − ajanın konumu okuduğu an,  Δt ≤ 10 s
 ```
 
 - **Tolerans neden sabit değil:** LLM, özellikle CPU'da çalışırsa, konumu okuduktan
   sonra saniyelerce düşünebilir. O sırada araç hareket eder. 0,5 m gibi sabit ve dar
   bir tolerans dürüst komutları da reddeder (yanlış alarm).
-- **Formül neden güvenilir:** bekçi hızı zaten 0,30 m/s'de kestiği için araç Δt sürede
+- **Formül neden güvenilir:** bekçi hızı zaten 0,60 m/s'de kestiği için araç Δt sürede
   en fazla `v_max × Δt` yol alabilir. Tolerans fiziksel bir üst sınırdan türetiliyor,
   tahmine dayanmıyor.
 - **Konum bilgisi 10 s'den eskiyse** komut `CONSISTENCY` ile reddedilir ve gerekçede
@@ -168,7 +180,7 @@ v_max = 0,30 m/s (bekçinin kendi hız limiti)
 - Gönderen: **köprü** (`guard_bridge`), LLM değil. LLM saniyelerce düşünebilir, onun
   sessizliği bağlantı kopması sayılmamalı.
 - Periyot **100 ms**, zaman aşımı **500 ms**. Art arda 4 kayba tolerans tanır.
-- 0,30 m/s'de 500 ms, durma kararından önce en fazla **15 cm** yol demek.
+- 0,60 m/s'de 500 ms, durma kararından önce en fazla **30 cm** yol demek.
 - Ölçüm kartta bir donanım zamanlayıcısıyla yapılır, yazılım döngüsüne bağlı değildir.
 
 ### 3.6 Kimlik ve tekrar

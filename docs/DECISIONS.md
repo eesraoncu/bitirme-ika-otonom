@@ -918,7 +918,7 @@ yalnızca lidarla bulunur, kamera gezinmede kullanılmaz.
 - Haritanın 2°'lik dönmesi uzak uçta Nav2'nin konumunu gerçekten ~1,4 m ayırıyor (deneme 2).
 
 ## K-039 · Hız ve ivme limitleri İKA'ya göre yeniden kurulacak (RULES §1)
-**Tarih:** 2026-10-08 · **Durum:** Yürürlükte (değerler bekliyor)
+**Tarih:** 2026-10-08 · **Durum:** Yürürlükte (doğrusal ivme ölçülecek)
 
 RULES §1'deki tablo TurtleBot 4 / Create 3'e göre yazılmıştı; araç artık İKA (K-034) ve
 Nav2'ye 0,5 m/s verildi, bekçi 0,30 m/s'de kaldı (sıralama ters). Karar: Nav2 indirilmez,
@@ -929,6 +929,13 @@ zaman yazılır.
 **Neden:** Nav2'yi indirmek çelişkiyi kapatır ama tablo var olmayan bir aracı anlatmaya devam
 ederdi; tezde sınırların gerekçesi bugünkü araca dayanmalı. Bedel: RULES, kart sabitleri,
 testler değişir, karta yeniden yükleme gerekir.
+
+**Değerler (2026-10-08, RULES §1):** bekçi 0,6 m/s · 0,6 rad/s · 1,2 rad/s² (Nav2'nin 1,2
+katı); İKA tavanı 3,6 m/s (KTR Tablo-3, 13 km/h) · ~7 rad/s (ω = 2v / 1,02 m). Doğrusal ivme:
+Nav2'de sınır olmadığı için Faz 4'ten önce `/cmd_vel` kaydından ölçülecek. KTR'de 15 ve
+30 km/h de geçiyor; resmî tablo esas alındı. **Düzeltme:** kartta henüz limit sabiti yok
+(kırpma Faz 4'te), bu adımda karta yükleme gerekmedi. Bağlı sonuçlar: §3.4 toleransı
+v_max = 0,60 ile, §5'te kalp atışı kaybında en fazla 30 cm.
 
 ## K-040 · 3.3 köprü tasarımı (protocol §10, K-031)
 **Tarih:** 2026-10-08 · **Durum:** Yürürlükte

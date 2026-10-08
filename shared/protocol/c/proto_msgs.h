@@ -438,7 +438,7 @@ static inline bool proto_wait_cmd_decode(const uint8_t *buf, size_t len, proto_w
 }
 
 /* SPEED_LIMIT_CMD  id=0x22  kanal=agent  yön=pc_to_board
- * Ajan: hiz_siniri(değer). Denetim: LIMIT (0 < değer ≤ 300), CONSISTENCY.
+ * Ajan: hiz_siniri(değer). Denetim: LIMIT (0 < değer ≤ 600), CONSISTENCY.
  */
 #define PROTO_ID_SPEED_LIMIT_CMD    0x22u
 #define PROTO_SIZE_SPEED_LIMIT_CMD  10u

@@ -318,7 +318,7 @@ class WaitCmd:
 
 @dataclass(frozen=True)
 class SpeedLimitCmd:
-    """SPEED_LIMIT_CMD: Ajan: hiz_siniri(değer). Denetim: LIMIT (0 < değer ≤ 300), CONSISTENCY."""
+    """SPEED_LIMIT_CMD: Ajan: hiz_siniri(değer). Denetim: LIMIT (0 < değer ≤ 600), CONSISTENCY."""
 
     ID: ClassVar[int] = 0x22
     NAME: ClassVar[str] = "SPEED_LIMIT_CMD"

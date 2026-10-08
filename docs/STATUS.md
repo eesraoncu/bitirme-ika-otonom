@@ -14,10 +14,10 @@
 incelendi ve `main`'e birleştirildi (fast-forward, push edilmedi). Karta hiçbir şey yüklenmedi.
 
 **Sırada:**
-1. **İKA tavanını bul (K-039):** modelin gerçek doğrusal/açısal hız ve ivme sınırları; sonra
-   RULES §1 tablosu Nav2 < bekçi < tavan ilkesiyle yeniden yazılır, kart sabitleri ve testler
-   güncellenir.
-2. **Karta yükleme (Esra'nın onayı):** yeni `site_data.c` + `guard_velocity` (ve K-039 sabitleri);
+1. ~~İKA tavanını bul (K-039)~~ **bitti (2026-10-08):** RULES §1 yeniden kuruldu (bekçi
+   0,6 m/s · 0,6 rad/s; tavan 3,6 m/s, KTR'den). Açık kalan: bekçinin doğrusal ivmesi,
+   Faz 4'ten önce Nav2'nin `/cmd_vel` kaydından ölçülecek.
+2. **Karta yükleme (Esra'nın onayı):** yeni `site_data.c` + `guard_velocity`;
    sonra `python3 tools/decision_test.py` ve `tools/link_test.py`.
 3. **3.3 köprü (K-040) kodlama planı:** Nav2 konularının yeniden adlandırılması, `Link`'in
    `ika_protocol/link.py`'ye taşınması, `agent_bridge` ve `vehicle_bridge`. Doğrulama: PC'de

@@ -100,14 +100,14 @@ Hattaki tüm sayılar **little-endian tamsayıdır** (Cortex-M4 ve x86'nın doğ
 | Açısal hız | mrad/s | int16 | ±32,767 rad/s | 0,001 rad/s |
 | Zaman | ms | uint32 | 49,7 gün, sonra taşar | 1 ms |
 
-**En önemli gerekçe güvenlik:** kayan noktada `NaN` vardır ve `NaN > 0,30` **yanlış** döner.
-`v = NaN` taşıyan bir hız komutu, "0,30'dan büyük mü?" denetiminden sessizce geçer. Tamsayıda
+**En önemli gerekçe güvenlik:** kayan noktada `NaN` vardır ve `NaN > 0,60` **yanlış** döner.
+`v = NaN` taşıyan bir hız komutu, "0,60'tan büyük mü?" denetiminden sessizce geçer. Tamsayıda
 böyle bir değer yoktur.
 
 Diğer gerekçeler: bayt düzeni tanımsızlığı yok, karşılaştırmalar belirlenimci, CAN'in
 8 baytına sığıyor (`GOAL`: x, y, yön, kaynak = 7 bayt).
 
-Aralıklar gereğin çok üstünde. Bekçinin 300 mm/s limiti int16'nın %1'i bile değil.
+Aralıklar gereğin çok üstünde. Bekçinin 600 mm/s limiti int16'nın %2'si bile değil.
 Simülasyon ortamı da ±327 m'nin çok içinde.
 
 ---
@@ -387,7 +387,7 @@ Planın istediği üç şey, "hangi kural, neden, izinli değer aralığı", şu
 | `FROM_FUTURE` | yaş (ms, negatif) | −50 / — | — |
 | `IN_RECOVERY`, `IN_HOLD`, `NOT_IN_HOLD`, `NO_HEARTBEAT` | — | — | — |
 | `GOAL_OUTSIDE_ALLOWED`, `GOAL_IN_FORBIDDEN` | — | — | **en yakın kayıtlı güvenli nokta** |
-| `ABOVE_MAX`, `NOT_POSITIVE` | istenen (mm/s) | 1 / 300 | — |
+| `ABOVE_MAX`, `NOT_POSITIVE` | istenen (mm/s) | 1 / 600 | — |
 | `TOO_FAR` | fark (cm) | — / tolerans (cm) | **aracın gerçek konumu** |
 | `BELIEF_TOO_OLD` | Δt (ms) | — / 10000 | — |
 | `BELIEF_FROM_FUTURE` | Δt (ms, negatif) | −50 / — | — |

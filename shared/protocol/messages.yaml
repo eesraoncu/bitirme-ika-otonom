@@ -80,8 +80,8 @@ enums:
       GOAL_OUTSIDE_ALLOWED: 30  # hint = en yakın kayıtlı güvenli nokta
       GOAL_IN_FORBIDDEN: 31     # hint = en yakın kayıtlı güvenli nokta
       # LIMIT
-      ABOVE_MAX: 40           # value = istenen (mm/s), lo = 1, hi = 300
-      NOT_POSITIVE: 41        # value = istenen (mm/s), lo = 1, hi = 300
+      ABOVE_MAX: 40           # value = istenen (mm/s), lo = 1, hi = 600
+      NOT_POSITIVE: 41        # value = istenen (mm/s), lo = 1, hi = 600
       # CONSISTENCY
       TOO_FAR: 50             # value = fark (cm), hi = tolerans (cm), hint = telemetri konumu
       BELIEF_TOO_OLD: 51      # value = Δt (ms), hi = 10000
@@ -215,7 +215,7 @@ messages:
     id: 0x22
     channel: agent
     dir: pc_to_board
-    doc: "Ajan: hiz_siniri(değer). Denetim: LIMIT (0 < değer ≤ 300), CONSISTENCY."
+    doc: "Ajan: hiz_siniri(değer). Denetim: LIMIT (0 < değer ≤ 600), CONSISTENCY."
     fields:
       - {name: limit_mm_s, type: u16, unit: mm/s}
       - {group: belief}
