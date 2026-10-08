@@ -4,7 +4,7 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-10-08
-**Bulunduğumuz faz:** Faz 3. 3.0 kurulum, saha (K-032), 3.1 harita (K-036), 3.2a saha tanımı (K-037), 3.2b Nav2 deneme 1–3 (K-038) bitti. 3.2c ve 3.3 kart tarafı yazıldı, karta yükleme bekliyor. Hız limitleri İKA'ya göre yeniden kurulacak (K-039), köprü tasarımı onaylandı (K-040)
+**Bulunduğumuz faz:** Faz 3. 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor. Açık: yerel costmap donması, AMCL kaybı (aşağıda)
 
 ---
 
@@ -40,7 +40,36 @@ incelendi ve `main`'e birleştirildi (fast-forward, push edilmedi). Karta hiçbi
    ACCEPTED ve GOAL araç köprüsüne ulaştı; kazı → GEOFENCE / GOAL_IN_FORBIDDEN, ipucu (8, 2) m
    `/guard/verdict`'te; `odom` çerçeveli hedef gönderilmedi; `/cmd_vel_nav` 0,25 → `/cmd_vel`
    0,25; ajan köprüsü durunca kart HOLD, `/cmd_vel`'e 20 Hz sıfır.
-   Kalan adımlar: 5 Nav2 yeniden adlandırma + launch, 6 uçtan uca test.
+   **Adım 5 bitti:** `navigation.launch.py`'de `TO_GUARD` (bt_navigator `goal_pose` →
+   `/goal_pose_unused`; controller ve behavior `cmd_vel` → `/cmd_vel_nav`), `bridge.launch.py`.
+   Doğrulandı: `/cmd_vel`'e yazan tek düğüm `vehicle_bridge`; `/goal_pose`'u yalnız köprü dinliyor.
+   **Adım 6 bitti (Esra'yla, 2026-10-08), Faz 3.3 BİTTİ:**
+   - RViz hedefi → kart → CAN → Nav2: izinli hedefler ACCEPTED ve `GOAL` sayacı yalnız onlarda arttı.
+   - Kazı/personel hedefi (6,22, −6,97) → REJECTED · GEOFENCE · GOAL_IN_FORBIDDEN, ipucu (8, 2) m;
+     Nav2'ye ulaşmadı, yeni hareket başlamadı (deneme 3'te Nav2 tek başına 0,4 m oynatmıştı).
+   - Her hız komutu karttan geçti: 10 s'de `VELOCITY_CMD` +82 = `DRIVE` +82; PC'de bozuk çerçeve 0.
+   - ST-LINK kablosu çekildi (kart ST-LINK'ten beslendiği için kapandı): bekçi köpeği 0,5 s'de
+     durdurdu, Nav2 karta uğramadan aracı oynatamadı ("Failed to make progress").
+   - **Yeniden bağlanma eklendi** (`link.open_link`, `LINK_LOST`, `Heartbeat` port kaybında
+     durur; iki köprü saniyede bir dener, kopukken komutları atar). Denendi: koptu → 0,5 s'de
+     araç durdu → kart yeniden başladı → ~1 s'de iki köprü yeni oturuma bağlandı, kart HOLD;
+     HOLD'da Nav2'nin hızları araca sıfır olarak gitti; reset → NORMAL, `VELOCITY_CMD` +705 =
+     `DRIVE` +705, araç hedefi tamamladı.
+   **Açık sorunlar (adım 6'da görüldü):**
+   - **Yerel costmap lidarsız da dondu:** `/local_costmap/costmap` 8 s'de 0 mesaj, genel costmap
+     güncel; denetleyici aracı eski yerinde sanıp "collision ahead" → "patience exceeded".
+     K-038'in "lidar katmanı yokken donmuyor" sonucu yanlış ya da eksik; tetikleyici bilinmiyor.
+     Belirti: `ros2 topic hz /local_costmap/costmap` boş. Geçici çare: Nav2'yi yeniden başlat.
+   - **AMCL ~14 m kayboldu, araç personel yasak bölgesine girdi:** Gazebo (3,52, −5,95), AMCL
+     (12,64, 5,29). Kart konumu AMCL'den aldığı için (K-040 karar 4) fark edemedi. Tez için
+     bilinen sınır: kartın konuma dayanan kuralları konum kaynağı kadar güvenilir. Nasıl girdiği
+     bilinmiyor; muhtemelen donan yerel costmap ile aynı zincir. Araç `ign service
+     /world/ika_saha/set_pose` ile (0, 0)'a alındı.
+   - **Reset'ten sonra Nav2 eski hedefe devam etti** (yeni hedef verilmeden). Kart o hedefi
+     onaylamıştı, reset insan eylemi; açık değil ama HOLD'da Nav2 hedefinin iptali (HALT) Faz
+     4'te karara bağlanmalı.
+   - Kart E5V'den beslenmediği için uçtan uca "kart açık, yalnız kalp atışı kesildi" denenmedi
+     (`decision_test` bunu sınıyor: 523 ms). `tools/unplug_test.py` başlığında E5V kurulumu var.
    Önceki plan: Nav2 konularının yeniden adlandırılması, `Link`'in
    `ika_protocol/link.py`'ye taşınması, `agent_bridge` ve `vehicle_bridge`. Doğrulama: PC'de
    `Link` ve çeviri birim testleri; uçtan uca (RViz hedefi karttan geçiyor, dışarıdaki hedef

@@ -13,12 +13,17 @@ Karta giden:
 Karttan gelen:
 - VERDICT → /guard/verdict (std_msgs/String, JSON; convert.verdict_text).
 - HEARTBEAT_ACK → kartın durumu, değiştiğinde günlüğe. STATUS → 10 s'de bir günlüğe.
+
+Kablo çekilirse düğüm çökmez: "bağlantı yok" der, saniyede bir yeniden bağlanmayı
+dener; kopukken gelen komutlar atılır. Yeniden bağlanınca kart HOLD'dadır (yeniden
+başladı ya da kalp atışı kesildi, HOLD mandallı): NORMAL'e yine /guard/reset ile.
 """
 from __future__ import annotations
 
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 import rclpy
 from geometry_msgs.msg import PoseStamped, Twist
@@ -33,17 +38,21 @@ sys.path.insert(0, str(HERE.parents[2] / "shared" / "protocol" / "python"))
 
 import convert as cv  # noqa: E402
 from ika_protocol import messages as m  # noqa: E402
-from ika_protocol.link import AGENT_PORT, KEY_FILE, Heartbeat, Link  # noqa: E402
+from ika_protocol.link import AGENT_PORT, KEY_FILE, LINK_LOST, Heartbeat, Link, open_link  # noqa: E402
 
 READ_PERIOD_S = 0.02
 VERDICT_WAIT_S = 0.5
 STATS_PERIOD_S = 10.0
+RECONNECT_PERIOD_S = 1.0
 
 
 class AgentBridge(Node):
-    def __init__(self, link: Link) -> None:
+    def __init__(self, key: bytes) -> None:
         super().__init__("agent_bridge")
-        self.link = link
+        self.key = key
+        self.link: Optional[Link] = None
+        self.hb: Optional[Heartbeat] = None
+        self.dropped = 0              # kopukken atılan komutlar
         self.verdicts = self.create_publisher(String, "/guard/verdict", 10)
         self.create_subscription(PoseStamped, "/goal_pose", self.on_goal_pose, 10)
         self.create_subscription(Twist, "/cmd_vel_nav", self.on_cmd_vel, 10)
@@ -54,6 +63,40 @@ class AgentBridge(Node):
         self.velocity_sent = 0
         self.create_timer(READ_PERIOD_S, self.read)
         self.create_timer(STATS_PERIOD_S, self.stats)
+        self.create_timer(RECONNECT_PERIOD_S, self.reconnect)
+        self.reconnect()
+
+    # -- bağlantı ------------------------------------------------------------
+
+    def reconnect(self) -> None:
+        if self.link is not None:
+            return
+        got = open_link(AGENT_PORT, m.Channel.AGENT, self.key)
+        if got is None:
+            return
+        self.link, hello, how = got
+        self.hb = Heartbeat(self.link)
+        self.hb.start()
+        self.get_logger().info(f"ajan kanalı: oturum 0x{hello.session_id:08X} ({how}), "
+                               f"kart {hello.state.name}")
+
+    def lost(self, why) -> None:
+        self.get_logger().error(f"ajan kanalı koptu ({why}): yeniden bağlanılacak")
+        if self.hb is not None:
+            self.hb.stop()
+        self.link.close()
+        self.link, self.hb, self.state = None, None, None
+
+    def send(self, msg) -> Optional[bytes]:
+        """Gönderir; bağlantı yoksa ya da koparsa None."""
+        if self.link is None:
+            self.dropped += 1
+            return None
+        try:
+            return self.link.send(msg)
+        except LINK_LOST as e:
+            self.lost(e)
+            return None
 
     # -- karta ---------------------------------------------------------------
 
@@ -64,16 +107,23 @@ class AgentBridge(Node):
             return
         p, q = msg.pose.position, msg.pose.orientation
         x, y, yaw = cv.pose_to_cm(p.x, p.y, q.x, q.y, q.z, q.w)
-        seq = Link.wire_seq(self.link.send(m.GotoCmd(x, y, yaw, 0, 0, 0)))
-        self.get_logger().info(f"GOTO_CMD #{seq}: ({x}, {y}) cm, {yaw} mrad")
+        wire = self.send(m.GotoCmd(x, y, yaw, 0, 0, 0))
+        if wire is None:
+            self.get_logger().warn(f"bağlantı yok: hedef ({x}, {y}) cm gönderilmedi")
+            return
+        self.get_logger().info(f"GOTO_CMD #{Link.wire_seq(wire)}: ({x}, {y}) cm, {yaw} mrad")
 
     def on_cmd_vel(self, msg: Twist) -> None:
-        self.link.send(m.VelocityCmd(*cv.twist_to_cmd(msg.linear.x, msg.angular.z)))
-        self.velocity_sent += 1
+        if self.send(m.VelocityCmd(*cv.twist_to_cmd(msg.linear.x, msg.angular.z))) is not None:
+            self.velocity_sent += 1
 
     def on_reset(self, _req, res: Trigger.Response) -> Trigger.Response:
         # Tek iş parçacıklı yürütücü: kararı burada okuruz, okuma zamanlayıcısı beklemez
-        seq = Link.wire_seq(self.link.send(m.ResetCmd()))
+        wire = self.send(m.ResetCmd())
+        if wire is None:
+            res.success, res.message = False, "bağlantı yok"
+            return res
+        seq = Link.wire_seq(wire)
         self.last_verdict = None
         end = time.monotonic() + VERDICT_WAIT_S
         while time.monotonic() < end:
@@ -89,7 +139,17 @@ class AgentBridge(Node):
     # -- karttan -------------------------------------------------------------
 
     def read(self) -> None:
-        for f, cls in self.link.receive(0.005):
+        if self.link is None:
+            return
+        if not self.hb.alive():
+            self.lost(self.hb.error)
+            return
+        try:
+            frames = self.link.receive(0.005)
+        except LINK_LOST as e:
+            self.lost(e)
+            return
+        for f, cls in frames:
             msg = cls.unpack(f.payload)
             if cls is m.Verdict:
                 self.on_verdict(msg)
@@ -115,6 +175,9 @@ class AgentBridge(Node):
             self.get_logger().warn(f"VERDICT {text}")
 
     def stats(self) -> None:
+        if self.link is None:
+            self.get_logger().warn(f"bağlantı yok · atılan komut {self.dropped}")
+            return
         s = self.last_status
         if s is None:
             self.get_logger().warn("STATUS gelmiyor")
@@ -131,22 +194,18 @@ def _verdict_fields(v: m.Verdict):
 
 
 def main() -> int:
-    key = KEY_FILE.read_bytes()
-    link = Link(AGENT_PORT, m.Channel.AGENT, key, strict=False)
-    hello, how = link.connect()
-    hb = Heartbeat(link)
-    hb.start()
     # ROS Ctrl-C'de bağlamı kendisi kapatmasın: kalp atışı düzgün durdurulsun
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
-    node = AgentBridge(link)
-    node.get_logger().info(f"ajan kanalı: oturum 0x{hello.session_id:08X} ({how}), "
-                           f"kart {hello.state.name}")
+    node = AgentBridge(KEY_FILE.read_bytes())
+    if node.link is None:
+        node.get_logger().warn("ajan kanalı açılamadı: bekleniyor")
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     finally:
-        hb.stop()   # kart 500 ms içinde HOLD'a geçer
+        if node.hb is not None:
+            node.hb.stop()   # kart 500 ms içinde HOLD'a geçer
         node.destroy_node()
         rclpy.try_shutdown()
     return 0

@@ -14,11 +14,15 @@ Karta giden:
 Bekçi köpeği: DRIVE 0,5 s gelmezse ya da düğüm kapanırken /cmd_vel'e sıfır hız
 yazılır. Gazebo'nun DiffDrive'ı son hızı süresiz uygular; kablo çıkarsa araç
 son komutla gitmeye devam ederdi. Gerçek araçta bunu STM32 yapar (KTR §5).
+
+Kablo çekilirse düğüm çökmez: saniyede bir yeniden bağlanmayı dener; bu sırada
+DRIVE gelmediği için bekçi köpeği aracı durdurur.
 """
 from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Optional
 
 import rclpy
 from geometry_msgs.msg import PoseStamped, Twist
@@ -35,18 +39,20 @@ sys.path.insert(0, str(HERE.parents[2] / "shared" / "protocol" / "python"))
 
 import convert as cv  # noqa: E402
 from ika_protocol import messages as m  # noqa: E402
-from ika_protocol.link import KEY_FILE, VEHICLE_PORT, Link  # noqa: E402
+from ika_protocol.link import KEY_FILE, LINK_LOST, VEHICLE_PORT, Link, open_link  # noqa: E402
 
 TELEMETRY_PERIOD_S = 0.05     # 20 Hz (protocol §2)
 READ_PERIOD_S = 0.02          # seri hattı okuma sıklığı
 DRIVE_TIMEOUT_S = 0.5         # bu kadar DRIVE gelmezse sıfır hız
 STATS_PERIOD_S = 10.0
+RECONNECT_PERIOD_S = 1.0
 
 
 class VehicleBridge(Node):
-    def __init__(self, link: Link) -> None:
+    def __init__(self, key: bytes) -> None:
         super().__init__("vehicle_bridge")
-        self.link = link
+        self.key = key
+        self.link: Optional[Link] = None
         self.cmd_vel = self.create_publisher(Twist, "/cmd_vel", 10)
         self.nav = ActionClient(self, NavigateToPose, "navigate_to_pose")
         self.tf = Buffer()
@@ -60,11 +66,37 @@ class VehicleBridge(Node):
         self.create_timer(TELEMETRY_PERIOD_S, self.send_telemetry)
         self.create_timer(0.1, self.watchdog)
         self.create_timer(STATS_PERIOD_S, self.stats)
+        self.create_timer(RECONNECT_PERIOD_S, self.reconnect)
+        self.reconnect()
+
+    # -- bağlantı ------------------------------------------------------------
+
+    def reconnect(self) -> None:
+        if self.link is not None:
+            return
+        got = open_link(VEHICLE_PORT, m.Channel.VEHICLE, self.key)
+        if got is None:
+            return
+        self.link, hello, how = got
+        self.get_logger().info(f"araç kanalı: oturum 0x{hello.session_id:08X} ({how}), "
+                               f"kart {hello.state.name}")
+
+    def lost(self, why) -> None:
+        self.get_logger().error(f"araç kanalı koptu ({why}): yeniden bağlanılacak")
+        self.link.close()
+        self.link = None
 
     # -- karttan -----------------------------------------------------------
 
     def read(self) -> None:
-        for f, cls in self.link.receive(0.005):
+        if self.link is None:
+            return
+        try:
+            frames = self.link.receive(0.005)
+        except LINK_LOST as e:
+            self.lost(e)
+            return
+        for f, cls in frames:
             msg = cls.unpack(f.payload)
             if cls is m.Drive:
                 self.on_drive(msg)
@@ -109,8 +141,14 @@ class VehicleBridge(Node):
             t = self.tf.lookup_transform("map", "base_link", Time())
         except TransformException:
             return    # AMCL henüz konum vermedi
+        if self.link is None:
+            return
         p, q = t.transform.translation, t.transform.rotation
-        self.link.send(m.Telemetry(*cv.pose_to_cm(p.x, p.y, q.x, q.y, q.z, q.w)))
+        try:
+            self.link.send(m.Telemetry(*cv.pose_to_cm(p.x, p.y, q.x, q.y, q.z, q.w)))
+        except LINK_LOST as e:
+            self.lost(e)
+            return
         self.telemetry_sent += 1
 
     # -- güvenlik ve kayıt ---------------------------------------------------
@@ -128,19 +166,17 @@ class VehicleBridge(Node):
             self.get_logger().warn(f"{silent:.1f} s DRIVE yok: araç durduruldu")
 
     def stats(self) -> None:
+        link = "bağlantı yok" if self.link is None else f"bozuk çerçeve {self.link.rx_errors}"
         self.get_logger().info(f"DRIVE {self.drives} · GOAL {self.goals} · "
-                               f"TELEMETRY {self.telemetry_sent} · bozuk çerçeve {self.link.rx_errors}")
+                               f"TELEMETRY {self.telemetry_sent} · {link}")
 
 
 def main() -> int:
-    key = KEY_FILE.read_bytes()
-    link = Link(VEHICLE_PORT, m.Channel.VEHICLE, key, strict=False)
-    hello, how = link.connect()
     # ROS Ctrl-C'de bağlamı kendisi kapatmasın: kapanırken sıfır hız yayımlanabilsin
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
-    node = VehicleBridge(link)
-    node.get_logger().info(f"araç kanalı: oturum 0x{hello.session_id:08X} ({how}), "
-                           f"kart {hello.state.name}")
+    node = VehicleBridge(KEY_FILE.read_bytes())
+    if node.link is None:
+        node.get_logger().warn("araç kanalı açılamadı: bekleniyor")
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

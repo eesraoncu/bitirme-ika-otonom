@@ -7,6 +7,7 @@ Testler (tools/link_test.py, decision_test.py, unplug_test.py) ve köprü
 from __future__ import annotations
 
 import struct
+import termios
 import threading
 import time
 from pathlib import Path
@@ -26,6 +27,9 @@ KEY_FILE = ROOT / "secrets" / "hmac_key.bin"   # depoya girmez (CLAUDE.md)
 HELLO_BROADCAST_WAIT_S = 1.2   # kart oturum kurulana kadar 500 ms'de bir yayınlar
 REPLY_WAIT_S = 0.3             # cevap beklenen ya da beklenmeyen süre
 STATUS_WAIT_S = 2.5            # STATUS saniyede bir
+
+# USB kablosu çekilince seri port bunlardan birini verir (tools/unplug_test.py)
+LINK_LOST = (serial.SerialException, OSError, termios.error)
 
 
 class Link:
@@ -194,6 +198,12 @@ class Link:
         Kalp atışı başka iş parçacığından gittiği için self.seq'e bakılamaz."""
         return int.from_bytes(fr.cobs_decode(wire[:-1])[1:5], "little")
 
+    def close(self) -> None:
+        try:
+            self.ser.close()
+        except LINK_LOST:
+            pass
+
     def status(self) -> m.Status:
         got = self.wait_for(m.Status, STATUS_WAIT_S)
         if got is None:
@@ -215,6 +225,7 @@ class Heartbeat:
         self.running = False
         self.thread = None
         self.last_sent = 0.0
+        self.error: Optional[str] = None
 
     def start(self) -> None:
         self.running = True
@@ -227,8 +238,33 @@ class Heartbeat:
         self.thread.join()
         return self.last_sent
 
+    def alive(self) -> bool:
+        return self.thread is not None and self.thread.is_alive()
+
     def _run(self) -> None:
-        while self.running:
-            self.link.send(m.Heartbeat(int(time.monotonic() * 1000) & 0xFFFFFFFF))
-            self.last_sent = time.monotonic()
-            time.sleep(HEARTBEAT_PERIOD_S)
+        try:
+            while self.running:
+                self.link.send(m.Heartbeat(int(time.monotonic() * 1000) & 0xFFFFFFFF))
+                self.last_sent = time.monotonic()
+                time.sleep(HEARTBEAT_PERIOD_S)
+        except LINK_LOST as e:
+            # Port kayboldu: kalp atışı kesilir, kart 500 ms'de HOLD'a geçer
+            self.error = f"{type(e).__name__}: {e}"
+            self.running = False
+
+
+def open_link(port: str, channel: m.Channel, key: bytes, *, strict: bool = False
+              ) -> Optional[Tuple[Link, m.Hello, str]]:
+    """Port varsa yeni bir Link açar ve oturuma katılır; olmazsa None.
+    Kablo geri takılınca eski Link yeniden açılmaz, yenisi kurulur."""
+    if not Path(port).exists():
+        return None
+    link = None
+    try:
+        link = Link(port, channel, key, strict=strict)
+        hello, how = link.connect()
+        return link, hello, how
+    except LINK_LOST + (RuntimeError, fr.FrameError):
+        if link is not None:
+            link.close()
+        return None
