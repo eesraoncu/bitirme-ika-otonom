@@ -990,3 +990,19 @@ konum inancıyla yeniden sınanmalı. (2) Reset "komut kabul et" demektir, "kalk
 kendiliğinden kalkmamalı. (3) RECOVERY zaten Nav2'nin hedefini değiştiriyor; HOLD'da iptal aynı
 mantık. (4) Deney bölümleri HOLD'da temiz biter. Bedel: ajan reset sonrası hedefi yeniden verir.
 RULES §5 uygulamayla birlikte güncellenecek.
+
+## K-043 · Tek dal (`main`), sürümler etiketle
+**Tarih:** 2026-10-08 · **Durum:** Yürürlükte
+
+Çalışma yalnız `main` dalında ilerler; ara dallar açılmaz. Önemli noktalar açıklamalı git
+etiketiyle işaretlenir, `vMAJOR.MINOR.PATCH`:
+- **MINOR** (`v0.X.0`): bir faz bitti.
+- **PATCH** (`v0.X.Y`): faz içinde, kartta doğrulanmış önemli ara durum.
+- **`v1.0.0`**: tez deneyleri tamamlandı. O zamana kadar `0.x` ("geliştiriliyor").
+Etiket mesajı Türkçe, o sürümde ne bittiğini söyler. `git push origin main --tags`.
+
+Geçmişe uygulanan: `v0.1.0` Faz 1 (`cb268ef`), `v0.2.0` Faz 2 (`9acab12`), `v0.2.1` kablo çekme
+testi (`5586815`), `v0.3.0` Faz 3 (bu maddenin commit'i).
+
+**Neden:** Esra'nın kararı (2026-10-08). Tek dal izlemeyi kolaylaştırır; etiket, tezde ve
+sunumda "şu sonuç şu sürümle alındı" demeyi sağlar.

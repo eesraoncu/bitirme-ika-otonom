@@ -588,7 +588,7 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
 - [ ] **Besleme varsayılana (Esra, donanım):** USB'leri çıkar, JP5'i 5V_STLK'e al, CN7 pin 6'daki
       E5V telini çıkar
 - [x] **Faz 3 öncesi kararlar:** Gazebo Fortress + TurtleBot 4 (K-027), disk engeli kalktı (K-028)
-- [ ] **Faz 3** (plan onaylandı, 2026-10-05):
+- [x] **Faz 3** (plan onaylandı 2026-10-05, bitti 2026-10-08, `v0.3.0`):
   - [x] **3.0 Kurulum** (K-030): `ros-gzharmonic` kaldırıldı, Fortress + TurtleBot 4 simülatörü
         kuruldu, `warehouse` dünyası açılıyor (ilk açılışta bir süre siyah ekran, sonra düzeldi).
         Konular: `/oakd/rgb/preview/image_raw` (320×240), `/oakd/rgb/preview/depth` (32FC1),
@@ -620,7 +620,7 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
           ~2° dönmüş (20 m'de ~0,7 m). "Harita = dünya" (K-032) en çok ~0,8 m hatayla tutuyor.
         - Kaydetme: `map_saver_cli -t /rtabmap/map` (konu `/map` değil).
         - Karar (K-036): harita kabul; 3.2'de yasak bölgelere ve izinli alana ≥ 1 m pay.
-  - [ ] **3.2 Saha tanımı ve Nav2** (K-037). Bitti: RViz "2D Goal Pose" ile araç hedefe gidiyor,
+  - [x] **3.2 Saha tanımı ve Nav2** (K-037, K-038). Bitti: RViz "2D Goal Pose" ile araç hedefe gidiyor,
         maske Nav2'de, kart aynı bölgeleri biliyor
     - [x] a. Saha tek dosyada (2026-10-07): `shared/site/ika_saha.yaml` (gerçek sınırlar, `margin_m`
           1,0, 3 yasak bölge, 5 adlı güvenli nokta) → `tools/gen_site.py` (`--check` var) →
@@ -647,7 +647,7 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
             (bilgisayar saatiyle damgalı; sebep değil ama tutarsızlık).
           Bu sonuca gelene kadar değişenler ve nedenleri: aşağıda "3.2b'de öğrenilenler".
     - [ ] c. Kart: firmware derlenir, `decision_test.py` YAML'dan okur, karta yükleme (onayla)
-  - [ ] **3.3 Köprü (`guard_bridge`):** `docs/protocol.md` §10. `tools/`'taki `Link` mantığı
+  - [x] **3.3 Köprü (`guard_bridge`)** (2026-10-08, K-040, K-041): `docs/protocol.md` §10. `tools/`'taki `Link` mantığı
         kullanılır. Kartta asgari `VELOCITY_CMD` → `DRIVE` aktarması (K-031). Bitti (plan
         belgesi): RViz hedefi karttan geçip araca ulaşıyor, izinli bölge dışındaki hedef
         reddediliyor, kartın kablosu çekilince araç duruyor
