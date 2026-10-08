@@ -916,3 +916,34 @@ yalnızca lidarla bulunur, kamera gezinmede kullanılmaz.
   altındaki katman bozulunca sessizce devre dışı kaldı; kart bu katmandan bağımsız.
 - Araç engellere ve yasak bölgelere en az 0,875 m (iç yarıçap) yaklaşır; dar yerlerde temkinli.
 - Haritanın 2°'lik dönmesi uzak uçta Nav2'nin konumunu gerçekten ~1,4 m ayırıyor (deneme 2).
+
+## K-039 · Hız ve ivme limitleri İKA'ya göre yeniden kurulacak (RULES §1)
+**Tarih:** 2026-10-08 · **Durum:** Yürürlükte (değerler bekliyor)
+
+RULES §1'deki tablo TurtleBot 4 / Create 3'e göre yazılmıştı; araç artık İKA (K-034) ve
+Nav2'ye 0,5 m/s verildi, bekçi 0,30 m/s'de kaldı (sıralama ters). Karar: Nav2 indirilmez,
+**tablo İKA'ya göre yeniden kurulur**. K-012'nin ilkesi aynen geçerli: Nav2 < bekçi < platform
+tavanı. İlk adım İKA modelinin gerçek tavanını bulmak; kesin değerler ve kart sabitleri o
+zaman yazılır.
+
+**Neden:** Nav2'yi indirmek çelişkiyi kapatır ama tablo var olmayan bir aracı anlatmaya devam
+ederdi; tezde sınırların gerekçesi bugünkü araca dayanmalı. Bedel: RULES, kart sabitleri,
+testler değişir, karta yeniden yükleme gerekir.
+
+## K-040 · 3.3 köprü tasarımı (protocol §10, K-031)
+**Tarih:** 2026-10-08 · **Durum:** Yürürlükte
+
+1. **Nav2 karttan kaçamaz:** `bt_navigator` `/goal_pose`'u dinlemez; hedef Nav2'ye yalnız
+   kartın `GOAL`'ı gelince `NavigateToPose` ile verilir. Nav2 hızı `/cmd_vel_nav`'a yayımlar;
+   `/cmd_vel`'e yalnız köprünün araç tarafı (`DRIVE`) yazar.
+2. **İki düğüm:** `agent_bridge` (GOTO_CMD, VELOCITY_CMD, HEARTBEAT, VERDICT → `/guard/verdict`)
+   ve `vehicle_bridge` (GOAL, DRIVE, TELEMETRY 20 Hz).
+3. **`Link` ortak pakette:** `tools/link_test.py`'deki `Link`,
+   `shared/protocol/python/ika_protocol/link.py`'ye taşınır; testler ve köprü aynı kodu kullanır.
+4. **TELEMETRY kaynağı AMCL'nin `map → base_link`'i**, `odom` değil.
+
+**Neden:** (1) Kartı atlayan bir yol açık kalırsa bekçi hiçbir şeyi engelleyemez, tezin ana
+iddiası çöker. (2) Deney yapılandırmalarında (K-005: A–D) yalnız ajan tarafı değişir; araç
+tarafı bir kez yazılıp sabit kalır. (3) Bir kavram tek yerde; testler köprünün gerçek kodunu
+sınar. (4) Saha harita çerçevesinde tanımlı; odometri zamanla kayar. AMCL sıçramalarının
+tutarlılık toleransında (RULES §3.4) kaldığı denemede ölçülecek.
