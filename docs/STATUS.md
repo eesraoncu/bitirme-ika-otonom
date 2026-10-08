@@ -25,9 +25,18 @@ incelendi ve `main`'e birleştirildi (fast-forward, push edilmedi). Karta hiçbi
    `shared/protocol/python/ika_protocol/link.py`'de; testler oradan alıyor. Yeni: `strict=False`
    bozuk çerçeveyi `rx_errors`'a sayıp geçer (köprü için). Kartta `decision_test` 7/7,
    `link_test` 9/10: biri PC tarafında `framing` (COBS) hatasıyla kaldı, tekrarlanmadı.
-   **Açık soru:** aralıklı seri bozulma mı? Köprünün `rx_errors`'ı uçtan uca testte ölçülecek.
-   Kalan adımlar: 2 birim çevirileri, 3 `vehicle_bridge`, 4 `agent_bridge`, 5 Nav2 yeniden
-   adlandırma + launch, 6 uçtan uca test. Önceki plan: Nav2 konularının yeniden adlandırılması, `Link`'in
+   Bir kez daha `Link` açılışında görüldü (ajan kanalı). 70 açılışta tekrarlanmadı.
+   **Tahmin ve düzeltme (kanıtlanmadı):** `Link` oturum kimliğini öğrenmeden atladığı
+   (doğrulanmamış) çerçeveyle de "temiz" sayıyordu; USB'de bekleyen eski baytların ardından
+   gelen bozukluk hata sayılıyordu. Artık yalnız imzası doğrulanmış çerçeve sayılıyor.
+   Sonra `link_test` 5/5, `decision_test` 3/3. **Açık:** tekrar görülürse tahmin yanlış.
+   **Adım 2 bitti:** `guard_bridge/convert.py` + 25 test (kasıtlı 4 hatanın 4'ü yakalandı).
+   **Adım 3 bitti:** `vehicle_bridge.py`, kartla simülasyonsuz: HOLD sıfır hızı `/cmd_vel`'e
+   20,1 Hz; sabit `map → base_link` → TELEMETRY, kartta yaş ≤ 44 ms; tek `DRIVE (0,3)`'ten
+   0,5 s sonra bekçi köpeği sıfırladı (Gazebo DiffDrive son hızı süresiz uygular); 1200 DRIVE'da
+   0 bozuk çerçeve. Denenmedi: GOAL → Nav2 (adım 6).
+   Kalan adımlar: 4 `agent_bridge`, 5 Nav2 yeniden adlandırma + launch, 6 uçtan uca test.
+   Önceki plan: Nav2 konularının yeniden adlandırılması, `Link`'in
    `ika_protocol/link.py`'ye taşınması, `agent_bridge` ve `vehicle_bridge`. Doğrulama: PC'de
    `Link` ve çeviri birim testleri; uçtan uca (RViz hedefi karttan geçiyor, dışarıdaki hedef
    reddediliyor, kablo çekilince araç duruyor) kartla, Esra'yla.
