@@ -21,7 +21,13 @@ incelendi ve `main`'e birleştirildi (fast-forward, push edilmedi). Karta hiçbi
    yazıldı ve doğrulandı. `decision_test` ve `link_test` kartta hepsi geçti. `decision_test`'e
    hız komutu eklendi: NORMAL'de `VELOCITY_CMD (300, 100)` → araca `DRIVE (300, 100)`,
    `VERDICT` yok; HOLD'da araca yalnız sıfır hız (10 `DRIVE`, hepsi 0).
-3. **3.3 köprü (K-040) kodlama planı:** Nav2 konularının yeniden adlandırılması, `Link`'in
+3. **3.3 köprü (K-040), adım 1 bitti (2026-10-08):** `Link` ve `Heartbeat`
+   `shared/protocol/python/ika_protocol/link.py`'de; testler oradan alıyor. Yeni: `strict=False`
+   bozuk çerçeveyi `rx_errors`'a sayıp geçer (köprü için). Kartta `decision_test` 7/7,
+   `link_test` 9/10: biri PC tarafında `framing` (COBS) hatasıyla kaldı, tekrarlanmadı.
+   **Açık soru:** aralıklı seri bozulma mı? Köprünün `rx_errors`'ı uçtan uca testte ölçülecek.
+   Kalan adımlar: 2 birim çevirileri, 3 `vehicle_bridge`, 4 `agent_bridge`, 5 Nav2 yeniden
+   adlandırma + launch, 6 uçtan uca test. Önceki plan: Nav2 konularının yeniden adlandırılması, `Link`'in
    `ika_protocol/link.py`'ye taşınması, `agent_bridge` ve `vehicle_bridge`. Doğrulama: PC'de
    `Link` ve çeviri birim testleri; uçtan uca (RViz hedefi karttan geçiyor, dışarıdaki hedef
    reddediliyor, kablo çekilince araç duruyor) kartla, Esra'yla.

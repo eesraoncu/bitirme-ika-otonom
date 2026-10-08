@@ -19,7 +19,6 @@ alır: telemetri yaşının düşmesi ters yöndeki CAN yolunu da gösterir.
 from __future__ import annotations
 
 import sys
-import threading
 import time
 from pathlib import Path
 
@@ -27,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from link_test import (AGENT_PORT, KEY_FILE, ROOT, VEHICLE_PORT, Link, Report,   # noqa: E402
                        fr, m)
+from ika_protocol.link import HEARTBEAT_PERIOD_S, Heartbeat   # noqa: E402,F401
 import gen_site as gs   # noqa: E402
 
 # Hedefler kartın sahasından (cm). İzinli hedef: konteynerin önü, kuzeye bakarak
@@ -47,34 +47,6 @@ def hint(p):
 
 assert gs.geofence_cm(SITE["allowed"], list(SITE["forbidden"].values()), ALLOWED_GOAL[:2]) == gs.OK
 VERDICT_WAIT_S = 0.5
-HEARTBEAT_PERIOD_S = 0.1
-
-
-class Heartbeat:
-    """Köprünün kalp atışı: 100 ms'de bir, istenince durur."""
-
-    def __init__(self, link: Link) -> None:
-        self.link = link
-        self.running = False
-        self.thread = None
-        self.last_sent = 0.0
-
-    def start(self) -> None:
-        self.running = True
-        self.thread = threading.Thread(target=self._run, daemon=True)
-        self.thread.start()
-
-    def stop(self) -> float:
-        """Durdurur ve son kalp atışının gönderildiği anı döndürür."""
-        self.running = False
-        self.thread.join()
-        return self.last_sent
-
-    def _run(self) -> None:
-        while self.running:
-            self.link.send(m.Heartbeat(int(time.monotonic() * 1000) & 0xFFFFFFFF))
-            self.last_sent = time.monotonic()
-            time.sleep(HEARTBEAT_PERIOD_S)
 
 
 def verdict_for(agent: Link, wire_seq: int):
