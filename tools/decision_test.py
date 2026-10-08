@@ -195,6 +195,14 @@ def run(agent: Link, vehicle: Link, hb: Heartbeat, rep: Report) -> None:
     st = agent.wait_for(m.Status, 2.5, lambda s: s.telemetry_age_ms < 1100)
     rep.check(st is not None, "telemetri yaşı düştü", f"{st[1].telemetry_age_ms} ms" if st else "")
 
+    print("Hız komutu (K-031)")
+    vehicle.receive(0.2)
+    agent.send(m.VelocityCmd(300, 100))
+    got = vehicle.wait_for(m.Drive, 0.5)
+    rep.check(got is not None and (got[1].v_mm_s, got[1].w_mrad_s) == (300, 100),
+              "NORMAL'de VELOCITY_CMD aynen DRIVE olarak araca", str(got[1]) if got else "gelmedi")
+    rep.check(agent.wait_for(m.Verdict, 0.3) is None, "VELOCITY_CMD'ye VERDICT yok")
+
     print("Kalp atışı kesildi")
     vehicle.receive(0.2)   # tampon boşalsın: ilk DRIVE kesintiden sonrakini göstersin
     last = hb.stop()
@@ -206,6 +214,11 @@ def run(agent: Link, vehicle: Link, hb: Heartbeat, rep: Report) -> None:
     rep.check(reaches_state(agent, m.BoardState.HOLD), "kart HOLD'da")
     v = send_cmd(agent, goto(*ALLOWED_GOAL))
     rep.check(v is not None and v.reason == m.Reason.IN_HOLD, "HOLD'da hedef reddedildi")
+    vehicle.receive(0.2)
+    agent.send(m.VelocityCmd(300, 100))
+    drives = [m.Drive.unpack(f.payload) for f, c in vehicle.receive(0.5) if c is m.Drive]
+    rep.check(drives and all((d.v_mm_s, d.w_mrad_s) == (0, 0) for d in drives),
+              "HOLD'da VELOCITY_CMD araca gitmedi, yalnız sıfır hız", f"{len(drives)} DRIVE")
 
     print("Kalp atışı geri geldi")
     hb.start()

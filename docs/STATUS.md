@@ -17,8 +17,10 @@ incelendi ve `main`'e birleştirildi (fast-forward, push edilmedi). Karta hiçbi
 1. ~~İKA tavanını bul (K-039)~~ **bitti (2026-10-08):** RULES §1 yeniden kuruldu (bekçi
    0,6 m/s · 0,6 rad/s; tavan 3,6 m/s, KTR'den). Açık kalan: bekçinin doğrusal ivmesi,
    Faz 4'ten önce Nav2'nin `/cmd_vel` kaydından ölçülecek.
-2. **Karta yükleme (Esra'nın onayı):** yeni `site_data.c` + `guard_velocity`;
-   sonra `python3 tools/decision_test.py` ve `tools/link_test.py`.
+2. ~~Karta yükleme~~ **bitti (2026-10-08):** `main` (`bb64cd9`) Debug, text 39 724 B, 0 uyarı;
+   yazıldı ve doğrulandı. `decision_test` ve `link_test` kartta hepsi geçti. `decision_test`'e
+   hız komutu eklendi: NORMAL'de `VELOCITY_CMD (300, 100)` → araca `DRIVE (300, 100)`,
+   `VERDICT` yok; HOLD'da araca yalnız sıfır hız (10 `DRIVE`, hepsi 0).
 3. **3.3 köprü (K-040) kodlama planı:** Nav2 konularının yeniden adlandırılması, `Link`'in
    `ika_protocol/link.py`'ye taşınması, `agent_bridge` ve `vehicle_bridge`. Doğrulama: PC'de
    `Link` ve çeviri birim testleri; uçtan uca (RViz hedefi karttan geçiyor, dışarıdaki hedef
