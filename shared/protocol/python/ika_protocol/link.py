@@ -97,8 +97,12 @@ class Link:
                             raise
                         self.rx_errors += 1
                     continue
-                self.clean = True
                 if got is not None:
+                    # "Geçerli" = imzası ve CRC'si doğrulanmış. Oturum kimliği
+                    # öğrenilmeden atlanan çerçeve (None) doğrulanmadı: USB'de
+                    # bekleyen eski baytlar olabilir, ardından gelen bozukluk
+                    # hâlâ açılışın izidir.
+                    self.clean = True
                     self.pending.append(got)
         return self.pending.pop(0) if self.pending else None
 
