@@ -1006,3 +1006,14 @@ testi (`5586815`), `v0.3.0` Faz 3 (bu maddenin commit'i).
 
 **Neden:** Esra'nın kararı (2026-10-08). Tek dal izlemeyi kolaylaştırır; etiket, tezde ve
 sunumda "şu sonuç şu sürümle alındı" demeyi sağlar.
+
+## K-044 · Ajanın yer isimleri `shared/site/ika_saha.yaml`'da
+**Tarih:** 2026-10-13 · **Durum:** Yürürlükte
+
+Plan belgesindeki `llm_agent/places.yaml` ayrı dosya olarak açılmaz. Ajan adlı yerleri
+`ika_saha.yaml`'dan okur; ajan için yeni bir yer gerekirse oraya eklenir (gerekirse ayrı
+bir anahtar altında, kartın güvenli noktalarıyla karışmadan).
+
+**Neden:** Esra'nın kararı (2026-10-13). Adlı noktalar zaten orada; ikinci dosya "bir
+kavram tek klasörde" kuralını bozar ve kartla ajanın aynı adı farklı koordinatla bilmesine
+yol açabilir.

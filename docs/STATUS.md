@@ -3,17 +3,38 @@
 > Bu dosya her çalışma oturumunun **başında okunur**, **sonunda güncellenir**.
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
-**Son güncelleme:** 2026-10-08
-**Bulunduğumuz faz:** Faz 3. 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor. Açık: AMCL kaybı (aşağıda)
+**Son güncelleme:** 2026-10-13
+**Bulunduğumuz faz:** **Faz 4 başladı** (plan onaylandı 2026-10-13, sıra 4.0 → 4.4). Faz 3 bitti (`v0.3.0`): 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor. Açık: AMCL kaybı (aşağıda)
 
 ---
 
 ## Şu an ne yapılıyor
 
+**2026-10-13: Faz 4 planı onaylandı** (Esra'yla). Bitti sayılır (plan belgesi): doğal dille
+verilen görev ("depo arkasına git, orada 30 saniye bekle") baştan sona kart üzerinden çalışıyor;
+hatalı komut reddedilince ajan gerekçeyi kullanıp kendini düzeltiyor. Sıra en belirsiz işten başlar:
+
+**Sırada:**
+1. **4.0 Hazırlık ve model seçimi:** bekçinin doğrusal ivmesi (Nav2 `/cmd_vel` kaydından);
+   NVIDIA sürücüsü (RTX 3050 `lspci`'de görünüyor, `nvidia-smi` yok; `sudo` komutlarını Esra
+   çalıştırır); Ollama; model seçimi (araç çağırma şart, ~4 GB VRAM), sıcaklık sabit ve kayıtlı.
+   Yerel model yetmezse B planı: API.
+2. **4.1 Kart, kalan kurallar** (her biri ayrı adım, kartta sınanır): `LIMIT` (görevde ret, hızda
+   kırpma) · `WAIT_CMD`/`SPEED_LIMIT_CMD`/`STOP_CMD` · `FRESHNESS` (zaman eşitlemesi, protocol §6) ·
+   araç konumunun coğrafi sınırı + `RECOVERY` + ret sayacı (RULES §5) · K-042 kart tarafı (`HALT(0)`) ·
+   `CONSISTENCY` en sonda (takvim kayarsa ilk kısılacak, plan §7).
+3. **4.2 Köprü:** K-042 köprü tarafı (Nav2 hedefini iptal), yeni görev komutlarının çevirisi,
+   ret gerekçesi ajanın konusuna.
+4. **4.3 Ajan (`llm_agent`):** araçlar `git`, `bekle`, `hiz_siniri`, `dur`; yer isimleri
+   `ika_saha.yaml`'dan (K-044); gerekçe ajana geri verilir, görev başına en çok 3 deneme (RULES §5.4).
+5. **4.4 Uçtan uca (Esra'yla)** → `v0.4.0`.
+
+---
+
 **2026-10-08:** `oto/faz3` (deneme 3, 3.2c yüklemesiz, 3.3 kart tarafı `guard_velocity`)
 incelendi ve `main`'e birleştirildi (fast-forward, push edilmedi). Karta hiçbir şey yüklenmedi.
 
-**Sırada:**
+**Faz 3'ün son adımları:**
 1. ~~İKA tavanını bul (K-039)~~ **bitti (2026-10-08):** RULES §1 yeniden kuruldu (bekçi
    0,6 m/s · 0,6 rad/s; tavan 3,6 m/s, KTR'den). Açık kalan: bekçinin doğrusal ivmesi,
    Faz 4'ten önce Nav2'nin `/cmd_vel` kaydından ölçülecek.
@@ -633,7 +654,7 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
           tanklardan). Kart orada ulaşılamaz hedef kabul edebilir, Nav2 reddeder.
           **Uyarı:** `site_data.c` değişti; `tools/decision_test.py` hâlâ eski deneme sahasını
           bekliyor, kartta eski derleme var (3.2c).
-    - [ ] b. Nav2 (2026-10-07, K-038): `ika_nav/config/nav2_params.yaml`,
+    - [x] b. Nav2 (2026-10-07, K-038; deneme 3 ve `use_sim_time` 2026-10-08): `ika_nav/config/nav2_params.yaml`,
           `ika_nav/launch/navigation.launch.py`. AMCL + `ika_saha.pgm`, NavFn, Regulated Pure Pursuit,
           araç izi 1,78 × 1,15 m + 0,3 m pay. Costmap'ler: statik harita + keepout katmanı +
           şişirme (1,5 m); lidar katmanı yok. Ara katman CycloneDDS (`~/.bashrc`).
@@ -646,15 +667,21 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
           - Yapılacak: `ika_sim` başlatma dosyasındaki 4 sabit `tf` yayıncısına `use_sim_time`
             (bilgisayar saatiyle damgalı; sebep değil ama tutarsızlık).
           Bu sonuca gelene kadar değişenler ve nedenleri: aşağıda "3.2b'de öğrenilenler".
-    - [ ] c. Kart: firmware derlenir, `decision_test.py` YAML'dan okur, karta yükleme (onayla)
+    - [x] c. Kart: firmware derlenir, `decision_test.py` YAML'dan okur, karta yükleme (onayla)
+          (2026-10-08, `bb64cd9`, `decision_test` kartta geçti)
   - [x] **3.3 Köprü (`guard_bridge`)** (2026-10-08, K-040, K-041): `docs/protocol.md` §10. `tools/`'taki `Link` mantığı
         kullanılır. Kartta asgari `VELOCITY_CMD` → `DRIVE` aktarması (K-031). Bitti (plan
         belgesi): RViz hedefi karttan geçip araca ulaşıyor, izinli bölge dışındaki hedef
         reddediliyor, kartın kablosu çekilince araç duruyor
-- [ ] Faz 4'e kalanlar (bilerek): FRESHNESS (zaman eşitlemesi), LIMIT, CONSISTENCY,
-      RECOVERY durumu (üst üste 5 içerik reddi), `WAIT_CMD`/`SPEED_LIMIT_CMD`/`STOP_CMD`/
-      `VELOCITY_CMD` kırpma (asgari aktarma Faz 3'te, K-031), araç konumunun coğrafi sınır denetimi
-- [ ] Ollama kurulumu (model seçimi Faz 4'te)
+- [ ] **Faz 4** (plan onaylandı 2026-10-13; ayrıntı yukarıda "Sırada"):
+  - [ ] **4.0 Hazırlık:** bekçi ivmesi ölçümü, NVIDIA sürücüsü, Ollama, model seçimi
+  - [ ] **4.1 Kart, kalan kurallar:** LIMIT ve `VELOCITY_CMD` kırpma (asgari aktarma Faz 3'te,
+        K-031), `WAIT_CMD`/`SPEED_LIMIT_CMD`/`STOP_CMD`, FRESHNESS (zaman eşitlemesi), araç
+        konumunun coğrafi sınır denetimi, RECOVERY (üst üste 5 içerik reddi), K-042 `HALT(0)`,
+        CONSISTENCY
+  - [ ] **4.2 Köprü:** K-042 hedef iptali, görev komutları, gerekçe konusu
+  - [ ] **4.3 Ajan:** araçlar, yer isimleri (K-044), ret döngüsü (≤ 3 deneme)
+  - [ ] **4.4 Uçtan uca** → `v0.4.0`
 
 ## Doğrulanmış testler
 
