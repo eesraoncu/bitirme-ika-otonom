@@ -19,6 +19,29 @@ hatalı komut reddedilince ajan gerekçeyi kullanıp kendini düzeltiyor. Sıra 
    NVIDIA sürücüsü (RTX 3050 `lspci`'de görünüyor, `nvidia-smi` yok; `sudo` komutlarını Esra
    çalıştırır); Ollama; model seçimi (araç çağırma şart, ~4 GB VRAM), sıcaklık sabit ve kayıtlı.
    Yerel model yetmezse B planı: API.
+   **İlerleme (2026-10-13):**
+   - NVIDIA `nvidia-driver-595-open` kuruldu (595.99.02; Secure Boot açık, MOK kaydı yapıldı).
+     `prime-select` on-demand: masaüstü Intel'de, NVIDIA isteyen programda. `nouveau` artık yüklü değil.
+   - Ollama 0.40.3 kuruldu (resmî betik; sürücü önceden kurulu olduğu için CUDA deposu eklenmedi),
+     servis açılışta başlıyor. `inference compute`: `library=CUDA`, **kullanılabilir 3,6 GiB**.
+   - Aday araştırması (Türkçe araç çağırma kıyaslaması yok, kendimiz ölçtük). Elenen: gemma4
+     (en küçüğü 4,3 GB), ministral-3, llama3.2, tev1 (karar modeli), 8B+.
+   - `tools/llm_select_bench.py`: 14 Türkçe cümle (yer adı, koordinat, bekle, hız, dur, bileşik,
+     iki ret-düzeltme), ilk araç çağrısı puanlanır. Sıcaklık 0, seed 42, `num_ctx` 4096, 3 tekrar:
+
+     | Model | Doğru | Hata | Medyan | En uzun | GPU |
+     |---|---|---|---|---|---|
+     | granite4.1:3b | 39/42 | 3 yanlış arg. ("iki dakika" → 2 s) | 0,38 s | 0,64 s | %100 |
+     | qwen3.5:4b | 39/42 | 3 yanlış arg. (coğrafi retten sonra aynı komutu tekrar) | 1,91 s | 4,55 s | %69 |
+     | qwen3.5:2b | 36/42 | 6 çağrı yok (iki retten sonra yalnız metin) | 0,70 s | 1,19 s | %92 |
+     | phi4-mini | 0/42 | 42 çağrı yok (çağrıyı metne yazıyor) | 1,30 s | 6,51 s | %86 |
+
+     İki ret-düzeltme cümlesini yalnız granite doğru yaptı. phi4-mini elendi ve silindi.
+     **Öndeki aday granite4.1:3b, karar verilmedi:** test küçük (14 bağımsız örnek), genişletilecek
+     (Esra'nın kararı). Boş disk 12 GB.
+   - **Açık (karar Esra'nın):** sıcaklık 0 + sabit seed'de tekrarlar birebir aynı cevap verdi; K-015'teki
+     senaryo başına 20 tekrar bu ayarla anlamsız. Faz 5 için sıcaklık > 0 ya da farklı seed gerekli.
+   - Araç tanımları şimdilik betikte taslak; 4.3'te `llm_agent`'a taşınacak, betik oradan okuyacak.
 2. **4.1 Kart, kalan kurallar** (her biri ayrı adım, kartta sınanır): `LIMIT` (görevde ret, hızda
    kırpma) · `WAIT_CMD`/`SPEED_LIMIT_CMD`/`STOP_CMD` · `FRESHNESS` (zaman eşitlemesi, protocol §6) ·
    araç konumunun coğrafi sınırı + `RECOVERY` + ret sayacı (RULES §5) · K-042 kart tarafı (`HALT(0)`) ·
