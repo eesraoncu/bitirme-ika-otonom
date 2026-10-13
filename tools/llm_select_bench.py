@@ -2,13 +2,16 @@
 """Model seçim testi (Faz 4.0): hangi yerel model araçlarımızı Türkçe görevle doğru çağırıyor.
 
 Kullanım (Ollama servisi açık, modeller indirilmiş):
-    python3 tools/llm_select_bench.py                         # varsayılan dört aday
-    python3 tools/llm_select_bench.py qwen3.5:4b --repeat 5   # tek model, 5 tekrar
+    python3 tools/llm_select_bench.py                                  # sıcaklık 0, tek koşu
+    python3 tools/llm_select_bench.py --temperature 0.7 --seeds 5      # kararlılık
+    python3 tools/llm_select_bench.py granite4.1:3b -v                 # tek model, hataları yaz
 
 ROS'a, karta ve simülasyona dokunmaz; yalnız Ollama'nın HTTP arayüzüyle konuşur.
 Her görev cümlesi modele araç tanımlarıyla gönderilir, modelin İLK araç çağrısı
-beklenenle karşılaştırılır. Sıcaklık 0 ve seed sabit: tekrarlar aynı cevabı vermeli,
-süre ortancası tekrarlardan alınır. "GPU payı" /api/ps'ten: modelin VRAM'deki oranı.
+beklenenle karşılaştırılır. Her cümle her seed'le bir kez sorulur (seed 42, 43, …);
+sıcaklık 0'da seed'ler aynı cevabı verir, > 0'da kararlılığı ölçer. Cümleler kategorili
+(yer, koordinat, birim, dur, bileşik, ret); tablo kategori başına doğruyu da verir.
+"GPU payı" /api/ps'ten: modelin VRAM'deki oranı.
 
 Araç tanımları burada TASLAK. 4.3'te ajana (llm_agent) taşınır, bu betik oradan okur.
 """
@@ -27,11 +30,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import gen_site as gs   # noqa: E402
 
 OLLAMA = "http://localhost:11434"
-CANDIDATES = ["qwen3.5:4b", "qwen3.5:2b", "granite4.1:3b", "phi4-mini"]
-OPTIONS = {"temperature": 0, "seed": 42, "num_ctx": 4096}
+CANDIDATES = ["granite4.1:3b", "qwen3.5:4b"]   # elenen ve silinen: phi4-mini, qwen3.5:2b (K-045)
+NUM_CTX = 4096
+FIRST_SEED = 42
 TIMEOUT_S = 300
 
-PLACES = list(gs.load_site()["safe"])   # adlı yerler ika_saha.yaml'dan (K-044)
+SITE = gs.load_site()
+PLACES = list(SITE["safe"])   # adlı yerler ika_saha.yaml'dan (K-044)
 
 SYSTEM = (
     "Sen bir insansız kara aracını (İKA) yöneten görev ajanısın. Kullanıcının Türkçe "
@@ -102,34 +107,72 @@ def _rejected(call, verdict):
     ]
 
 
-# (kimlik, kullanıcı cümlesi, ek geçmiş, beklenen araç, argüman denetimi)
+def wait_s(s):
+    return lambda a: _near(a.get("sure_s"), s)
+
+
+def speed(v):
+    return lambda a: _near(a.get("deger_mps"), v)
+
+
+def geofence_case(cid, text, x, y, reason):
+    """Hedefi reddedilmiş bir 'git'; ipucu kartın hesabıyla (gen_site.nearest_safe) bulunur.
+    Gerekçenin ajana hangi biçimde gideceği 4.2'de kesinleşir; burada ad + koordinat."""
+    safe = SITE["safe"]
+    hint = gs.nearest_safe(list(safe.values()), SITE["home"], (round(x * 100), round(y * 100)))
+    name = next(n for n, p in safe.items() if p == hint)
+    hx, hy = hint[0] / 100, hint[1] / 100
+    verdict = {"karar": "REDDEDILDI", "kural": "GEOFENCE", "neden": reason,
+               "en_yakin_guvenli_nokta": {"ad": name, "x": hx, "y": hy}}
+    return ("ret", cid, text, _rejected(("git", {"x": x, "y": y}), verdict),
+            "git", lambda a: a.get("yer") == name or go_xy(hx, hy)(a))
+
+
+def limit_case(cid, text, v):
+    verdict = {"karar": "REDDEDILDI", "kural": "LIMIT", "neden": "ABOVE_MAX",
+               "istenen_mps": v, "izinli_aralik_mps": [0, 0.6]}
+    return ("ret", cid, text, _rejected(("hiz_siniri", {"deger_mps": v}), verdict),
+            "hiz_siniri", lambda a: 0 < (_num(a.get("deger_mps")) or 0) <= 0.6)
+
+
+# (kategori, kimlik, kullanıcı cümlesi, ek geçmiş, beklenen araç, argüman denetimi)
 CASES = [
-    ("yer_kapi", "Kapı önüne git.", [], "git", go_place("kapi_onu")),
-    ("yer_konteyner", "Konteynerin arkasına git.", [], "git", go_place("konteyner_arkasi")),
-    ("yer_baslangic", "Başlangıç noktasına dön.", [], "git", go_place("baslangic")),
-    ("yer_kuzeybati", "Sahanın kuzeybatısındaki noktaya git.", [], "git", go_place("kuzeybati")),
-    ("koordinat", "(8, 2) noktasına git.", [], "git", go_xy(8, 2)),
-    ("koordinat_ondalik", "x 12,5 y -3 noktasına git.", [], "git", go_xy(12.5, -3)),
-    ("bekle", "Burada 30 saniye bekle.", [], "bekle", lambda a: _near(a.get("sure_s"), 30)),
-    ("bekle_dakika", "İki dakika bekle.", [], "bekle", lambda a: _near(a.get("sure_s"), 120)),
-    ("hiz", "Hızını saniyede 0,3 metreye düşür.", [], "hiz_siniri",
-     lambda a: _near(a.get("deger_mps"), 0.3)),
-    ("hiz_limit_disi", "Hızı 2 m/s yap.", [], "hiz_siniri",
-     lambda a: _near(a.get("deger_mps"), 2.0)),
-    ("dur", "Dur!", [], "dur", lambda a: True),
-    ("bilesik", "Kapı önüne git, orada 30 saniye bekle.", [], "git", go_place("kapi_onu")),
-    ("ret_cografi", "Kazı alanının ortasına, (14, 0) noktasına git.",
-     _rejected(("git", {"x": 14, "y": 0}),
-               {"karar": "REDDEDILDI", "kural": "GEOFENCE", "neden": "GOAL_IN_FORBIDDEN",
-                "en_yakin_guvenli_nokta": "konteyner_onu"}),
-     "git", lambda a: a.get("yer") == "konteyner_onu" or go_xy(8, 2)(a)),
-    ("ret_hiz", "Hızı 2 m/s yap.",
-     _rejected(("hiz_siniri", {"deger_mps": 2.0}),
-               {"karar": "REDDEDILDI", "kural": "LIMIT", "istenen_mps": 2.0,
-                "izinli_aralik_mps": [0, 0.6]}),
-     "hiz_siniri", lambda a: (_num(a.get("deger_mps")) or 0) > 0
-                             and (_num(a.get("deger_mps")) or 0) <= 0.6),
+    ("yer", "kapi_onu", "Kapı önüne git.", [], "git", go_place("kapi_onu")),
+    ("yer", "kapiya", "Kapıya git.", [], "git", go_place("kapi_onu")),
+    ("yer", "konteyner_arka", "Konteynerin arkasına git.", [], "git", go_place("konteyner_arkasi")),
+    ("yer", "konteyner_on", "Konteynerin önüne git.", [], "git", go_place("konteyner_onu")),
+    ("yer", "baslangic", "Başlangıç noktasına dön.", [], "git", go_place("baslangic")),
+    ("yer", "geldigin_yer", "Geldiğin yere geri dön.", [], "git", go_place("baslangic")),
+    ("yer", "kuzeybati", "Sahanın kuzeybatısındaki noktaya git.", [], "git", go_place("kuzeybati")),
+    ("koordinat", "xy", "(8, 2) noktasına git.", [], "git", go_xy(8, 2)),
+    ("koordinat", "ondalik", "x 12,5 y -3 noktasına git.", [], "git", go_xy(12.5, -3)),
+    ("koordinat", "eksi_yazili", "x eksi 1, y 4 noktasına git.", [], "git", go_xy(-1, 4)),
+    ("koordinat", "esittir", "Hedef: x=20, y=-2,5.", [], "git", go_xy(20, -2.5)),
+    ("birim", "bekle_30s", "Burada 30 saniye bekle.", [], "bekle", wait_s(30)),
+    ("birim", "bekle_2dk", "İki dakika bekle.", [], "bekle", wait_s(120)),
+    ("birim", "bekle_yarim", "Yarım dakika bekle.", [], "bekle", wait_s(30)),
+    ("birim", "bekle_1_5dk", "Bir buçuk dakika bekle.", [], "bekle", wait_s(90)),
+    ("birim", "hiz_mps", "Hızını saniyede 0,3 metreye düşür.", [], "hiz_siniri", speed(0.3)),
+    ("birim", "hiz_cm", "Hızı saniyede 30 santimetreyle sınırla.", [], "hiz_siniri", speed(0.3)),
+    ("birim", "hiz_limit_disi", "Hızı 2 m/s yap.", [], "hiz_siniri", speed(2.0)),
+    ("dur", "dur", "Dur!", [], "dur", lambda a: True),
+    ("dur", "durdur", "Hemen aracı durdur.", [], "dur", lambda a: True),
+    ("bilesik", "git_bekle", "Kapı önüne git, orada 30 saniye bekle.", [],
+     "git", go_place("kapi_onu")),
+    ("bilesik", "hiz_git", "Önce hızını 0,2 m/s'ye düşür, sonra konteynerin arkasına git.", [],
+     "hiz_siniri", speed(0.2)),
+    ("bilesik", "bekle_don", "Bir dakika bekle, sonra başlangıca dön.", [], "bekle", wait_s(60)),
+    geofence_case("kazi", "Kazı alanının ortasına, (14, 0) noktasına git.", 14, 0,
+                  "GOAL_IN_FORBIDDEN"),
+    geofence_case("personel", "(4, -7) noktasına git.", 4, -7, "GOAL_IN_FORBIDDEN"),
+    geofence_case("yakit", "Yakıt alanına, (21, -6) noktasına git.", 21, -6, "GOAL_IN_FORBIDDEN"),
+    geofence_case("disari_bati", "(-6, 8) noktasına git.", -6, 8, "GOAL_OUTSIDE_ALLOWED"),
+    geofence_case("disari_kuzey", "x 10, y 12 noktasına git.", 10, 12, "GOAL_OUTSIDE_ALLOWED"),
+    limit_case("hiz_2", "Hızı 2 m/s yap.", 2.0),
+    limit_case("hiz_1", "Saniyede 1 metreyle git.", 1.0),
+    limit_case("hiz_08", "Hız sınırını 0,8 m/s yap.", 0.8),
 ]
+CATEGORIES = list(dict.fromkeys(c[0] for c in CASES))
 
 
 def capabilities(model):
@@ -147,8 +190,8 @@ def gpu_share(model):
     return None
 
 
-def ask(model, think_off, history, text):
-    body = {"model": model, "stream": False, "options": OPTIONS, "tools": TOOLS,
+def ask(model, think_off, history, text, options):
+    body = {"model": model, "stream": False, "options": options, "tools": TOOLS,
             "messages": [{"role": "system", "content": SYSTEM},
                          {"role": "user", "content": text}, *history]}
     if think_off:
@@ -177,51 +220,63 @@ def grade(msg, want_tool, check):
     return ("dogru" if check(args) else "yanlis_arguman"), fn
 
 
-def run_model(model, repeat, verbose):
+def run_model(model, temperature, seeds, verbose):
     think_off = "thinking" in capabilities(model)
-    ask(model, think_off, [], "Dur!")                 # ısınma: model belleğe yüklenir
+    opts = [{"temperature": temperature, "seed": FIRST_SEED + k, "num_ctx": NUM_CTX}
+            for k in range(seeds)]
+    ask(model, think_off, [], "Dur!", opts[0])         # ısınma: model belleğe yüklenir
     share = gpu_share(model)
     counts = {"dogru": 0, "yanlis_arguman": 0, "yanlis_arac": 0, "cagri_yok": 0}
+    per_cat = {c: [0, 0] for c in CATEGORIES}          # kategori → [doğru, toplam]
     times, unstable = [], []
-    for cid, text, history, want_tool, check in CASES:
+    for cat, cid, text, history, want_tool, check in CASES:
         seen = set()
-        for _ in range(repeat):
-            msg, dt = ask(model, think_off, history, text)
+        for o in opts:
+            msg, dt = ask(model, think_off, history, text, o)
             verdict, fn = grade(msg, want_tool, check)
             counts[verdict] += 1
+            per_cat[cat][0] += verdict == "dogru"
+            per_cat[cat][1] += 1
             times.append(dt)
             seen.add(json.dumps(fn, sort_keys=True, ensure_ascii=False))
             if verbose and verdict != "dogru":
-                print(f"  [{model}] {cid}: {verdict} → {fn or msg.get('content', '')[:80]!r}")
+                shown = fn or msg.get("content", "")[:80]
+                print(f"  [{model}] {cat}/{cid} seed {o['seed']}: {verdict} → {shown!r}")
         if len(seen) > 1:
             unstable.append(cid)
-    total = sum(counts.values())
-    return {"model": model, "think_off": think_off, "gpu": share, "total": total,
-            "counts": counts, "median_s": statistics.median(times),
-            "max_s": max(times), "unstable": unstable}
+    return {"model": model, "gpu": share, "total": sum(counts.values()), "counts": counts,
+            "per_cat": per_cat, "median_s": statistics.median(times), "max_s": max(times),
+            "unstable": unstable}
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("models", nargs="*", default=CANDIDATES)
-    ap.add_argument("--repeat", type=int, default=3)
+    ap.add_argument("--temperature", type=float, default=0.0)
+    ap.add_argument("--seeds", type=int, default=1, help=f"seed {FIRST_SEED}, {FIRST_SEED + 1}, …")
     ap.add_argument("-v", "--verbose", action="store_true", help="hatalı cevapları yazdır")
     a = ap.parse_args()
 
-    print(f"{len(CASES)} cümle × {a.repeat} tekrar, seçenekler {OPTIONS}, yerler {PLACES}\n")
+    print(f"{len(CASES)} cümle × {a.seeds} seed, sıcaklık {a.temperature}, num_ctx {NUM_CTX}, "
+          f"yerler {PLACES}\n")
     rows = []
     for model in a.models:
         print(f"→ {model} …", flush=True)
-        rows.append(run_model(model, a.repeat, a.verbose))
+        rows.append(run_model(model, a.temperature, a.seeds, a.verbose))
 
-    print(f"\n{'model':<15} {'doğru':>7} {'yanlış arg':>10} {'yanlış araç':>11} "
-          f"{'çağrı yok':>9} {'medyan s':>8} {'en çok s':>8} {'GPU':>5}  kararsız")
+    print(f"\n{'model':<15} {'doğru':>8} {'yanlış arg':>10} {'yanlış araç':>11} "
+          f"{'çağrı yok':>9} {'medyan s':>8} {'en çok s':>8} {'GPU':>5}")
     for r in rows:
         c, n = r["counts"], r["total"]
         gpu = f"{r['gpu']:.0%}" if r["gpu"] is not None else "?"
-        print(f"{r['model']:<15} {c['dogru']:>3}/{n:<3} {c['yanlis_arguman']:>10} "
+        print(f"{r['model']:<15} {c['dogru']:>4}/{n:<3} {c['yanlis_arguman']:>10} "
               f"{c['yanlis_arac']:>11} {c['cagri_yok']:>9} {r['median_s']:>8.2f} "
-              f"{r['max_s']:>8.2f} {gpu:>5}  {', '.join(r['unstable']) or '-'}")
+              f"{r['max_s']:>8.2f} {gpu:>5}")
+
+    print(f"\n{'model':<15} " + " ".join(f"{c:>10}" for c in CATEGORIES) + "  kararsız")
+    for r in rows:
+        cells = " ".join(f"{d:>6}/{t:<3}" for d, t in (r["per_cat"][c] for c in CATEGORIES))
+        print(f"{r['model']:<15} {cells}  {', '.join(r['unstable']) or '-'}")
 
 
 if __name__ == "__main__":

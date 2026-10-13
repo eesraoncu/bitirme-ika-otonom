@@ -1017,3 +1017,28 @@ bir anahtar altında, kartın güvenli noktalarıyla karışmadan).
 **Neden:** Esra'nın kararı (2026-10-13). Adlı noktalar zaten orada; ikinci dosya "bir
 kavram tek klasörde" kuralını bozar ve kartla ajanın aynı adı farklı koordinatla bilmesine
 yol açabilir.
+
+## K-045 · Ajanın modeli `granite4.1:3b` (Ollama, yerel)
+**Tarih:** 2026-10-13 · **Durum:** Yürürlükte
+
+Faz 4 ajanı IBM `granite4.1:3b` ile çalışır: Ollama 0.40.3, Q4_K_M, 3,4B parametre, Apache 2.0,
+digest `6fd349357287c7ffc9e38189a93b48ea175d24fc566b38f09cfc564fb7f303eb`. RTX 3050 Mobile'da
+(kullanılabilir 3,6 GiB) tamamen GPU'da. Yedek: `qwen3.5:4b` (digest `d8b0f5e9…2e38c04`), diskte tutulur.
+
+Seçim `tools/llm_select_bench.py` ile (31 Türkçe cümle, 6 kategori, ilk araç çağrısı puanlanır):
+
+| Model | Sıcaklık 0 | Ret düzeltme (0) | Sıcaklık 0,7 × 5 seed | Ret (0,7) | Medyan | GPU |
+|---|---|---|---|---|---|---|
+| granite4.1:3b | 27/31 | 8/8 | 127/155 | 37/40 | 0,39 s | %100 |
+| qwen3.5:4b | 30/31 | 8/8 | 138/155 | 35/40 | 1,80–2,25 s | %69 |
+| qwen3.5:2b | 22/31 | 1/8 | 100/155 | 4/40 | 0,72 s | %92 |
+| phi4-mini | 0/42 (ilk test) | — | — | — | — | — |
+
+**Neden:** Esra'nın kararı (2026-10-13). Gerekçeyle düzeltmede (S3) en iyisi, ~5 kat hızlı (Faz 5'te
+binlerce çağrı), GPU'ya sığan tek aday. Hataları sistematik (sıcaklık 0,7'de de aynı): dakika →
+saniye çevirmiyor, "konteynerin önü"nü `konteyner_arkasi` sanıyor; istemle/araç tanımıyla
+düzeltilmesi 4.3'te denenir. qwen3.5:4b'nin hataları rastgele (0,7'de `stop`, `bur` gibi var olmayan
+araçlar, ilgisiz `hiz_siniri`). qwen3.5:2b retten sonra araç çağırmıyor; phi4-mini çağrıyı metne yazıyor.
+Türkçe araç çağırmayı ölçen yayımlanmış kıyaslama bulunamadı, seçim kendi ölçümümüzle.
+
+Açık: Faz 5'te sıcaklık ve seed (sıcaklık 0 + sabit seed'de tekrarlar birebir aynı; K-015).

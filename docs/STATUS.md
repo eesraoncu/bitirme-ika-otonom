@@ -37,8 +37,23 @@ hatalı komut reddedilince ajan gerekçeyi kullanıp kendini düzeltiyor. Sıra 
      | phi4-mini | 0/42 | 42 çağrı yok (çağrıyı metne yazıyor) | 1,30 s | 6,51 s | %86 |
 
      İki ret-düzeltme cümlesini yalnız granite doğru yaptı. phi4-mini elendi ve silindi.
-     **Öndeki aday granite4.1:3b, karar verilmedi:** test küçük (14 bağımsız örnek), genişletilecek
-     (Esra'nın kararı). Boş disk 12 GB.
+     Test küçüktü (14 bağımsız örnek), genişletildi:
+   - **Genişletilmiş test** (31 cümle: yer 7, koordinat 4, birim 7, dur 2, bileşik 3, ret 8 = 5 GEOFENCE
+     ipucu `gen_site.nearest_safe`'ten + 3 LIMIT; `--temperature`, `--seeds`):
+
+     | Model | Sıcaklık 0 | ret | 0,7 × 5 seed | ret | kararsız cümle | Medyan | En uzun |
+     |---|---|---|---|---|---|---|---|
+     | granite4.1:3b | 27/31 | 8/8 | 127/155 | 37/40 | 4 | 0,39 s | 1,18 s |
+     | qwen3.5:4b | 30/31 | 8/8 | 138/155 | 35/40 | 11 | 1,80 s | 8,22 s |
+     | qwen3.5:2b | 22/31 | 1/8 | 100/155 | 4/40 | 11 | 0,72 s | 2,03 s |
+
+     granite hataları sistematik (dakika → saniye yok; "konteynerin önü" → `konteyner_arkasi`),
+     qwen3.5:4b'ninki rastgele (0,7'de `stop`, `bur` gibi uydurma araçlar).
+   - **Model seçildi: `granite4.1:3b` (K-045).** qwen3.5:2b silindi, qwen3.5:4b yedek. Boş disk 13 GB.
+   - **4.2'ye not:** ilk testte qwen3.5:4b ipucu yalnız adken (`"konteyner_onu"`) aynı reddedilmiş komutu
+     tekrarladı, ad + koordinat verilince düzeltti (tek örnek, kanıt değil). Gerekçe ajana ad + koordinat
+     ile verilsin.
+   - **4.3'e not:** granite'in birim hatası araç tanımı/istemle denenecek (ör. `bekle`'de dakika).
    - **Açık (karar Esra'nın):** sıcaklık 0 + sabit seed'de tekrarlar birebir aynı cevap verdi; K-015'teki
      senaryo başına 20 tekrar bu ayarla anlamsız. Faz 5 için sıcaklık > 0 ya da farklı seed gerekli.
    - Araç tanımları şimdilik betikte taslak; 4.3'te `llm_agent`'a taşınacak, betik oradan okuyacak.
@@ -697,7 +712,7 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
         belgesi): RViz hedefi karttan geçip araca ulaşıyor, izinli bölge dışındaki hedef
         reddediliyor, kartın kablosu çekilince araç duruyor
 - [ ] **Faz 4** (plan onaylandı 2026-10-13; ayrıntı yukarıda "Sırada"):
-  - [ ] **4.0 Hazırlık:** bekçi ivmesi ölçümü, NVIDIA sürücüsü, Ollama, model seçimi
+  - [ ] **4.0 Hazırlık:** ~~NVIDIA sürücüsü~~, ~~Ollama~~, ~~model seçimi (K-045)~~; kalan: bekçi ivmesi ölçümü
   - [ ] **4.1 Kart, kalan kurallar:** LIMIT ve `VELOCITY_CMD` kırpma (asgari aktarma Faz 3'te,
         K-031), `WAIT_CMD`/`SPEED_LIMIT_CMD`/`STOP_CMD`, FRESHNESS (zaman eşitlemesi), araç
         konumunun coğrafi sınır denetimi, RECOVERY (üst üste 5 içerik reddi), K-042 `HALT(0)`,
