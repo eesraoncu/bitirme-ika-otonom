@@ -27,7 +27,8 @@ from ika_protocol.messages import BoardState, GoalSource, Reason, Result, Rule  
 
 pytestmark = pytest.mark.skipif(shutil.which("gcc") is None, reason="gcc yok")
 
-HOLD, NORMAL = int(BoardState.HOLD), int(BoardState.NORMAL)
+HOLD, NORMAL, RECOVERY = int(BoardState.HOLD), int(BoardState.NORMAL), int(BoardState.RECOVERY)
+HOME = (-100, -100)                     # guard_driver.c'deki test haritası
 
 
 @dataclass
@@ -76,7 +77,8 @@ def guard(tmp_path_factory):
          "-Werror", "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
          "-I", str(APP), "-I", str(PROTO / "c"), str(TESTS / "guard_driver.c"),
          str(APP / "guard" / "guard.c"), str(APP / "site" / "site.c"),
-         str(APP / "rules" / "geofence" / "geofence.c"), "-o", str(exe)],
+         str(APP / "rules" / "geofence" / "geofence.c"), str(APP / "recovery" / "recovery.c"),
+         "-o", str(exe)],
         capture_output=True, text=True)
     assert cc.returncode == 0, "Kartın C kodu katı uyarılarla derlenmedi:\n" + cc.stderr
     return Guard(exe)
@@ -156,9 +158,10 @@ def test_reject_streak_counts_content_rejections_only(guard):
 
 
 def test_reject_streak_saturates(guard):
-    cmds = ["init", "reset 1 1"] + [f"goto {i} 9000 0 0" for i in range(2, 302)]
+    # kanal ölüyken kurtarma başlamaz, sayaç saymaya devam eder ve 255'te doyar
+    cmds = ["init", "reset 1 1"] + [f"goto {i} 9000 0 0 0" for i in range(2, 302)]
     ds = guard.seq(*cmds)
-    assert ds[-1].streak == 255
+    assert ds[-1].streak == 255 and ds[-1].state == NORMAL
 
 
 # ---- En yakın güvenli nokta (RULES §5.3) -------------------------------------------
@@ -194,3 +197,96 @@ def test_velocity_does_not_change_state_or_streak(guard):
     d = guard.seq("reset 1 1", "goto 2 5000 0 0", "vel 100 100", "goto 3 5000 0 0")
     assert (d[1].streak, d[2].streak) == (1, 2)   # aradaki hız komutu sayacı sıfırlamadı
     assert d[2].state == NORMAL
+
+
+# ---- Kurtarma (RULES §5.2–§5.4, K-047) -------------------------------------------
+
+def _tel(out: str):
+    goal, state = out.split()
+    return (None if goal == "-" else tuple(int(v) for v in goal.split(","))), int(state)
+
+
+def test_fifth_content_rejection_starts_recovery_home(guard):
+    ds = guard.seq("init", "reset 1 1", *[f"goto {i} 9000 0 0" for i in range(2, 7)])
+    *first4, fifth = ds[1:]
+    assert all(d.state == NORMAL and d.goal is None for d in first4)
+    # ajan 5. reddin VERDICT'ini yine alır; aynı kararda araca başlangıç hedefi gider
+    assert fifth.result == Result.REJECTED and fifth.rule == Rule.GEOFENCE
+    assert fifth.state == RECOVERY and fifth.streak == 5
+    assert fifth.goal == (*HOME, 0, int(GoalSource.RECOVERY_HOME))
+
+
+def test_fifth_rejection_with_dead_channel_does_not_recover(guard):
+    ds = guard.seq("init", "reset 1 1", *[f"goto {i} 9000 0 0 0" for i in range(2, 7)])
+    assert ds[-1].state == NORMAL and ds[-1].goal is None and ds[-1].streak == 5
+
+
+@pytest.mark.parametrize("x,y,goal", [
+    (700, 700, (0, 1000)),          # yasak bölgede: en yakın güvenli nokta
+    (2500, 2500, (1500, 1500)),     # izinli alanın dışında
+])
+def test_vehicle_outside_starts_recovery_safe(guard, x, y, goal):
+    out = guard.run(["init", "reset 1 1", f"tel {x} {y} 1"])
+    assert _tel(out[2]) == ((*goal, 0, int(GoalSource.RECOVERY_SAFE)), RECOVERY)
+
+
+def test_vehicle_position_ignored_unless_normal_and_alive(guard):
+    out = guard.run(["init", "tel 700 700 1",              # HOLD: kurtarma yalnız NORMAL'den
+                     "reset 1 1", "tel 0 0 1",             # içeride: bir şey olmaz
+                     "tel 700 700 0"])                     # kanal ölü: kalp atışı zaten HOLD'a alır
+    assert [_tel(out[i]) for i in (1, 3, 4)] == [(None, HOLD), (None, NORMAL), (None, NORMAL)]
+
+
+def test_recovery_rejects_agent_but_passes_velocity(guard):
+    out = guard.run(["init", "reset 1 1", "tel 700 700 1",
+                     "goto 2 0 0 0", "reset 3 1", "vel 200 -100"])
+    goto, reset = _parse(out[3]), _parse(out[4])
+    assert rejected(goto, Rule.MODE, Reason.IN_RECOVERY) and goto.streak == 0   # MODE sayılmaz
+    assert rejected(reset, Rule.MODE, Reason.NOT_IN_HOLD) and reset.state == RECOVERY
+    assert out[5] == "200,-100"
+
+
+def test_arrival_within_35_cm_enters_hold(guard):
+    # hedef (0, 1000); 36 cm ve 35,6 cm uzakta sürer, tam 35 cm'de (sınır dahil) HOLD
+    out = guard.run(["init", "reset 1 1", "tel 700 700 1",
+                     "tel 0 1036 1", "tel 22 1028 1", "tel 21 1028 1", "vel 100 0"])
+    assert [_tel(o)[1] for o in out[3:6]] == [RECOVERY, RECOVERY, HOLD]   # 21²+28² = 35²
+    assert out[6] == "-"                                                   # HOLD: hız geçmez
+
+
+def test_telemetry_timeout_in_recovery_enters_hold(guard):
+    out = guard.run(["init", "tick 0 100000",                          # HOLD: etkisiz
+                     "reset 1 1", "tick 0 100000",                     # NORMAL: etkisiz
+                     "tel 700 700 1", "tick 0 500", "tick 0 501"])     # RECOVERY: > 500 ms HOLD
+    assert [int(out[i]) for i in (1, 3, 5, 6)] == [HOLD, NORMAL, RECOVERY, HOLD]
+
+
+def test_recovery_timeout_enters_hold(guard):
+    # süre girişten sonraki ilk tick'te başlar: 1000'de giriş, 181000'de sürer, 181001'de HOLD
+    out = guard.run(["init", "reset 1 1", "tick 999999 0",             # NORMAL: etkisiz
+                     "tel 700 700 1", "tick 1000 0", "tick 181000 0", "tick 181001 0"])
+    assert [int(out[i]) for i in (2, 4, 5, 6)] == [NORMAL, RECOVERY, RECOVERY, HOLD]
+
+
+def test_recovery_timeout_restarts_on_each_entry(guard):
+    # ilk kurtarma varışla bitti; ikinci kurtarmanın süresi kendi girişinden sayılır
+    out = guard.run(["init", "reset 1 1", "tel 700 700 1", "tick 0 0", "tel 0 1000 1",
+                     "reset 2 1", "tel 700 700 1", "tick 200000 0", "tick 380000 0",
+                     "tick 380001 0"])
+    assert [int(out[i]) for i in (7, 8, 9)] == [RECOVERY, RECOVERY, HOLD]
+
+
+def test_recovery_timeout_survives_tick_wraparound(guard):
+    # HAL_GetTick 49 günde taşar: giriş taşmadan 296 ms önce, fark işaretsiz alınır.
+    # 179704'te geçen süre 296 + 179704 = 180000 (sürer), 179705'te 180001 (HOLD)
+    out = guard.run(["init", "reset 1 1", "tel 700 700 1", "tick 4294967000 0",
+                     "tick 179704 0", "tick 179705 0"])
+    assert [int(out[i]) for i in (4, 5)] == [RECOVERY, HOLD]
+
+
+def test_heartbeat_loss_in_recovery_is_latched(guard):
+    out = guard.run(["init", "reset 1 1", "tel 700 700 1", "lost",
+                     "tel 0 1000 1",                    # hedefte bile olsa HOLD'da kalır
+                     "goto 2 0 0 0"])
+    assert _tel(out[4]) == (None, HOLD)
+    assert rejected(_parse(out[5]), Rule.MODE, Reason.IN_HOLD)

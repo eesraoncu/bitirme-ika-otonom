@@ -314,7 +314,7 @@ static void on_agent_frame(channel_t *ch, const frame_t *f)
         if (!proto_goto_cmd_decode(f->payload, f->payload_len, &cmd)) {
             return;
         }
-        guard_goto(&guard, &site, f->seq, &cmd, &d);
+        guard_goto(&guard, &site, f->seq, heartbeat_alive(), &cmd, &d);
         send_decision(ch, &d);
         timing_record(&goto_timing, ch->frame_t0);
         break;
@@ -350,15 +350,25 @@ static void on_vehicle_frame(channel_t *ch, const frame_t *f)
     }
 }
 
-/* Bekçi düğümüne (FDCAN1) araç tarafından gelen: TELEMETRY. İçeriği
- * tutarlılık kuralında kullanılacak (Faz 4), şimdilik yalnızca yaşı. */
+/* Bekçi düğümüne (FDCAN1) araç tarafından gelen: TELEMETRY. Araç konumunun
+ * coğrafi sınırı ve kurtarmada varış (RULES §3.1, §5.2); kurtarma hedefi
+ * çıkarsa araca GOAL olarak gider. */
 static void guard_can_poll(uint32_t now)
 {
     can_frame_t cf;
     while (can_link_receive(CAN_LINK_GUARD, &cf)) {
-        if (cf.id == PROTO_CAN_ID_TELEMETRY) {
-            telemetry_seen = true;
-            last_telemetry_ms = now;
+        proto_telemetry_t tel;
+        if (cf.id != PROTO_CAN_ID_TELEMETRY ||
+            !proto_telemetry_decode(cf.data, cf.len, &tel)) {
+            continue;
+        }
+        telemetry_seen = true;
+        last_telemetry_ms = now;
+        proto_goal_t goal;
+        if (guard_telemetry(&guard, &site, &tel, heartbeat_alive(), &goal)) {
+            uint8_t g[PROTO_SIZE_GOAL];
+            proto_goal_encode(&goal, g);
+            guard_can_send(PROTO_CAN_ID_GOAL, g, sizeof g);
         }
     }
 }
@@ -413,6 +423,7 @@ void app_loop(void)
     channel_poll(&agent_ch, now, &board, on_agent_frame);
     channel_poll(&vehicle_ch, now, &board, on_vehicle_frame);
     guard_can_poll(now);
+    guard_tick(&guard, now, telemetry_age_ms(now));
     hold_drive(now);
     vehicle_node_poll(&vehicle_ch);
     channel_service(&agent_ch, now, &board);

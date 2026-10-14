@@ -2,10 +2,12 @@
 
 #include <string.h>
 
+#include "recovery/recovery.h"
+
 void guard_init(guard_t *g)
 {
+    memset(g, 0, sizeof *g);
     g->state = PROTO_BOARD_STATE_HOLD;
-    g->reject_streak = 0u;
 }
 
 static void verdict(guard_decision_t *out, uint32_t seq, uint8_t result,
@@ -37,7 +39,21 @@ static void content_rejected(guard_t *g)
     }
 }
 
-void guard_goto(guard_t *g, const site_t *s, uint32_t seq,
+/* NORMAL → RECOVERY: hedef hatırlanır ve araca gidecek GOAL'e yazılır. Varış
+ * yönü 0: güvenli noktalarda araç her yönde dönebilir (shared/site/tests/
+ * test_safe_points.py), yön önemsiz. */
+static void enter_recovery(guard_t *g, geo_point_t target, uint8_t source, proto_goal_t *goal)
+{
+    g->state = PROTO_BOARD_STATE_RECOVERY;
+    g->recovery_goal = target;
+    g->recovery_timed = false;
+    goal->x_cm = target.x_cm;
+    goal->y_cm = target.y_cm;
+    goal->yaw_mrad = 0;
+    goal->source = source;
+}
+
+void guard_goto(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
                 const proto_goto_cmd_t *cmd, guard_decision_t *out)
 {
     if (mode_rejects(g, seq, out)) {
@@ -54,6 +70,10 @@ void guard_goto(guard_t *g, const site_t *s, uint32_t seq,
         out->verdict.hint_x_cm = hint.x_cm;
         out->verdict.hint_y_cm = hint.y_cm;
         content_rejected(g);
+        if (g->reject_streak >= RECOVERY_REJECT_LIMIT && heartbeat_alive) {
+            enter_recovery(g, s->home, PROTO_GOAL_SOURCE_RECOVERY_HOME, &out->goal);
+            out->send_goal = true;
+        }
         return;
     }
 
@@ -83,7 +103,7 @@ void guard_reset(guard_t *g, uint32_t seq, bool heartbeat_alive, guard_decision_
 
 bool guard_velocity(const guard_t *g, const proto_velocity_cmd_t *cmd, proto_drive_t *out)
 {
-    if (g->state != PROTO_BOARD_STATE_NORMAL) {
+    if (g->state == PROTO_BOARD_STATE_HOLD) {
         return false;
     }
     out->v_mm_s = cmd->v_mm_s;
@@ -94,4 +114,37 @@ bool guard_velocity(const guard_t *g, const proto_velocity_cmd_t *cmd, proto_dri
 void guard_heartbeat_lost(guard_t *g)
 {
     g->state = PROTO_BOARD_STATE_HOLD;
+}
+
+bool guard_telemetry(guard_t *g, const site_t *s, const proto_telemetry_t *tel,
+                     bool heartbeat_alive, proto_goal_t *goal)
+{
+    geo_point_t pos = { tel->x_cm, tel->y_cm };
+    if (g->state == PROTO_BOARD_STATE_RECOVERY) {
+        if (recovery_arrived(pos, g->recovery_goal)) {
+            g->state = PROTO_BOARD_STATE_HOLD;
+        }
+        return false;
+    }
+    if (g->state != PROTO_BOARD_STATE_NORMAL || !heartbeat_alive ||
+        geofence_check(&s->fence, pos) == GEOFENCE_OK) {
+        return false;
+    }
+    enter_recovery(g, site_nearest_safe(s, pos), PROTO_GOAL_SOURCE_RECOVERY_SAFE, goal);
+    return true;
+}
+
+void guard_tick(guard_t *g, uint32_t now_ms, uint32_t telemetry_age_ms)
+{
+    if (g->state != PROTO_BOARD_STATE_RECOVERY) {
+        return;
+    }
+    if (!g->recovery_timed) {
+        g->recovery_timed = true;
+        g->recovery_t0_ms = now_ms;
+    }
+    if (telemetry_age_ms > RECOVERY_TELEMETRY_TIMEOUT_MS ||
+        now_ms - g->recovery_t0_ms > RECOVERY_TIMEOUT_MS) {
+        g->state = PROTO_BOARD_STATE_HOLD;
+    }
 }

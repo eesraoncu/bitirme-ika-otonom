@@ -68,8 +68,8 @@ hatalı komut reddedilince ajan gerekçeyi kullanıp kendini düzeltiyor. Sıra 
 
      Doğrulananlar: çıkış sabit 20 Hz (aralık ≤ 52 ms; yumuşatıcısız kurtarmalar 10 Hz geliyordu);
      yol takibinde |ω| en çok 0,556 < 0,6; tipik ivme (%99) ~0,6 m/s². Tur 4'te neden hiç collision
-     ahead olmadığı açıklanmadı.
-   - **AÇIK, 4.1 RECOVERY'ye bağlı: güvenli noktaların bir kısmına Nav2 ulaşamıyor.** İz (+0,3 pay)
+     ahead olmadığı açıklanmadı (2026-10-14 sonrası: tesadüf, aşağıda).
+   - **~~AÇIK~~ ÇÖZÜLDÜ (d1, aşağıda): güvenli noktaların bir kısmına Nav2 ulaşamıyordu.** İz (+0,3 pay)
      harita ve keepout maskesiyle karşılaştırıldı: `baslangic`, `kapi_onu` temiz; `konteyner_arkasi`
      (8; 7,6) paylı kuzey sınırına (y 8,59) 0°'de 12 cm, 10°'de değiyor (tur 1'in nedeni);
      `kuzeybati` (1, 6) 0°'de haritadaki engele değiyor, 75°'de temiz; `konteyner_onu` (8, 2)
@@ -89,7 +89,26 @@ hatalı komut reddedilince ajan gerekçeyi kullanıp kendini düzeltiyor. Sıra 
      kart 65, köprü 25. **4.3'e not:** `llm_select_bench.py`'deki "Konteynerin arkasına git" cümlesi artık
      olmayan yeri bekliyor (K-045 sonuçları eski noktalarla, geçerli); ajan için `places` anahtarı
      açılınca betik oradan okusun.
-   - **Push bekliyor:** bu ağda GitHub'ın 22. portu kapalı (443 açık); `c20910a` ve sonrası yerelde.
+   - **d2 + d3 bitti (2026-10-14), 4.1d BİTTİ:** `firmware/app/recovery/` (5 ret, varış 35 cm,
+     telemetri 500 ms, süre 180 s; K-047), `guard`: `guard_telemetry` (araç konumunun coğrafi sınırı,
+     varış), `guard_tick` (zaman kuralları), RECOVERY'de hız geçer. PC: 77 test, kasıtlı 6 hatanın 6'sı
+     yakalandı. Kart: flash 40 576 B, 0 uyarı, yüklendi ve doğrulandı; `link_test` ve `decision_test`
+     (yeni: yasak bölgede araç → RECOVERY_SAFE + varış, telemetri kesilince 513–515 ms'de HOLD, 5 ret →
+     RECOVERY_HOME + varış) 4 çalıştırmada hepsi geçti. Uçtan uca (simülasyon, kart, köprü):
+     - A: araç (8,5; 1) → 5 yasak hedef → 4 s'de RECOVERY + GOAL (0,0) RECOVERY_HOME → 24 s sonra
+       varış, HOLD.
+     - B: araç kazı köşesinde (11,7; −3,05) → RECOVERY → Nav2 12 s'de vazgeçti (araç kıpırdamadı) →
+       kart tam 180 s'de HOLD. Süre sınırı yokken (sabah, d2 yazılımı) kart süresiz RECOVERY'de kaldı.
+     - Test hatası düzeltildi: `decision_test`'in durum okuması tampondaki eski HEARTBEAT_ACK'i
+       okuyordu (kart doğruydu).
+   - **AÇIK, sıradaki iş: Nav2 kazı köşesinde (12; −2,5) tekrarlanabilir biçimde takılıyor** (tur 3,
+     sabahki deneme, B). Orada AMCL + harita gerçeğe göre 0,76 m sapıyor. Tur 4'teki başarı tesadüftü:
+     yumuşatıcının yavaşlamasını sınırsız yapmak bu sorunu çözmedi (K-046'nın yavaşlama gerekçesi
+     yine geçerli).
+   - **AÇIK, 4.1b:** kart varışta HOLD'a geçince Nav2'nin hedefi açık kalıyor (A'da 120 s'de bitmedi);
+     K-042 (HOLD'da Nav2 hedefini iptal) çözecek.
+   - **Ağ:** okul Wi-Fi'si (GSBWIFI) IP'yi ara ara kaybediyor; o an ROS (CycloneDDS) ve Gazebo
+     multicast'i kopuyor, süreçler toparlanmıyor. Kendi bağlantıyla sorun yok. Port 22 orada kapalı.
    - **Teşhis düzeltmesi:** "collision ahead ← AMCL kaybı" (aşağıda, 3.3) yanlıştı: tur 1'de AMCL
      0,2 m doğruyken de oldu. Neden: paylı iz keepout'a değiyor (planlayıcı yalnız merkeze bakıyor,
      RPP izin tamamına). Yol yasak bölge köşelerinin yakınından geçince titreme.

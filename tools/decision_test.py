@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Kartın kararlarını uçtan uca dener (Faz 2.6 c ve d).
+"""Kartın kararlarını uçtan uca dener (Faz 2.6 c ve d, Faz 4.1d kurtarma).
 
 Kullanım:
     python3 tools/decision_test.py
@@ -15,10 +15,14 @@ Kartta aynı YAML'dan üretilmiş site_data.c yüklü olmalı.
 
 Kart TELEMETRY'yi araç kanalından alıp CAN'e koyar, bekçi düğümü CAN'den
 alır: telemetri yaşının düşmesi ters yöndeki CAN yolunu da gösterir.
+
+Kurtarma (RULES §5.2, K-047): araç konumu arka planda 50 ms'de bir gönderilir
+(TelemetryStream), kart RECOVERY'de telemetri 500 ms gelmezse HOLD'a geçer.
 """
 from __future__ import annotations
 
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -65,6 +69,38 @@ def send_cmd(agent: Link, msg):
 def goto(x: int, y: int, yaw: int = 0) -> m.GotoCmd:
     # belief alanları tutarlılık kuralı içindir (Faz 4), henüz denetlenmiyor
     return m.GotoCmd(x, y, yaw, 0, 0, 0)
+
+
+class TelemetryStream:
+    """Araç köprüsünün yerine: araç kanalından 50 ms'de bir TELEMETRY (cm)."""
+
+    PERIOD_S = 0.05
+
+    def __init__(self, link: Link) -> None:
+        self.link = link
+        self.pos = (0, 0)
+        self.running = False
+        self.last_sent = 0.0
+        self.thread = None
+
+    def start(self, pos) -> None:
+        self.pos = pos
+        self.running = True
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+
+    def stop(self) -> float:
+        """Durdurur ve son telemetrinin gönderildiği anı döndürür."""
+        self.running = False
+        if self.thread is not None:
+            self.thread.join()
+        return self.last_sent
+
+    def _run(self) -> None:
+        while self.running:
+            self.link.send(m.Telemetry(self.pos[0], self.pos[1], 0))
+            self.last_sent = time.monotonic()
+            time.sleep(self.PERIOD_S)
 
 
 def reaches_state(agent: Link, state: m.BoardState) -> bool:
@@ -198,7 +234,98 @@ def run(agent: Link, vehicle: Link, hb: Heartbeat, rep: Report) -> None:
     ack = agent.wait_for(m.HeartbeatAck, 0.5)
     rep.check(ack is not None and ack[1].state == m.BoardState.HOLD,
               "HOLD mandallı: SIFIRLA olmadan NORMAL'e dönmedi")
+
+    tel = TelemetryStream(vehicle)
+    try:
+        recovery(agent, vehicle, tel, rep)
+    finally:
+        tel.stop()
     hb.stop()
+
+
+def board_state(agent: Link):
+    """Kartın şimdiki durumu. Tamponda geçişten önceki HEARTBEAT_ACK'ler birikmiş
+    olabilir: önce boşaltılır, sonraki cevap (100 ms içinde) okunur."""
+    agent.receive(0.12)
+    ack = agent.wait_for(m.HeartbeatAck, 0.5)
+    return None if ack is None else ack[1].state
+
+
+def reset_to_normal(agent: Link, rep: Report) -> None:
+    v = send_cmd(agent, m.ResetCmd())
+    rep.check(v is not None and v.result == m.Result.ACCEPTED, "SIFIRLA → NORMAL")
+
+
+def wait_goal(vehicle: Link, source: m.GoalSource):
+    got = vehicle.wait_for(m.Goal, 0.5, lambda g: g.source == source)
+    return None if got is None else got[1]
+
+
+def holds_with_zero_drive(agent: Link, vehicle: Link) -> bool:
+    vehicle.receive(0.1)
+    drives = [m.Drive.unpack(f.payload) for f, c in vehicle.receive(0.3) if c is m.Drive]
+    return (board_state(agent) == m.BoardState.HOLD and len(drives) >= 4
+            and all((d.v_mm_s, d.w_mrad_s) == (0, 0) for d in drives))
+
+
+def recovery(agent: Link, vehicle: Link, tel: TelemetryStream, rep: Report) -> None:
+    # Hedefler kartın sahasından: araç kazının ortasındayken en yakın güvenli nokta
+    inside_forbidden = FORBIDDEN_GOAL
+    safe = hint(inside_forbidden)
+    home = SITE["home"]
+    away_from_home = ALLOWED_GOAL[:2]
+
+    print("Kurtarma 1: araç yasak bölgede (RULES §5.2)")
+    reset_to_normal(agent, rep)
+    vehicle.receive(0.2)
+    tel.start(inside_forbidden)
+    g = wait_goal(vehicle, m.GoalSource.RECOVERY_SAFE)
+    rep.check(g is not None and (g.x_cm, g.y_cm) == safe,
+              f"araç {inside_forbidden} → GOAL en yakın güvenli nokta {safe}, RECOVERY_SAFE",
+              str(g) if g else "gelmedi")
+    rep.check(board_state(agent) == m.BoardState.RECOVERY, "kart RECOVERY'de")
+    v = send_cmd(agent, goto(*ALLOWED_GOAL))
+    rep.check(v is not None and v.rule == m.Rule.MODE and v.reason == m.Reason.IN_RECOVERY,
+              "RECOVERY'de GOTO → MODE / IN_RECOVERY")
+    agent.send(m.VelocityCmd(300, 100))
+    got = vehicle.wait_for(m.Drive, 0.5, lambda d: (d.v_mm_s, d.w_mrad_s) == (300, 100))
+    rep.check(got is not None, "RECOVERY'de VELOCITY_CMD araca geçiyor (Nav2 götürür)")
+    tel.pos = (safe[0] + 21, safe[1] + 28)            # 21² + 28² = 35²: sınır dahil
+    time.sleep(0.2)
+    rep.check(holds_with_zero_drive(agent, vehicle), "hedefe 35 cm: HOLD, 20 Hz sıfır hız")
+    tel.stop()
+
+    print("Kurtarma 2: telemetri kesildi (K-047)")
+    reset_to_normal(agent, rep)
+    tel.start(inside_forbidden)
+    rep.check(wait_goal(vehicle, m.GoalSource.RECOVERY_SAFE) is not None, "RECOVERY'ye girdi")
+    vehicle.receive(0.1)
+    last = tel.stop()
+    got = vehicle.wait_for(m.Drive, 1.5, lambda d: (d.v_mm_s, d.w_mrad_s) == (0, 0))
+    gap_ms = (time.monotonic() - last) * 1000 if got else None
+    rep.check(got is not None and 480 <= gap_ms <= 650,
+              "son telemetriden ~500 ms sonra HOLD ve sıfır hız",
+              f"{gap_ms:.0f} ms" if gap_ms else "gelmedi")
+    rep.check(board_state(agent) == m.BoardState.HOLD, "kart HOLD'da")
+
+    print("Kurtarma 3: üst üste 5 içerik reddi (RULES §5.4)")
+    reset_to_normal(agent, rep)
+    tel.start(away_from_home)
+    time.sleep(0.2)
+    vehicle.receive(0.1)
+    verdicts = [send_cmd(agent, goto(*FORBIDDEN_GOAL)) for _ in range(4)]
+    early = [c for _, c in vehicle.receive(0.2) if c is m.Goal]
+    rep.check(all(v is not None and v.rule == m.Rule.GEOFENCE for v in verdicts) and not early,
+              "ilk 4 ret: GEOFENCE, araca hedef yok", f"{len(early)} GOAL")
+    v = send_cmd(agent, goto(*FORBIDDEN_GOAL))
+    rep.check(v is not None and v.rule == m.Rule.GEOFENCE, "5. ret yine ajana VERDICT olarak döndü")
+    g = wait_goal(vehicle, m.GoalSource.RECOVERY_HOME)
+    rep.check(g is not None and (g.x_cm, g.y_cm) == home,
+              f"5. ret → GOAL başlangıç {home}, RECOVERY_HOME", str(g) if g else "gelmedi")
+    rep.check(board_state(agent) == m.BoardState.RECOVERY, "kart RECOVERY'de")
+    tel.pos = home
+    time.sleep(0.2)
+    rep.check(holds_with_zero_drive(agent, vehicle), "başlangıca vardı: HOLD")
 
 
 if __name__ == "__main__":

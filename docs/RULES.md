@@ -266,7 +266,7 @@ engel riski yüzünden kullanılmaz.
 | `NORMAL` → `HOLD` | kalp atışı zaman aşımı · araç yasak bölgede ve kanal ölü |
 | `NORMAL` → `RECOVERY` (hedef: **başlangıç**) | üst üste 5 içerik reddi, kanal canlı |
 | `NORMAL` → `RECOVERY` (hedef: **en yakın güvenli nokta**) | araç yasak bölgede, kanal canlı |
-| `RECOVERY` → `HOLD` | hedefe varıldı · kalp atışı zaman aşımı |
+| `RECOVERY` → `HOLD` | hedefe varıldı (≤ 0,35 m) · kalp atışı zaman aşımı · telemetri 500 ms yok · 180 s geçti (K-047) |
 | `HOLD` → `NORMAL` | yalnızca imzalı **`SIFIRLA`** komutu, kalp atışı canlıyken |
 
 - **Kurtarma her zaman `HOLD`'da biter. `NORMAL`'e dönüşün tek yolu `SIFIRLA`.**
@@ -280,13 +280,20 @@ engel riski yüzünden kullanılmaz.
 ### 5.3 Kurtarma noktaları
 
 - **Başlangıç noktası** ve **güvenli noktalar** (≤ 8) harita çerçevesinde
-  kayıtlıdır. **Faz 3'te doldurulacak.**
+  kayıtlıdır (`shared/site/ika_saha.yaml`). **Seçim ölçütü:** araç noktada her yönde durup
+  dönebilmeli: Nav2'nin izi + payının dönüş yarıçapı (1,56 m) içinde harita engeli ya da
+  keepout hücresi yok. Böylece kartın gönderdiği varış yönü (0) önemsiz. Denetim:
+  `shared/site/tests/test_safe_points.py` (iz ve pay Nav2 ayarından okunur). İlk seçim bu
+  ölçütü karşılamıyordu: Nav2 iki noktaya ulaşamıyordu (2026-10-14, STATUS).
 - **En yakın:** mevcut telemetri konumuna düz çizgi (Öklid) uzaklığı en küçük olan. Eşitlikte
   sıra numarası küçük olan seçilir. Düz çizgi uzaklığı yol uzaklığı değildir. Gerçek
   rotayı Nav2 planlar.
 - **Varış toleransı: 0,35 m**. Nav2'nin hedefe varış toleransından
   (`xy_goal_tolerance`) **büyük olmalı.** Küçük olursa Nav2 "vardım" deyip durur,
-  kart ise varışı hiç görmez ve `RECOVERY`'de takılır. **Faz 3'te doğrulanacak.**
+  kart ise varışı hiç görmez ve `RECOVERY`'de takılır. **Doğrulandı (2026-10-14):** uçtan uca
+  kurtarmada kart varışı gördü ve HOLD'a geçti (Nav2 0,3 m).
+- **Zaman kuralları (K-047):** kurtarmada telemetri 500 ms gelmezse ya da kurtarma 180 s'de
+  bitmezse `HOLD`. Kart varışı göremiyorsa ya da Nav2 hedefte vazgeçtiyse takılı kalmaz.
 
 ### 5.4 Ret sayacı
 
@@ -328,8 +335,8 @@ karşılaştırılabilir.
 | Konu | Ne zaman | Not |
 |---|---|---|
 | Geofence çokgenlerinin koordinatları | Faz 3 | Harita çıkınca |
-| Başlangıç ve güvenli noktalar | Faz 3 | `places.yaml` ile birlikte |
-| Varış toleransı > Nav2 `xy_goal_tolerance` | Faz 3 | §5.3 |
+| ~~Başlangıç ve güvenli noktalar~~ | ✅ 2026-10-14 | §5.3; `ika_saha.yaml` (K-044) |
+| ~~Varış toleransı > Nav2 `xy_goal_tolerance`~~ | ✅ 2026-10-14 | §5.3 |
 | ~~Nav2 frekansının 20 Hz olduğu~~ | ✅ 2026-10-14 | §3.2; `velocity_smoother` güvencesinde (K-046) |
 | Kablo çekme testinde kartın beslenmesi | Faz 2 | STATUS'ta "Bilinen engeller" |
 

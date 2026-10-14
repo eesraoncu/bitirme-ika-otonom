@@ -1060,3 +1060,16 @@ büyüklük; yavaşlama, durma ve işaret değişimi serbest (yumuşatıcıyla a
 - İşaret değişimini yavaşlama saymak Nav2'nin normal çıktısını kırpmamak için (bölünmüş tanımla
   5 150'de 2 kırpma olurdu). Bilinen sınır: yön değişiminde ani sıçrama sınırlanmaz.
 - Yan kazanç: kurtarma hareketleri (10 Hz) artık karta 20 Hz ulaşıyor; §3.2'nin 50 ms'i güvencede.
+
+## K-047 · Kurtarmanın zaman kuralları: telemetri 500 ms, süre 180 s
+**Tarih:** 2026-10-14 · **Durum:** Yürürlükte
+
+RECOVERY'de iki yeni HOLD geçişi: (1) telemetri 500 ms gelmezse (kart varışı göremiyorsa
+kör beklemez, K-010); (2) kurtarma 180 s'de bitmezse (Nav2 hedefte vazgeçerse kart takılı
+kalmasın). Süre girişten sonraki ilk döngüde başlar, her girişte yeniden. Sabitler
+`firmware/app/recovery/recovery.h`.
+
+**Neden:** Esra'nın kararı (2026-10-14). (1) RULES'ta telemetri kaybı tanımlı değildi.
+(2) önce eklenmedi; uçtan uca denemede Nav2 kurtarma hedefinde (kazı köşesi) vazgeçti, kart
+süresiz RECOVERY'de kaldı ve ajanın her komutu IN_RECOVERY ile reddedildi: Faz 5'in otomatik
+koşuları kilitlenirdi. Sınırla aynı durumda kart 180 s'de HOLD'a geçti (doğrulandı).

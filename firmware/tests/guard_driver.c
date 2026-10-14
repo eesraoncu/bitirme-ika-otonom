@@ -6,11 +6,13 @@
  *
  * Her satır bir komut, her komuta bir satır cevap. Sayılar ondalık.
  *   init                       → "ok"
- *   goto <seq> <x> <y> <yaw>   → karar
+ *   goto <seq> <x> <y> <yaw> [canlı 0|1]  → karar (canlı verilmezse 1)
  *   reset <seq> <canlı 0|1>    → karar
  *   lost                       → "ok" (kalp atışı zaman aşımı)
  *   vel <v> <w>                → "v,w" araca giden DRIVE ya da aktarılmıyorsa "-"
  *   nearest <0|1> <x> <y>      → "<x> <y>"; 0: güvenli noktasız harita
+ *   tel <x> <y> <canlı 0|1>    → "<goal|-> <state>" (araç konumu, TELEMETRY)
+ *   tick <now_ms> <tel_yaşı_ms> → "<state>" (her döngüdeki zaman denetimi)
  * Karar satırı:
  *   <ref_seq> <result> <rule> <reason> <hint_x> <hint_y> <goal|-> <state> <streak>
  *   goal: "x,y,yaw,source" ya da hedef gönderilmiyorsa "-" */
@@ -63,10 +65,13 @@ int main(void)
         if (strncmp(line, "init", 4) == 0) {
             guard_init(&g);
             puts("ok");
-        } else if (sscanf(line, "goto %lu %d %d %d", &seq, &x, &y, &yaw) == 4) {
+        } else if (sscanf(line, "goto %lu %d %d %d %d", &seq, &x, &y, &yaw, &alive) >= 4) {
+            if (sscanf(line, "goto %lu %d %d %d %d", &seq, &x, &y, &yaw, &alive) == 4) {
+                alive = 1;
+            }
             proto_goto_cmd_t cmd = { .goal_x_cm = (int16_t)x, .goal_y_cm = (int16_t)y,
                                      .goal_yaw_mrad = (int16_t)yaw };
-            guard_goto(&g, &test_site, (uint32_t)seq, &cmd, &d);
+            guard_goto(&g, &test_site, (uint32_t)seq, alive != 0, &cmd, &d);
             print_decision(&d);
         } else if (sscanf(line, "reset %lu %d", &seq, &alive) == 2) {
             guard_reset(&g, (uint32_t)seq, alive != 0, &d);
@@ -79,6 +84,17 @@ int main(void)
             } else {
                 puts("-");
             }
+        } else if (sscanf(line, "tel %d %d %d", &x, &y, &alive) == 3) {
+            proto_telemetry_t tel = { .x_cm = (int16_t)x, .y_cm = (int16_t)y, .yaw_mrad = 0 };
+            proto_goal_t goal;
+            if (guard_telemetry(&g, &test_site, &tel, alive != 0, &goal)) {
+                printf("%d,%d,%d,%u %u\n", goal.x_cm, goal.y_cm, goal.yaw_mrad, goal.source, g.state);
+            } else {
+                printf("- %u\n", g.state);
+            }
+        } else if (sscanf(line, "tick %lu %d", &seq, &x) == 2) {
+            guard_tick(&g, (uint32_t)seq, (uint32_t)x);
+            printf("%u\n", g.state);
         } else if (strncmp(line, "lost", 4) == 0) {
             guard_heartbeat_lost(&g);
             puts("ok");

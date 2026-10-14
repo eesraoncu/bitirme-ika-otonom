@@ -1,14 +1,13 @@
 /* Bekçinin karar katmanı: denetim sırası (docs/RULES.md §4) ve durum
  * makinesi (§5.2).
  *
- * Kuralların kendisi rules/ altında, burada yalnızca sıraları ve sonuçları:
- * hangi kural önce bakar, ret hangi gerekçeyle döner, durum nasıl değişir.
- * Donanıma dokunmaz, girdi alır ve karar döndürür: PC'de sınanır
- * (firmware/tests/test_guard.py). Çıktıları göndermek çağıranın işi.
+ * Kuralların kendisi rules/ altında, kurtarmanın sayıları recovery/'de; burada
+ * yalnızca sıraları ve sonuçları: hangi kural önce bakar, ret hangi gerekçeyle
+ * döner, durum nasıl değişir. Donanıma dokunmaz, girdi alır ve karar döndürür:
+ * PC'de sınanır (firmware/tests/test_guard.py). Çıktıları göndermek çağıranın işi.
  *
  * AUTH ve REPLAY buraya gelmeden kanal katmanında düşer (K-023). FRESHNESS,
- * LIMIT ve CONSISTENCY Faz 4'te; RECOVERY durumu da (üst üste 5 içerik
- * reddi, §5.4). Bu fazda sayaç tutulur ama geçiş yapılmaz. */
+ * LIMIT ve CONSISTENCY Faz 4'ün sonraki adımlarında. */
 #ifndef GUARD_H
 #define GUARD_H
 
@@ -21,11 +20,14 @@
 typedef struct {
     uint8_t state;           /* proto_board_state_t */
     uint8_t reject_streak;   /* üst üste içerik reddi (§5.4), 255'te doyar */
+    geo_point_t recovery_goal;   /* RECOVERY'de gidilen nokta */
+    bool recovery_timed;         /* girişten sonraki ilk guard_tick'te true olur */
+    uint32_t recovery_t0_ms;     /* o tick'in zamanı */
 } guard_t;
 
 typedef struct {
     proto_verdict_t verdict;
-    bool send_goal;          /* onaylı hedef CAN'den araç tarafına gider */
+    bool send_goal;          /* hedef CAN'den araç tarafına gider: onaylı ya da kurtarma */
     proto_goal_t goal;
 } guard_decision_t;
 
@@ -33,22 +35,38 @@ typedef struct {
 void guard_init(guard_t *g);
 
 /* GOTO_CMD: MODE → GEOFENCE. Coğrafi sınır reddinde ipucu, hedefe en yakın
- * güvenli nokta (docs/protocol.md §7.1). */
-void guard_goto(guard_t *g, const site_t *s, uint32_t seq,
+ * güvenli nokta (docs/protocol.md §7.1). Üst üste RECOVERY_REJECT_LIMIT'inci
+ * içerik reddinde, kanal canlıysa NORMAL → RECOVERY: aynı kararda ret VERDICT'i
+ * ve başlangıca kurtarma hedefi (RECOVERY_HOME) çıkar (§5.2). */
+void guard_goto(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
                 const proto_goto_cmd_t *cmd, guard_decision_t *out);
 
 /* RESET_CMD (SIFIRLA): yalnızca HOLD'da ve kalp atışı canlıyken kabul
  * edilir, HOLD → NORMAL. */
 void guard_reset(guard_t *g, uint32_t seq, bool heartbeat_alive, guard_decision_t *out);
 
-/* VELOCITY_CMD (K-031, asgari aktarma): NORMAL'de araca DRIVE olarak aynen
- * gider (true, out doldurulur), başka her durumda gitmez (false). HOLD'da
- * araca giden sıfır hızı app.c gönderir. VERDICT yoktur (docs/protocol.md
- * §7.2). Kırpma (LIMIT, RULES §3.2) Faz 4'te. */
+/* VELOCITY_CMD (K-031, asgari aktarma): NORMAL ve RECOVERY'de araca DRIVE
+ * olarak aynen gider (true, out doldurulur): kurtarmada aracı hedefe Nav2
+ * götürür (§5.2). HOLD'da gitmez (false), araca giden sıfır hızı app.c
+ * gönderir. VERDICT yoktur (docs/protocol.md §7.2). Kırpma (LIMIT, §3.2)
+ * Faz 4'ün sonraki adımında. */
 bool guard_velocity(const guard_t *g, const proto_velocity_cmd_t *cmd, proto_drive_t *out);
 
 /* Kalp atışı zaman aşımı: NORMAL ya da RECOVERY → HOLD. Mandallıdır, kalp
  * atışı geri gelince kendiliğinden NORMAL'e dönülmez (§5.2). */
 void guard_heartbeat_lost(guard_t *g);
+
+/* TELEMETRY (araç konumu, 20 Hz). NORMAL'de araç izinli alanın dışında ya da
+ * yasak bölgedeyse ve kanal canlıysa → RECOVERY, hedef araca en yakın güvenli
+ * nokta (RECOVERY_SAFE). RECOVERY'de hedefe varınca → HOLD. HOLD'da etkisiz.
+ * Araca gidecek bir kurtarma hedefi çıktıysa true döner, goal doldurulur. */
+bool guard_telemetry(guard_t *g, const site_t *s, const proto_telemetry_t *tel,
+                     bool heartbeat_alive, proto_goal_t *goal);
+
+/* Her döngüde. RECOVERY'nin zaman kuralları (K-047): son telemetri
+ * RECOVERY_TELEMETRY_TIMEOUT_MS'den eskiyse ya da kurtarma RECOVERY_TIMEOUT_MS'den
+ * uzun sürdüyse → HOLD. Süre, girişten sonraki ilk çağrıda başlar. Başka
+ * durumlarda etkisiz. now_ms taşar (49 gün): fark işaretsiz alınır. */
+void guard_tick(guard_t *g, uint32_t now_ms, uint32_t telemetry_age_ms);
 
 #endif /* GUARD_H */
