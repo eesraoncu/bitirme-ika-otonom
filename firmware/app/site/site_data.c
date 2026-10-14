@@ -20,12 +20,11 @@ const site_t site = {
         },
     },
     .home = {0, 0},
-    .n_safe = 5,
+    .n_safe = 4,
     .safe = {
         {0, 0},   /* baslangic */
         {175, 600},   /* kuzeybati */
         {850, 100},   /* konteyner_onu */
         {2600, 0},   /* kapi_onu */
-        {1300, -550},   /* guney */
     },
 };

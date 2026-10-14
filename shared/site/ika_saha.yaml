@@ -29,9 +29,10 @@ home: [0, 0]           # aracın başlangıcı: (0, 0), doğuya bakar (K-032)
 # olmalı: Nav2'nin izi + payının dönüş yarıçapı (1,56 m) içinde harita engeli ya da keepout
 # yok. Denetim: shared/site/tests/test_safe_points.py. 2026-10-14'te yeniden seçildi: eski
 # konteyner_arkasi (8, 7,6) kuzey sınırına, konteyner_onu (8, 2) konteynere değiyordu.
+# Noktaya giden YOL denetlenmiyor: guney (13, −5,5) temizdi ama tek girişi personel ile kazı
+# köşeleri arasındaki 2,24 m'lik boğaz (paylı); Nav2 orada 4 denemenin 2'sinde takıldı, çıkarıldı.
 safe_points:           # sıra önemli: eşitlikte sıra numarası küçük olan seçilir (RULES §5.3)
   baslangic:     [0, 0]
   kuzeybati:     [1.75, 6]
   konteyner_onu: [8.5, 1]
   kapi_onu:      [26, 0]
-  guney:         [13, -5.5]   # personel ile yakıt bölgesinin arası

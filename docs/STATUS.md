@@ -82,7 +82,8 @@ hatalı komut reddedilince ajan gerekçeyi kullanıp kendini düzeltiyor. Sıra 
      bilinen sınır, Nav2 kurtarma hedefinde vazgeçerse kart RECOVERY'de kalır (çıkış: kalp atışı kaybı).
    - **d1 bitti (2026-10-14):** güvenli noktalar yeniden seçildi (ölçüt: izin + payın dönüş yarıçapı
      1,559 m içinde harita engeli ve keepout yok): baslangic (0, 0) · kuzeybati (1,75; 6) ·
-     konteyner_onu (8,5; 1) · kapi_onu (26, 0) · **guney (13; −5,5) yeni** · konteyner_arkasi çıkarıldı
+     konteyner_onu (8,5; 1) · kapi_onu (26, 0) · ~~guney (13; −5,5)~~ (aynı gün çıkarıldı, aşağıda) ·
+     konteyner_arkasi çıkarıldı
      (kuzey koridorunda 4 m içinde uygun yer yok). `shared/site/tests/test_safe_points.py`: iz/pay
      nav2_params'tan, harita ve maske ika_nav/maps'ten okunur; eski noktalarla 3'ünü yakaladı.
      `site_data.c` yeniden üretildi (maske değişmedi), **karta henüz yüklenmedi (d3)**. Testler: site 24,
@@ -101,10 +102,18 @@ hatalı komut reddedilince ajan gerekçeyi kullanıp kendini düzeltiyor. Sıra 
        kart tam 180 s'de HOLD. Süre sınırı yokken (sabah, d2 yazılımı) kart süresiz RECOVERY'de kaldı.
      - Test hatası düzeltildi: `decision_test`'in durum okuması tampondaki eski HEARTBEAT_ACK'i
        okuyordu (kart doğruydu).
-   - **AÇIK, sıradaki iş: Nav2 kazı köşesinde (12; −2,5) tekrarlanabilir biçimde takılıyor** (tur 3,
-     sabahki deneme, B). Orada AMCL + harita gerçeğe göre 0,76 m sapıyor. Tur 4'teki başarı tesadüftü:
-     yumuşatıcının yavaşlamasını sınırsız yapmak bu sorunu çözmedi (K-046'nın yavaşlama gerekçesi
-     yine geçerli).
+   - **Nav2 kazı köşesinde takılması: nedeni bulundu, guney güvenli noktalardan çıkarıldı (Esra, A).**
+     Planlayıcı (NavFn) yalnız merkeze bakıyor, yol keepout'a 1,04 m yaklaşıyor (10,96; −3,05), izin
+     dönüş yarıçapı 1,56 m. guney bölgesinin tek girişi personel köşesi (10; −3,5) ile kazı köşesi
+     (12; −2,5) arasındaki 2,24 m'lik çapraz boğaz (paylarla; gerçekte ~5 m: kartın 1 m'si K-036 +
+     Nav2'nin 0,3 m'si K-038 aynı harita hatası için üst üste). Araç boğazda dönünce izi keepout'a
+     giriyor, sonra her hareket (ileri, spin, backup) "collision ahead": 4 denemenin 2'si takıldı.
+     Tur 4'teki başarı tesadüftü (K-046'nın yavaşlama gerekçesi yine geçerli). guney çıkarıldı:
+     4 güvenli nokta, `site_data.c` karta yüklendi, `link_test` + `decision_test` geçti (kazı ortası
+     ipucu artık konteyner_onu). **Sahanın bilinen sınırı:** personel–yakıt arası (kazının güneyi)
+     Nav2 için zor bölge; `nav2_accel_bench.py` turunun 1. bacağı (13; −5,5) da oradan geçiyor.
+     Kalan seçenekler (seçilmedi): iz payını küçültmek (K-038 yeniden), Smac Hybrid-A*.
+     test_safe_points noktanın kendisini denetliyor, noktaya giden yolu değil.
    - **AÇIK, 4.1b:** kart varışta HOLD'a geçince Nav2'nin hedefi açık kalıyor (A'da 120 s'de bitmedi);
      K-042 (HOLD'da Nav2 hedefini iptal) çözecek.
    - **Ağ:** okul Wi-Fi'si (GSBWIFI) IP'yi ara ara kaybediyor; o an ROS (CycloneDDS) ve Gazebo
