@@ -4,7 +4,7 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-10-14
-**Bulunduğumuz faz:** **Faz 4 başladı** (plan onaylandı 2026-10-13, sıra 4.0 → 4.4). Faz 3 bitti (`v0.3.0`): 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor. Açık: AMCL kaybı (aşağıda)
+**Bulunduğumuz faz:** **Faz 4**: 4.0 ve 4.1 bitti (2026-10-14, `v0.3.1`), sırada 4.2 köprü ve 4.3 ajan. Faz 3 bitti (`v0.3.0`): 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor. Açık: AMCL kaybı (aşağıda)
 
 ---
 
@@ -141,8 +141,18 @@ hatalı komut reddedilince ajan gerekçeyi kullanıp kendini düzeltiyor. Sıra 
      yakalandı (biri doğru kodla eşdeğer çıktı, gerçek taşma hatasıyla yeniden). Kart: 42 440 B, 0 uyarı;
      `link_test`, `decision_test` 2/2 (RTT 11 ms; −500 ms → 505–507, +200 ms → −192). Uçtan uca: 897
      komutta 0 bayat, 0 kırpma, RTT 7 ms.
-     **Sırada:** 4.1e CONSISTENCY (son kart kuralı; takvim kayarsa ilk kısılacak, plan §7); sonra 4.2
-     (ajan köprüsünde görev komutları arayüzü: WAIT/STOP/hiz_siniri, belief alanları) ve 4.3 (ajan).
+   - **4.1e bitti (2026-10-14, K-049) → 4.1 BİTTİ, kartın bütün kuralları çalışıyor (`v0.3.1`):**
+     `rules/consistency` (tol = 25 cm + 0,6 m/s × Δt, −50 ms ≤ Δt ≤ 5 s, telemetri ≤ 500 ms); GOTO
+     (GEOFENCE'ten sonra), WAIT, hiz_siniri (LIMIT'ten sonra), STOP'ta yok; içerik reddi. `guard_tick`
+     döngünün başına alındı (zaman ve telemetri yaşı komutlardan önce). Ajan köprüsü RViz hedeflerinde
+     inancı TF'ten doldurur. RULES §3.4'ün sayıları v_max 0,30 ile kalmıştı, düzeltildi. PC: 131 test,
+     kasıtlı 4 hatanın 4'ü yakalandı. Kart: 43 868 B, 0 uyarı; `decision_test` baştan düzenlendi (bütün
+     görev komutları telemetriyle tutarlı inançla; yeni TOO_FAR 300/25 cm, BELIEF_TOO_OLD 6009 ms,
+     NO_TELEMETRY 754 ms), 2/2. Uçtan uca: RViz yolundan iki hedef kabul, vardı; seri 0, bayat ve kırpma
+     artmadı, RTT 8 ms.
+     **Sırada: 4.2** (ajan köprüsünde görev komutları arayüzü: GOTO/WAIT/hiz_siniri/STOP ve inanç
+     alanları, gerekçenin ajana ad + koordinatla verilmesi, C/D yapılandırması) ve **4.3** (ajan,
+     granite4.1:3b, K-045).
    - **Ağ:** okul Wi-Fi'si (GSBWIFI) IP'yi ara ara kaybediyor; o an ROS (CycloneDDS) ve Gazebo
      multicast'i kopuyor, süreçler toparlanmıyor. Kendi bağlantıyla sorun yok. Port 22 orada kapalı.
    - **Teşhis düzeltmesi:** "collision ahead ← AMCL kaybı" (aşağıda, 3.3) yanlıştı: tur 1'de AMCL

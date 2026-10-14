@@ -7,8 +7,9 @@
  * PC'de sınanır (firmware/tests/test_guard.py). Çıktıları göndermek çağıranın işi.
  *
  * AUTH ve REPLAY buraya gelmeden kanal katmanında düşer (K-023). FRESHNESS
- * onlardan sonra, içerik kurallarından önce (guard_fresh). CONSISTENCY Faz 4'ün
- * sonraki adımında. */
+ * onlardan sonra, içerik kurallarından önce (guard_fresh). İçerik kuralları
+ * GEOFENCE · LIMIT · CONSISTENCY sırasıyla (§4); CONSISTENCY son telemetriyi ve
+ * guard_tick'in verdiği zamanı kullanır. */
 #ifndef GUARD_H
 #define GUARD_H
 
@@ -27,6 +28,9 @@ typedef struct {
     bool halt_pending;           /* HOLD'a girildi, araca bir kez HALT(0) gidecek (K-042) */
     int16_t prev_v_mm_s;         /* araca son GÖNDERİLEN hız (RULES §3.2); HOLD'da 0 */
     int16_t prev_w_mrad_s;
+    geo_point_t telemetry_pos;   /* son telemetri konumu (CONSISTENCY) */
+    uint32_t now_ms;             /* guard_tick'ten: döngü başındaki saat */
+    uint32_t telemetry_age_ms;   /* guard_tick'ten; açılışta "hiç gelmedi" */
 } guard_t;
 
 typedef struct {
@@ -64,10 +68,10 @@ bool guard_fresh(uint32_t seq, uint8_t type, uint32_t now_ms, uint32_t ts_ms,
 void guard_speed_limit(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
                        const proto_speed_limit_cmd_t *cmd, guard_decision_t *out);
 
-/* WAIT_CMD (bekle): görev komutu, NORMAL dışında MODE ile ret. Kabulde araca
- * HALT(süre): Nav2'nin hedefi iptal edilir, araç durur. Kabul ret serisini
- * sıfırlar (§5.4). CONSISTENCY Faz 4'ün sonraki adımında. */
-void guard_wait(guard_t *g, uint32_t seq, const proto_wait_cmd_t *cmd, guard_decision_t *out);
+/* WAIT_CMD (bekle): görev komutu: MODE → CONSISTENCY. Kabulde araca HALT(süre):
+ * Nav2'nin hedefi iptal edilir, araç durur. Kabul ret serisini sıfırlar (§5.4). */
+void guard_wait(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
+                const proto_wait_cmd_t *cmd, guard_decision_t *out);
 
 /* STOP_CMD (dur): her durumda kabul edilir, araca HALT(0) (§2: durmak her
  * zaman güvenli). RECOVERY'de kurtarma biter → HOLD. Ret serisini sıfırlamaz:
@@ -101,7 +105,8 @@ bool guard_telemetry(guard_t *g, const site_t *s, const proto_telemetry_t *tel,
  * yollar (kalp atışı, varış, zaman kuralları, STOP) bunu kurar. */
 bool guard_take_halt(guard_t *g);
 
-/* Her döngüde. RECOVERY'nin zaman kuralları (K-047): son telemetri
+/* Her döngünün BAŞINDA, komutlar işlenmeden önce: saat ve telemetri yaşı
+ * saklanır (CONSISTENCY). RECOVERY'nin zaman kuralları (K-047): son telemetri
  * RECOVERY_TELEMETRY_TIMEOUT_MS'den eskiyse ya da kurtarma RECOVERY_TIMEOUT_MS'den
  * uzun sürdüyse → HOLD. Süre, girişten sonraki ilk çağrıda başlar. Başka
  * durumlarda etkisiz. now_ms taşar (49 gün): fark işaretsiz alınır. */

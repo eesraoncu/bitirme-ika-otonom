@@ -5,7 +5,9 @@ Kullanım (depo kökünden; bridge.launch.py ikisini birlikte başlatır):
     python3 ros2_ws/src/guard_bridge/agent_bridge.py --ros-args -p use_sim_time:=true
 
 Karta giden:
-- /goal_pose (PoseStamped, harita çerçevesi) → GOTO_CMD. Konum inancı alanları 0 (Faz 4).
+- /goal_pose (PoseStamped, harita çerçevesi) → GOTO_CMD. Konum inancı (CONSISTENCY, RULES
+  §3.4) o anki map → base_link'ten, okunduğu an kartın saatiyle (protocol §6.3): RViz'i
+  kullanan insanın inancı aracın konumudur. LLM ajanı kendi okuduğu konumu verecek (4.3).
 - /cmd_vel_nav (Nav2'nin hız komutu) → VELOCITY_CMD.
 - HEARTBEAT 100 ms'de bir, arka planda. Bu düğüm durunca kart 500 ms'de HOLD'a geçer.
 - /guard/reset servisi (std_srvs/Trigger) → RESET_CMD: kart açılışta HOLD'dadır,
@@ -29,8 +31,10 @@ import rclpy
 from geometry_msgs.msg import PoseStamped, Twist
 from rclpy.node import Node
 from rclpy.signals import SignalHandlerOptions
+from rclpy.time import Time
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
+from tf2_ros import Buffer, TransformException, TransformListener
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -58,6 +62,8 @@ class AgentBridge(Node):
         self.create_subscription(Twist, "/cmd_vel_nav", self.on_cmd_vel, 10)
         self.create_service(Trigger, "/guard/reset", self.on_reset)
         self.state = None
+        self.tf = Buffer()
+        self.tf_listener = TransformListener(self.tf, self)
         self.last_status = None
         self.last_verdict = None
         self.velocity_sent = 0
@@ -107,11 +113,26 @@ class AgentBridge(Node):
             return
         p, q = msg.pose.position, msg.pose.orientation
         x, y, yaw = cv.pose_to_cm(p.x, p.y, q.x, q.y, q.z, q.w)
-        wire = self.send(m.GotoCmd(x, y, yaw, 0, 0, 0))
+        bx, by, bts = self.belief()
+        wire = self.send(m.GotoCmd(x, y, yaw, bx, by, bts))
         if wire is None:
             self.get_logger().warn(f"bağlantı yok: hedef ({x}, {y}) cm gönderilmedi")
             return
         self.get_logger().info(f"GOTO_CMD #{Link.wire_seq(wire)}: ({x}, {y}) cm, {yaw} mrad")
+
+    def belief(self):
+        """Aracın konumu (map → base_link, cm) ve okunduğu an (kartın saati). Dönüşüm yoksa
+        (0, 0, 0): kart BELIEF_TOO_OLD ile reddeder, karar kartta kalır."""
+        if self.link is None:
+            return 0, 0, 0
+        try:
+            t = self.tf.lookup_transform("map", "base_link", Time()).transform
+        except TransformException as e:
+            self.get_logger().warn(f"konum inancı okunamadı ({e}): 0 gönderiliyor")
+            return 0, 0, 0
+        r = t.rotation
+        x, y, _ = cv.pose_to_cm(t.translation.x, t.translation.y, r.x, r.y, r.z, r.w)
+        return x, y, self.link.board_now()
 
     def on_cmd_vel(self, msg: Twist) -> None:
         if self.send(m.VelocityCmd(*cv.twist_to_cmd(msg.linear.x, msg.angular.z))) is not None:

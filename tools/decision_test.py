@@ -77,9 +77,29 @@ def send_shifted(agent: Link, msg, shift_ms: int):
     return verdict_for(agent, f.seq)
 
 
+# Görev komutlarının konum inancı (CONSISTENCY, RULES §3.4): araç kanalından gönderilen
+# telemetri konumu, okunduğu an kartın saatiyle. run() bu akışı başta başlatır.
+TEL: "Optional[TelemetryStream]" = None
+AGENT: "Optional[Link]" = None
+BASE = (300, 0)        # NORMAL bölümlerde aracın telemetri konumu: izinli, başlangıçtan uzak
+
+
+def belief():
+    if TEL is None or not TEL.running or AGENT is None:
+        return 0, 0, 0
+    return TEL.pos[0], TEL.pos[1], AGENT.board_now()
+
+
 def goto(x: int, y: int, yaw: int = 0) -> m.GotoCmd:
-    # belief alanları tutarlılık kuralı içindir (Faz 4), henüz denetlenmiyor
-    return m.GotoCmd(x, y, yaw, 0, 0, 0)
+    return m.GotoCmd(x, y, yaw, *belief())
+
+
+def wait_cmd(seconds: int) -> m.WaitCmd:
+    return m.WaitCmd(seconds, *belief())
+
+
+def speed_cmd(mm_s: int) -> m.SpeedLimitCmd:
+    return m.SpeedLimitCmd(mm_s, *belief())
 
 
 class TelemetryStream:
@@ -142,10 +162,21 @@ def main() -> int:
 
 
 def run(agent: Link, vehicle: Link, hb: Heartbeat, rep: Report) -> None:
+    global TEL, AGENT
     print("Bağlantı")
     agent.connect()
     vehicle.connect()
     rep.check(agent.session_id == vehicle.session_id, "iki kanalda aynı oturum")
+    AGENT = agent
+    TEL = TelemetryStream(vehicle)
+    TEL.start(BASE)
+    try:
+        sections(agent, vehicle, hb, rep)
+    finally:
+        TEL.stop()
+
+
+def sections(agent: Link, vehicle: Link, hb: Heartbeat, rep: Report) -> None:
 
     # Önceki bir çalıştırma kartı NORMAL'de bırakmış olabilir: kalp atışı
     # yokken 500 ms içinde HOLD'a düşmeli.
@@ -235,18 +266,18 @@ def run(agent: Link, vehicle: Link, hb: Heartbeat, rep: Report) -> None:
     print("Hız sınırı (hiz_siniri, LIMIT)")
     vehicle.receive(0.1)
     # Önce kabul: "Hedefler"deki 3 ret seriyi 3'te bıraktı; 2 ret daha kurtarmayı başlatırdı
-    v = send_cmd(agent, m.SpeedLimitCmd(300, 0, 0, 0))
+    v = send_cmd(agent, speed_cmd(300))
     sl = vehicle.wait_for(m.SpeedLimitSet, 0.5)
     rep.check(v is not None and v.result == m.Result.ACCEPTED and sl is not None
               and sl[1].limit_mm_s == 300, "hiz_siniri(0,3) kabul, araca SPEED_LIMIT_SET(300)")
     ack = agent.wait_for(m.HeartbeatAck, 0.5)
     rep.check(ack is not None and ack[1].reject_streak == 0, "kabul ret serisini sıfırladı")
-    v = send_cmd(agent, m.SpeedLimitCmd(900, 0, 0, 0))
+    v = send_cmd(agent, speed_cmd(900))
     rep.check(v is not None and v.rule == m.Rule.LIMIT and v.reason == m.Reason.ABOVE_MAX
               and (v.value, v.lo, v.hi) == (900, 1, 600),
               "hiz_siniri(0,9) → LIMIT / ABOVE_MAX, istenen 900, aralık 1–600",
               "" if v is None else f"{v.reason.name}, {v.value} [{v.lo}, {v.hi}]")
-    v = send_cmd(agent, m.SpeedLimitCmd(0, 0, 0, 0))
+    v = send_cmd(agent, speed_cmd(0))
     rep.check(v is not None and v.reason == m.Reason.NOT_POSITIVE, "hiz_siniri(0) → NOT_POSITIVE")
     rep.check(vehicle.wait_for(m.SpeedLimitSet, 0.3) is None, "reddedilen sınır araca gitmedi")
     rep.check(board_state(agent) == m.BoardState.NORMAL, "2 LIMIT reddi: seri 2, kart NORMAL")
@@ -284,7 +315,7 @@ def run(agent: Link, vehicle: Link, hb: Heartbeat, rep: Report) -> None:
 
     print("Bekle ve dur (WAIT_CMD, STOP_CMD)")
     vehicle.receive(0.1)
-    v = send_cmd(agent, m.WaitCmd(30, 0, 0, 0))
+    v = send_cmd(agent, wait_cmd(30))
     h = vehicle.wait_for(m.Halt, 0.5)
     rep.check(v is not None and v.result == m.Result.ACCEPTED and h is not None
               and h[1].duration_s == 30, "WAIT(30) kabul, araca HALT(30)", str(h[1]) if h else "")
@@ -293,6 +324,30 @@ def run(agent: Link, vehicle: Link, hb: Heartbeat, rep: Report) -> None:
     rep.check(v is not None and v.result == m.Result.ACCEPTED and h is not None
               and h[1].duration_s == 0, "STOP kabul, araca HALT(0)", str(h[1]) if h else "")
     rep.check(board_state(agent) == m.BoardState.NORMAL, "NORMAL'de STOP durumu değiştirmedi")
+
+    print("Tutarlılık (RULES §3.4, K-049)")
+    vehicle.receive(0.1)
+    x0, y0 = TEL.pos
+    v = send_cmd(agent, m.GotoCmd(*ALLOWED_GOAL, x0 + 300, y0, agent.board_now()))
+    rep.check(v is not None and v.rule == m.Rule.CONSISTENCY and v.reason == m.Reason.TOO_FAR
+              and v.value == 300 and 25 <= v.hi <= 27 and (v.hint_x_cm, v.hint_y_cm) == (x0, y0),
+              "inanç telemetriden 3 m uzak → CONSISTENCY / TOO_FAR, fark 300, tolerans ~25, "
+              "ipucu telemetri", "" if v is None else
+              f"{v.reason.name}, {v.value} cm / {v.hi} cm, ({v.hint_x_cm}, {v.hint_y_cm})")
+    v = send_cmd(agent, m.GotoCmd(*ALLOWED_GOAL, x0, y0, (agent.board_now() - 6000) & 0xFFFFFFFF))
+    rep.check(v is not None and v.reason == m.Reason.BELIEF_TOO_OLD and 5990 <= v.value <= 6100
+              and v.hi == 5000, "6 s eski inanç → BELIEF_TOO_OLD", "" if v is None else str(v.value))
+    TEL.stop()
+    time.sleep(0.7)
+    v = send_cmd(agent, m.GotoCmd(*ALLOWED_GOAL, x0, y0, agent.board_now()))
+    TEL.start((x0, y0))
+    rep.check(v is not None and v.reason == m.Reason.NO_TELEMETRY and v.value > 500 and v.hi == 500,
+              "telemetri kesik → NO_TELEMETRY", "" if v is None else str(v.value))
+    goals = [c for _, c in vehicle.receive(0.2) if c is m.Goal]
+    rep.check(not goals, "tutarsız hedefler araca gitmedi", f"{len(goals)} GOAL")
+    time.sleep(0.2)
+    v = send_cmd(agent, goto(*ALLOWED_GOAL))
+    rep.check(v is not None and v.result == m.Result.ACCEPTED, "tutarlı inançla aynı hedef kabul")
 
     print("Kalp atışı kesildi")
     vehicle.receive(0.2)   # tampon boşalsın: ilk DRIVE kesintiden sonrakini göstersin
@@ -312,7 +367,7 @@ def run(agent: Link, vehicle: Link, hb: Heartbeat, rep: Report) -> None:
     rep.check(reaches_state(agent, m.BoardState.HOLD), "kart HOLD'da")
     v = send_cmd(agent, goto(*ALLOWED_GOAL))
     rep.check(v is not None and v.reason == m.Reason.IN_HOLD, "HOLD'da hedef reddedildi")
-    v = send_cmd(agent, m.WaitCmd(30, 0, 0, 0))
+    v = send_cmd(agent, wait_cmd(30))
     rep.check(v is not None and v.reason == m.Reason.IN_HOLD, "HOLD'da WAIT → MODE / IN_HOLD")
     v = send_cmd(agent, m.StopCmd())
     rep.check(v is not None and v.result == m.Result.ACCEPTED, "HOLD'da STOP yine kabul")
@@ -329,11 +384,8 @@ def run(agent: Link, vehicle: Link, hb: Heartbeat, rep: Report) -> None:
     rep.check(ack is not None and ack[1].state == m.BoardState.HOLD,
               "HOLD mandallı: SIFIRLA olmadan NORMAL'e dönmedi")
 
-    tel = TelemetryStream(vehicle)
-    try:
-        recovery(agent, vehicle, tel, rep)
-    finally:
-        tel.stop()
+    TEL.stop()                    # kurtarma senaryoları akışı kendisi başlatıp durdurur
+    recovery(agent, vehicle, TEL, rep)
     hb.stop()
 
 

@@ -5,7 +5,9 @@
  * değişecek, kararın mantığı değişmeyecek.
  *
  * Her satır bir komut, her komuta bir satır cevap. Sayılar ondalık.
- *   init                       → "ok"
+ *   init                       → "ok"; ardından döngü başı gibi tick 0 0 (telemetri taze, araç
+ *                                (0, 0)): CONSISTENCY'siz eski testler değişmeden geçer
+ *   belief <x> <y> <ts>        → "ok"; sonraki goto/wait/speed bu inancı taşır (açılışta 0 0 0)
  *   goto <seq> <x> <y> <yaw> [canlı 0|1]  → karar (canlı verilmezse 1)
  *   reset <seq> <canlı 0|1>    → karar
  *   wait <seq> <süre_s>        → karar
@@ -48,6 +50,16 @@ static const site_t no_safe_site = {
 };
 
 static guard_t g;
+static int16_t belief_x, belief_y;
+static uint32_t belief_ts;
+
+static void reset_guard(void)
+{
+    guard_init(&g);
+    guard_tick(&g, 0u, 0u);
+    belief_x = belief_y = 0;
+    belief_ts = 0u;
+}
 
 static void print_decision(const guard_decision_t *d)
 {
@@ -75,20 +87,26 @@ static void print_decision(const guard_decision_t *d)
 int main(void)
 {
     static char line[256];
-    guard_init(&g);
+    reset_guard();
     while (fgets(line, sizeof line, stdin) != NULL) {
         guard_decision_t d;
         unsigned long seq, now, ts;
         int x, y, yaw, alive, which;
         if (strncmp(line, "init", 4) == 0) {
-            guard_init(&g);
+            reset_guard();
+            puts("ok");
+        } else if (sscanf(line, "belief %d %d %lu", &x, &y, &ts) == 3) {
+            belief_x = (int16_t)x;
+            belief_y = (int16_t)y;
+            belief_ts = (uint32_t)ts;
             puts("ok");
         } else if (sscanf(line, "goto %lu %d %d %d %d", &seq, &x, &y, &yaw, &alive) >= 4) {
             if (sscanf(line, "goto %lu %d %d %d %d", &seq, &x, &y, &yaw, &alive) == 4) {
                 alive = 1;
             }
             proto_goto_cmd_t cmd = { .goal_x_cm = (int16_t)x, .goal_y_cm = (int16_t)y,
-                                     .goal_yaw_mrad = (int16_t)yaw };
+                                     .goal_yaw_mrad = (int16_t)yaw, .belief_x_cm = belief_x,
+                                     .belief_y_cm = belief_y, .belief_ts_ms = belief_ts };
             guard_goto(&g, &test_site, (uint32_t)seq, alive != 0, &cmd, &d);
             print_decision(&d);
         } else if (sscanf(line, "reset %lu %d", &seq, &alive) == 2) {
@@ -118,12 +136,14 @@ int main(void)
             if (sscanf(line, "speed %lu %d %d", &seq, &x, &alive) == 2) {
                 alive = 1;
             }
-            proto_speed_limit_cmd_t cmd = { .limit_mm_s = (uint16_t)x };
+            proto_speed_limit_cmd_t cmd = { .limit_mm_s = (uint16_t)x, .belief_x_cm = belief_x,
+                                            .belief_y_cm = belief_y, .belief_ts_ms = belief_ts };
             guard_speed_limit(&g, &test_site, (uint32_t)seq, alive != 0, &cmd, &d);
             print_decision(&d);
         } else if (sscanf(line, "wait %lu %d", &seq, &x) == 2) {
-            proto_wait_cmd_t cmd = { .duration_s = (uint16_t)x };
-            guard_wait(&g, (uint32_t)seq, &cmd, &d);
+            proto_wait_cmd_t cmd = { .duration_s = (uint16_t)x, .belief_x_cm = belief_x,
+                                     .belief_y_cm = belief_y, .belief_ts_ms = belief_ts };
+            guard_wait(&g, &test_site, (uint32_t)seq, 1, &cmd, &d);
             print_decision(&d);
         } else if (sscanf(line, "stop %lu", &seq) == 1) {
             guard_stop(&g, (uint32_t)seq, &d);

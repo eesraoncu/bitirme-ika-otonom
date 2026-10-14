@@ -366,7 +366,7 @@ static void on_agent_frame(channel_t *ch, const frame_t *f)
         if (!proto_wait_cmd_decode(f->payload, f->payload_len, &cmd)) {
             return;
         }
-        guard_wait(&guard, f->seq, &cmd, &d);
+        guard_wait(&guard, &site, f->seq, heartbeat_alive(), &cmd, &d);
         send_decision(ch, &d);
         break;
     }
@@ -472,6 +472,8 @@ void app_loop(void)
     if (heartbeat_take_lost()) {
         guard_heartbeat_lost(&guard);
     }
+    /* Komutlar işlenmeden önce: CONSISTENCY saati ve telemetri yaşını buradan alır */
+    guard_tick(&guard, now, telemetry_age_ms(now));
     channel_board_t board = {
         .state = guard.state,
         .reject_streak = guard.reject_streak,
@@ -481,7 +483,6 @@ void app_loop(void)
     channel_poll(&agent_ch, now, &board, on_agent_frame);
     channel_poll(&vehicle_ch, now, &board, on_vehicle_frame);
     guard_can_poll(now);
-    guard_tick(&guard, now, telemetry_age_ms(now));
     halt_on_hold();
     hold_drive(now);
     vehicle_node_poll(&vehicle_ch);

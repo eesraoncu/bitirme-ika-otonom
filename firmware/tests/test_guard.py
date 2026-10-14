@@ -86,6 +86,7 @@ def guard(tmp_path_factory):
          str(APP / "guard" / "guard.c"), str(APP / "site" / "site.c"),
          str(APP / "rules" / "geofence" / "geofence.c"), str(APP / "recovery" / "recovery.c"),
          str(APP / "rules" / "limits" / "limits.c"), str(APP / "rules" / "freshness" / "freshness.c"),
+         str(APP / "rules" / "consistency" / "consistency.c"),
          "-o", str(exe)],
         capture_output=True, text=True)
     assert cc.returncode == 0, "Kartın C kodu katı uyarılarla derlenmedi:\n" + cc.stderr
@@ -467,3 +468,76 @@ def test_freshness_does_not_touch_state_or_streak(guard):
                      f"fresh 3 {m.GotoCmd.ID} 100000 90000", "goto 4 9000 0 0"])
     assert [_parse(out[i]).streak for i in (2, 4)] == [1, 2]       # bayat ret seriye girmedi
     assert _parse(out[4]).state == NORMAL
+
+
+# ---- Tutarlılık (RULES §3.4, K-049) ----------------------------------------------
+# Sürücünün init'i: saat 0, telemetri taze, araç (0, 0). "tel x y 1" konumu, "tick now age"
+# saati ve telemetri yaşını değiştirir; "belief x y ts" sonraki komutların inancıdır.
+
+def _goto_with(guard, *setup):
+    out = guard.run(["init", "reset 1 1", *setup, "goto 9 100 100 0"])
+    return _parse(out[-1])
+
+
+@pytest.mark.parametrize("dist,ok", [(25, True), (26, False)])
+def test_consistency_d0_at_zero_dt(guard, dist, ok):
+    # Δt = 0: tolerans 25 cm; sınır dahil
+    d = _goto_with(guard, f"belief {dist} 0 0")
+    assert accepted(d) if ok else rejected(d, Rule.CONSISTENCY, Reason.TOO_FAR)
+
+
+@pytest.mark.parametrize("dt,dist,ok", [
+    (1000, 85, True), (1000, 86, False),          # 1 s: 25 + 60 = 85 cm
+    (5000, 325, True), (5000, 326, False),        # 5 s: 25 + 300 = 325 cm (K-049)
+])
+def test_consistency_tolerance_grows_with_dt(guard, dt, dist, ok):
+    d = _goto_with(guard, f"tick {dt} 0", f"belief {dist} 0 0")
+    assert accepted(d) if ok else rejected(d, Rule.CONSISTENCY, Reason.TOO_FAR)
+
+
+def test_too_far_verdict_fields(guard):
+    # inanç (300, 400), telemetri (0, 0): fark 500 cm, Δt 1 s → tolerans 85 cm; ipucu telemetri
+    d = _goto_with(guard, "tel 0 0 1", "tick 1000 0", "belief 300 400 0")
+    assert rejected(d, Rule.CONSISTENCY, Reason.TOO_FAR)
+    assert (d.value, d.hi, d.hint) == (500, 85, (0, 0)) and d.goal is None and d.streak == 1
+
+
+@pytest.mark.parametrize("now,ts,reason,value", [
+    (5001, 0, Reason.BELIEF_TOO_OLD, 5001),
+    (1000, 1051, Reason.BELIEF_FROM_FUTURE, -51),
+])
+def test_belief_time_limits(guard, now, ts, reason, value):
+    d = _goto_with(guard, f"tick {now} 0", f"belief 0 0 {ts}")
+    assert rejected(d, Rule.CONSISTENCY, reason) and d.value == value
+
+
+def test_belief_time_boundaries_accepted(guard):
+    assert accepted(_goto_with(guard, "tick 5000 0", "belief 0 0 0"))
+    assert accepted(_goto_with(guard, "tick 1000 0", "belief 0 0 1050"))
+
+
+def test_no_telemetry(guard):
+    assert accepted(_goto_with(guard, "tick 0 500"))
+    d = _goto_with(guard, "tick 0 501")
+    assert rejected(d, Rule.CONSISTENCY, Reason.NO_TELEMETRY) and (d.value, d.hi) == (501, 500)
+
+
+def test_geofence_checked_before_consistency(guard):
+    out = guard.run(["init", "reset 1 1", "belief 3000 0 0", "goto 9 9000 0 0"])
+    assert rejected(_parse(out[-1]), Rule.GEOFENCE, Reason.GOAL_OUTSIDE_ALLOWED)
+
+
+def test_consistency_on_wait_and_speed_limit_not_stop(guard):
+    out = guard.run(["init", "reset 1 1", "belief 3000 0 0", "wait 2 10", "speed 3 300",
+                     "speed 4 900", "stop 5"])
+    w, sp, sp_bad, st = (_parse(o) for o in out[3:])
+    assert rejected(w, Rule.CONSISTENCY, Reason.TOO_FAR) and w.halt is None
+    assert rejected(sp, Rule.CONSISTENCY, Reason.TOO_FAR) and sp.speed is None
+    assert rejected(sp_bad, Rule.LIMIT, Reason.ABOVE_MAX)            # LIMIT önce
+    assert accepted(st) and st.halt == 0                              # dur() inanç taşımaz
+    assert [w.streak, sp.streak, sp_bad.streak] == [1, 2, 3]
+
+
+def test_fifth_consistency_rejection_starts_recovery(guard):
+    ds = guard.seq("init", "reset 1 1", "belief 3000 0 0", *[f"goto {i} 100 100 0" for i in range(2, 7)])
+    assert ds[-1].rule == Rule.CONSISTENCY and ds[-1].state == RECOVERY

@@ -173,7 +173,7 @@ damgasını** taşır. Kart bunu en son telemetriyle kıyaslar:
 tol(Δt) = d₀ + v_max × Δt
 d₀    = 0,25 m   (konum gürültüsü payı)
 v_max = 0,60 m/s (bekçinin kendi hız limiti)
-Δt    = şimdi − ajanın konumu okuduğu an,  Δt ≤ 10 s
+Δt    = şimdi − ajanın konumu okuduğu an,  −50 ms ≤ Δt ≤ 5 s  (K-049)
 ```
 
 - **Tolerans neden sabit değil:** LLM, özellikle CPU'da çalışırsa, konumu okuduktan
@@ -182,9 +182,9 @@ v_max = 0,60 m/s (bekçinin kendi hız limiti)
 - **Formül neden güvenilir:** bekçi hızı zaten 0,60 m/s'de kestiği için araç Δt sürede
   en fazla `v_max × Δt` yol alabilir. Tolerans fiziksel bir üst sınırdan türetiliyor,
   tahmine dayanmıyor.
-- **Konum bilgisi 10 s'den eskiyse** komut `CONSISTENCY` ile reddedilir ve gerekçede
-  "konumu yeniden oku" denir. 10 s'de tolerans 3,25 m'ye çıkar. Daha eskisi anlamlı
-  bir denetim bırakmaz.
+- **Konum bilgisi 5 s'den eskiyse** komut `CONSISTENCY / BELIEF_TOO_OLD` ile reddedilir ve
+  gerekçede "konumu yeniden oku" denir. 5 s'de tolerans 3,25 m'ye çıkar (1 s'de 0,85 m).
+  Daha eskisi anlamlı bir denetim bırakmaz (K-049; önceki 10 s, v_max 0,30 ile yazılmıştı).
 - Bu kural ince hataları değil, **kaba hataları** yakalamak için var: yanlış koordinat
   çerçevesi, yer değiştirmiş x/y, uydurulmuş konum. Bunlar genelde metrelerce sapar.
 - **Telemetri 500 ms'den eskiyse** tutarlılık denetlenemez. Komut `CONSISTENCY /
@@ -195,13 +195,20 @@ v_max = 0,60 m/s (bekçinin kendi hız limiti)
 **Sınırlamalar** (tezin sınırlamalar bölümüne girecek):
 
 - **LLM ne kadar yavaşsa kural o kadar gevşer.** Örneğin 1,4 m'lik bir x/y yer değiştirme
-  hatası Δt = 1 s'de yakalanır (tolerans 0,55 m) ama Δt = 5 s'de kaçar (tolerans 1,75 m).
+  hatası Δt = 1 s'de yakalanır (tolerans 0,85 m) ama Δt = 2 s'de kaçar (tolerans 1,45 m).
   Faz 4'teki model seçimi (CPU mu GPU mu) kuralın gücünü doğrudan etkiler. Her kararın
   Δt'si kayda geçtiği için Faz 6'da **"LLM gecikmesine göre yakalama oranı"** ek bir
   özellik gerekmeden çizilebilir.
 - **Araç dururken de tolerans büyür.** Daha sıkı bir alternatif, telemetri geçmişinden
   aracın gerçekte ne kadar yol aldığını hesaplamak. Ama bu, kartta konum geçmişi saklamayı
   ve karar süresini değişken yapmayı gerektirir. Basit formülde kalındı.
+
+**Uygulandı (2026-10-14):** `firmware/app/rules/consistency/` (cm, ms, tamsayı; uzaklık
+karesiyle, VERDICT için tamsayı karekök). Sıra (§4): GOTO'da GEOFENCE'ten, `hiz_siniri`'de
+LIMIT'ten sonra, `bekle`'de tek içerik kuralı; `dur()`'da yok. İçerik reddi (seri, 5'te
+kurtarma). Önce telemetri yaşı, sonra Δt, sonra uzaklık. Kartta: 3 m uzak inanç → TOO_FAR
+300 / 25 cm, ipucu telemetri; 6 s eski → BELIEF_TOO_OLD; telemetri kesik → NO_TELEMETRY.
+RViz yolunda köprü inancı TF'ten doldurur (K-049).
 
 ### 3.5 Kalp atışı
 

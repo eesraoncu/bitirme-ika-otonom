@@ -21,6 +21,10 @@ typedef enum {
     FRESHNESS_FROM_FUTURE,   /* VERDICT'te FROM_FUTURE */
 } freshness_result_t;
 
+/* now − ts, işaretli (ms): ileriden gelen damgada negatif. Saat taşmasında
+ * doğru. Tutarlılık kuralı da kullanır (inancın yaşı). */
+int32_t time_age_ms(uint32_t now_ms, uint32_t ts_ms);
+
 /* *age_ms: yaş (ms), ileriden gelen damgada negatif. */
 freshness_result_t freshness_check(uint32_t now_ms, uint32_t ts_ms, int32_t *age_ms);
 

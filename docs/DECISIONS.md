@@ -1088,3 +1088,14 @@ kalsa 180 s boşuna beklerdi. HOLD daha kısıtlayıcı, ajan bununla kurtarmada
 STOP seriyi sıfırlasaydı ajan araya "dur" koyarak 5. reddi hiç görmez, kurtarma tetiklenmezdi.
 Doğrulandı: yoldayken ajan köprüsü kapandı → 0,61 s'de Nav2 hedefi iptal, araç durdu;
 SIFIRLA'dan sonra araç kıpırdamadı.
+
+## K-049 · Tutarlılıkta inancın en çok 5 s eski olabileceği
+**Tarih:** 2026-10-14 · **Durum:** Yürürlükte
+
+CONSISTENCY'de Δt üst sınırı 10 s'den 5 s'ye indi: tol = 0,25 m + 0,6 m/s × Δt en çok
+3,25 m. RViz yolundan (/goal_pose) gelen hedeflerde köprü inancı o anki map → base_link'ten
+doldurur; LLM ajanı 4.3'te kendi okuduğu konumu gönderir.
+
+**Neden:** Esra'nın kararı (2026-10-14). RULES §3.4'ün sayıları v_max 0,30 m/s ile kalmıştı
+(K-039'da 0,60 oldu): "10 s'de 3,25 m" aslında 6,25 m'ydi, sahanın yarısı. 5 s metnin niyetini
+korur; granite ile bir karar ~0,4 s, dürüst ajana bol pay.

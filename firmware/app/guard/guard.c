@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "recovery/recovery.h"
+#include "rules/consistency/consistency.h"
 #include "rules/freshness/freshness.h"
 #include "rules/limits/limits.h"
 
@@ -10,6 +11,7 @@ void guard_init(guard_t *g)
 {
     memset(g, 0, sizeof *g);
     g->state = PROTO_BOARD_STATE_HOLD;
+    g->telemetry_age_ms = UINT32_MAX;        /* ilk guard_tick'e kadar: telemetri yok */
 }
 
 static void verdict(guard_decision_t *out, uint32_t seq, uint8_t result,
@@ -73,6 +75,36 @@ static void content_rejected(guard_t *g, const site_t *s, bool heartbeat_alive,
     }
 }
 
+/* CONSISTENCY (§3.4): inanç son telemetriyle tutarlı değilse ret. İçerik reddi:
+ * seri artar, 5'te kurtarma. TOO_FAR'da ipucu telemetri konumu. */
+static bool consistency_rejects(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
+                                int16_t bx, int16_t by, uint32_t bts, guard_decision_t *out)
+{
+    static const uint8_t reasons[] = {
+        [CONSISTENCY_TOO_FAR] = PROTO_REASON_TOO_FAR,
+        [CONSISTENCY_BELIEF_TOO_OLD] = PROTO_REASON_BELIEF_TOO_OLD,
+        [CONSISTENCY_BELIEF_FROM_FUTURE] = PROTO_REASON_BELIEF_FROM_FUTURE,
+        [CONSISTENCY_NO_TELEMETRY] = PROTO_REASON_NO_TELEMETRY,
+    };
+    consistency_detail_t det;
+    geo_point_t belief = { bx, by };
+    consistency_result_t r = consistency_check(g->now_ms, belief, bts, g->telemetry_pos,
+                                               g->telemetry_age_ms, &det);
+    if (r == CONSISTENCY_OK) {
+        return false;
+    }
+    verdict(out, seq, PROTO_RESULT_REJECTED, PROTO_RULE_CONSISTENCY, reasons[r]);
+    out->verdict.value = det.value;
+    out->verdict.lo = det.lo;
+    out->verdict.hi = det.hi;
+    if (r == CONSISTENCY_TOO_FAR) {
+        out->verdict.hint_x_cm = g->telemetry_pos.x_cm;
+        out->verdict.hint_y_cm = g->telemetry_pos.y_cm;
+    }
+    content_rejected(g, s, heartbeat_alive, out);
+    return true;
+}
+
 void guard_goto(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
                 const proto_goto_cmd_t *cmd, guard_decision_t *out)
 {
@@ -90,6 +122,10 @@ void guard_goto(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
         out->verdict.hint_x_cm = hint.x_cm;
         out->verdict.hint_y_cm = hint.y_cm;
         content_rejected(g, s, heartbeat_alive, out);
+        return;
+    }
+    if (consistency_rejects(g, s, seq, heartbeat_alive, cmd->belief_x_cm, cmd->belief_y_cm,
+                            cmd->belief_ts_ms, out)) {
         return;
     }
 
@@ -153,15 +189,22 @@ void guard_speed_limit(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat
         content_rejected(g, s, heartbeat_alive, out);
         return;
     }
+    if (consistency_rejects(g, s, seq, heartbeat_alive, cmd->belief_x_cm, cmd->belief_y_cm,
+                            cmd->belief_ts_ms, out)) {
+        return;
+    }
     verdict(out, seq, PROTO_RESULT_ACCEPTED, PROTO_RULE_NONE, PROTO_REASON_NONE);
     out->send_speed_limit = true;
     out->speed_limit.limit_mm_s = cmd->limit_mm_s;
     g->reject_streak = 0u;
 }
 
-void guard_wait(guard_t *g, uint32_t seq, const proto_wait_cmd_t *cmd, guard_decision_t *out)
+void guard_wait(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
+                const proto_wait_cmd_t *cmd, guard_decision_t *out)
 {
-    if (mode_rejects(g, seq, out)) {
+    if (mode_rejects(g, seq, out) ||
+        consistency_rejects(g, s, seq, heartbeat_alive, cmd->belief_x_cm, cmd->belief_y_cm,
+                            cmd->belief_ts_ms, out)) {
         return;
     }
     verdict(out, seq, PROTO_RESULT_ACCEPTED, PROTO_RULE_NONE, PROTO_REASON_NONE);
@@ -226,6 +269,7 @@ bool guard_telemetry(guard_t *g, const site_t *s, const proto_telemetry_t *tel,
                      bool heartbeat_alive, proto_goal_t *goal)
 {
     geo_point_t pos = { tel->x_cm, tel->y_cm };
+    g->telemetry_pos = pos;
     if (g->state == PROTO_BOARD_STATE_RECOVERY) {
         if (recovery_arrived(pos, g->recovery_goal)) {
             enter_hold(g);
@@ -242,6 +286,8 @@ bool guard_telemetry(guard_t *g, const site_t *s, const proto_telemetry_t *tel,
 
 void guard_tick(guard_t *g, uint32_t now_ms, uint32_t telemetry_age_ms)
 {
+    g->now_ms = now_ms;
+    g->telemetry_age_ms = telemetry_age_ms;
     if (g->state != PROTO_BOARD_STATE_RECOVERY) {
         return;
     }
