@@ -394,7 +394,7 @@ Planın istediği üç şey, "hangi kural, neden, izinli değer aralığı", şu
 | `GOAL_OUTSIDE_ALLOWED`, `GOAL_IN_FORBIDDEN` | — | — | **en yakın kayıtlı güvenli nokta** |
 | `ABOVE_MAX`, `NOT_POSITIVE` | istenen (mm/s) | 1 / 600 | — |
 | `TOO_FAR` | fark (cm) | — / tolerans (cm) | **aracın gerçek konumu** |
-| `BELIEF_TOO_OLD` | Δt (ms) | — / 10000 | — |
+| `BELIEF_TOO_OLD` | Δt (ms) | — / 5000 (K-049) | — |
 | `BELIEF_FROM_FUTURE` | Δt (ms, negatif) | −50 / — | — |
 | `NO_TELEMETRY` | telemetri yaşı (ms) | — / 500 | — |
 
@@ -422,7 +422,8 @@ Bunun iki sebebi var:
    sorusu doğardı.
 2. **S1 kayıtları C'de de tam.** Hangi kuralın neyi yakaladığı her yapılandırmada ölçülür.
 
-`VERDICT`'i ajanın anlayacağı metne çevirmek köprünün ve ajanın işi (Faz 4). Örnek:
+`VERDICT`'i ajanın anlayacağı metne çevirmek köprünün işi: `convert.feedback_text`,
+`/guard/feedback` (Faz 4.2, `feedback` parametresi `full` = D, `minimal` = C). Örnek:
 
 > Komut reddedildi (CONSISTENCY / TOO_FAR). Varsaydığın konum telemetriden 3,10 m uzak,
 > tolerans 1,45 m. Aracın şu anki konumu: (4,20 ; 1,50).
@@ -482,7 +483,8 @@ Köprü, protokolün bilgisayar tarafındaki tek uygulayıcısıdır:
 - Tüm zaman damgalarını kartın saat alanına çevirmek, `belief_ts_ms` dahil
 - `TELEMETRY`'yi 20 Hz'de araç kanalından göndermek
 - Araç kanalından gelen `GOAL`, `DRIVE`, `HALT`, `SPEED_LIMIT_SET`'i ROS'a iletmek
-- `VERDICT`'i ajana iletmek. **C yapılandırmasında gerekçeyi gizlemek** (§7.3)
+- `VERDICT`'i ajana iletmek. **C yapılandırmasında gerekçeyi gizlemek** (§7.3). Uygulandı
+  (K-050): `/guard/task` → kart → `/guard/feedback`, `feedback` parametresi `full` / `minimal`
 - `STATUS` sayaçlarını deney kaydına yazmak
 
 Faz 2.6'nın test betiklerinden (`tools/link_test.py`, `tools/decision_test.py`) köprüye kalan üç ders:

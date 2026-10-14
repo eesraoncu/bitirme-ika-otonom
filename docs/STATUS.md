@@ -150,9 +150,20 @@ hatalı komut reddedilince ajan gerekçeyi kullanıp kendini düzeltiyor. Sıra 
      görev komutları telemetriyle tutarlı inançla; yeni TOO_FAR 300/25 cm, BELIEF_TOO_OLD 6009 ms,
      NO_TELEMETRY 754 ms), 2/2. Uçtan uca: RViz yolundan iki hedef kabul, vardı; seri 0, bayat ve kırpma
      artmadı, RTT 8 ms.
-     **Sırada: 4.2** (ajan köprüsünde görev komutları arayüzü: GOTO/WAIT/hiz_siniri/STOP ve inanç
-     alanları, gerekçenin ajana ad + koordinatla verilmesi, C/D yapılandırması) ve **4.3** (ajan,
-     granite4.1:3b, K-045).
+   - **4.2 bitti (2026-10-14, K-050):** `agent_bridge`: `/guard/task` (JSON: id, cmd git/bekle/hiz_siniri/dur,
+     m/rad/s, inanç {x, y, stamp ROS}; dur dışında inanç şart) → GOTO/WAIT/SPEED_LIMIT/STOP; inancın
+     zamanı kartın saatine (`ros_to_board_ms`); kararı `/guard/feedback` {id, accepted, text}; hatalı
+     görev karta gitmez, id'siyle hata metni döner; bağlantı koparsa bekleyen görevlere "karar
+     alınamadı". `feedback` parametresi full (D) / minimal (C); `/guard/verdict` her zaman tam.
+     Türkçe gerekçe metni her reason için, coğrafi sınır ipucu güvenli noktanın adıyla
+     (`convert.feedback_text`). Köprü birim testleri 59 (34 yeni). Uçtan uca (kart + simülasyon):
+     D'de kabul, GEOFENCE ("konteyner_onu (8,50; 1,00)"), LIMIT, CONSISTENCY metinleri; hatalı JSON
+     karta gitmedi; hiz_siniri → /speed_limit 0,3; C'de ajan yalnız "Komut reddedildi." gördü,
+     /guard/verdict tam kaldı. `messages.yaml` yorumu ve protocol §7.1: BELIEF_TOO_OLD hi 5000
+     (şema özeti değişmedi, kart yeniden yüklenmedi).
+     **Sırada: 4.3 ajan** (granite4.1:3b, K-045; `/guard/task` ve `/guard/feedback` ile; inanç anlık
+     konumdan; ret döngüsü en çok 3 deneme, RULES §5.4; birim hatası için araç tanımı) ve **4.4**
+     uçtan uca ("depo arkasına git, 30 s bekle" türü görev).
    - **Ağ:** okul Wi-Fi'si (GSBWIFI) IP'yi ara ara kaybediyor; o an ROS (CycloneDDS) ve Gazebo
      multicast'i kopuyor, süreçler toparlanmıyor. Kendi bağlantıyla sorun yok. Port 22 orada kapalı.
    - **Teşhis düzeltmesi:** "collision ahead ← AMCL kaybı" (aşağıda, 3.3) yanlıştı: tur 1'de AMCL

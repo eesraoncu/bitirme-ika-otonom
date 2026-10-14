@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import math
-from typing import Tuple
+from typing import Optional, Tuple
 
 INT16_MIN, INT16_MAX = -32768, 32767
 
@@ -59,10 +59,151 @@ def cmd_to_twist(v_mm_s: int, w_mrad_s: int) -> Tuple[float, float]:
 
 def verdict_text(ref_seq: int, result: str, rule: str, reason: str, value: int,
                  lo: int, hi: int, hint_x_cm: int, hint_y_cm: int) -> str:
-    """VERDICT → /guard/verdict'e yazılan JSON. Adlar sayı değil metin: ajan okur.
-    Gerekçe gizleme (C yapılandırması, protocol §7.3) burada değil, Faz 5'te."""
+    """VERDICT → /guard/verdict'e yazılan JSON: her yapılandırmada tam (deney kaydı, S1).
+    Ajanın gördüğü metin feedback_text'te (C/D, protocol §7.3)."""
     return json.dumps({
         "ref_seq": ref_seq, "result": result, "rule": rule, "reason": reason,
         "value": value, "lo": lo, "hi": hi,
         "hint_m": [hint_x_cm / 100, hint_y_cm / 100],
     }, ensure_ascii=False)
+
+
+# ---- Ajanın görev arayüzü (/guard/task → kart → /guard/feedback, Faz 4.2) ------------
+
+U16_MAX = 65535
+U32 = 0xFFFFFFFF
+TASK_CMDS = ("git", "bekle", "hiz_siniri", "dur")
+
+
+class TaskError(ValueError):
+    """Görev JSON'u anlaşılamadı: karta hiçbir şey gönderilmez, ajana metin döner."""
+
+
+def _number(task: dict, key: str) -> float:
+    v = task.get(key)
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+        raise TaskError(f"'{key}' sayı olmalı")
+    return float(v)
+
+
+def parse_task(text: str) -> dict:
+    """/guard/task JSON'u → doğrulanmış sözlük (id, cmd, alanlar; inanç dur dışında şart).
+    Örnek: {"id": "g7", "cmd": "git", "x": 8.5, "y": 1.0, "yaw": 0.0,
+            "belief": {"x": 0.0, "y": 0.0, "stamp": 12.5}}"""
+    try:
+        task = json.loads(text)
+    except json.JSONDecodeError as e:
+        raise TaskError(f"JSON değil ({e.msg})") from None
+    if not isinstance(task, dict):
+        raise TaskError("JSON nesnesi olmalı")
+    out = {"id": str(task.get("id", "")), "cmd": task.get("cmd")}
+    if out["cmd"] not in TASK_CMDS:
+        raise TaskError(f"'cmd' şunlardan biri olmalı: {', '.join(TASK_CMDS)}")
+    if out["cmd"] == "git":
+        out.update(x=_number(task, "x"), y=_number(task, "y"), yaw=float(task.get("yaw", 0.0)))
+        if not math.isfinite(out["yaw"]):
+            raise TaskError("'yaw' sayı olmalı")
+    elif out["cmd"] == "bekle":
+        out["sure_s"] = _number(task, "sure_s")
+        if not 0 < out["sure_s"] <= U16_MAX:
+            raise TaskError(f"'sure_s' 0'dan büyük, en çok {U16_MAX} olmalı")
+    elif out["cmd"] == "hiz_siniri":
+        out["deger_mps"] = _number(task, "deger_mps")
+    if out["cmd"] != "dur":
+        b = task.get("belief")
+        if not isinstance(b, dict):
+            raise TaskError("'belief' (x, y, stamp) gerekli: aracın konumu ve okunduğu an (ROS zamanı)")
+        out["belief"] = {k: _number(b, k) for k in ("x", "y", "stamp")}
+    return out
+
+
+def task_id(text: str) -> str:
+    """Anlaşılamayan görevin id'si, okunabiliyorsa (ajan hatayı komutuyla eşleştirsin)."""
+    try:
+        task = json.loads(text)
+    except json.JSONDecodeError:
+        return ""
+    return str(task.get("id", "")) if isinstance(task, dict) else ""
+
+
+def ros_to_board_ms(stamp_s: float, ros_now_s: float, board_now_ms: int) -> int:
+    """ROS zamanındaki bir an → kartın saat alanı (protocol §6.3: dönüşüm köprünün işi).
+    Kartın şimdiki tahmini eksi o anın ne kadar önce olduğu; 32 bit sarar."""
+    return (board_now_ms - round((ros_now_s - stamp_s) * 1000)) & U32
+
+
+def task_args(task: dict, belief_ts_board: int) -> Tuple:
+    """Doğrulanmış görev → protokol alanları (tamsayı). İlk eleman komut adı."""
+    cmd = task["cmd"]
+    if cmd == "dur":
+        return ("dur",)
+    b = task["belief"]
+    belief = (to_int16(b["x"], 100), to_int16(b["y"], 100), belief_ts_board)
+    if cmd == "git":
+        return ("git", to_int16(task["x"], 100), to_int16(task["y"], 100),
+                to_int16(wrap_angle(task["yaw"]), 1000), *belief)
+    if cmd == "bekle":
+        return ("bekle", min(U16_MAX, round(task["sure_s"])), *belief)
+    mm = round(task["deger_mps"] * 1000)              # LIMIT'i kart denetler, burada kırpılmaz
+    return ("hiz_siniri", max(0, min(U16_MAX, mm)), *belief)
+
+
+def safe_point_name(x_cm: int, y_cm: int, safe_points: dict) -> Optional[str]:
+    """İpucu bir kayıtlı güvenli noktaysa adı (K-044). safe_points: ad → (x_cm, y_cm)."""
+    for name, (sx, sy) in safe_points.items():
+        if (sx, sy) == (x_cm, y_cm):
+            return name
+    return None
+
+
+def _m(cm: int) -> str:
+    return f"{cm / 100:.2f}".replace(".", ",")
+
+
+def _mps(mm_s: int) -> str:
+    return f"{mm_s / 1000:.3f}".rstrip("0").rstrip(".").replace(".", ",")
+
+
+def feedback_text(result: str, rule: str, reason: str, value: int, lo: int, hi: int,
+                  hint_x_cm: int, hint_y_cm: int, *, full: bool,
+                  safe_points: Optional[dict] = None) -> str:
+    """Ajanın göreceği Türkçe metin. full=False: C yapılandırması, gerekçe gizli
+    (protocol §7.3). Ondalık virgül, koordinatlar "(x; y)" m (protocol §7.3 örneği)."""
+    if result == "ACCEPTED":
+        return "Komut kabul edildi."
+    if not full:
+        return "Komut reddedildi."
+    head = f"Komut reddedildi ({rule} / {reason})."
+    if reason in ("GOAL_IN_FORBIDDEN", "GOAL_OUTSIDE_ALLOWED"):
+        where = "yasak bölgede" if reason == "GOAL_IN_FORBIDDEN" else "izinli alanın dışında"
+        name = safe_point_name(hint_x_cm, hint_y_cm, safe_points or {})
+        point = f"{name} ({_m(hint_x_cm)}; {_m(hint_y_cm)})" if name else \
+            f"({_m(hint_x_cm)}; {_m(hint_y_cm)})"
+        detail = f"Hedef {where}. En yakın güvenli nokta: {point}."
+    elif reason == "ABOVE_MAX":
+        detail = (f"İstenen hız sınırı {_mps(value)} m/s, izinli aralık {_mps(lo)}–{_mps(hi)} m/s.")
+    elif reason == "NOT_POSITIVE":
+        detail = f"Hız sınırı 0'dan büyük olmalı, izinli aralık {_mps(lo)}–{_mps(hi)} m/s."
+    elif reason == "TOO_FAR":
+        detail = (f"Varsaydığın konum telemetriden {_m(value)} m uzak, tolerans {_m(hi)} m. "
+                  f"Aracın şu anki konumu: ({_m(hint_x_cm)}; {_m(hint_y_cm)}).")
+    elif reason == "BELIEF_TOO_OLD":
+        age = f"{value / 1000:.1f}".replace(".", ",")
+        detail = f"Konum bilgin {age} s eski, en çok {hi // 1000} s olmalı: konumu yeniden oku."
+    elif reason == "BELIEF_FROM_FUTURE":
+        detail = f"Konum bilginin zamanı {-value} ms ileride: konumu yeniden oku."
+    elif reason == "NO_TELEMETRY":
+        detail = (f"Araçtan {value} ms'dir konum gelmiyor (en çok {hi} ms): tutarlılık "
+                  f"denetlenemedi, biraz sonra yeniden dene.")
+    elif reason == "TOO_OLD":
+        detail = f"Komut karta {value} ms'de ulaştı, en çok {hi} ms olmalı: yeniden gönder."
+    elif reason == "FROM_FUTURE":
+        detail = f"Komutun zaman damgası kartın saatinden {-value} ms ileride (en çok {-lo} ms)."
+    elif reason == "IN_HOLD":
+        detail = "Kart beklemede (HOLD): komut kabul edilmiyor, operatörün SIFIRLA'sı gerekir."
+    elif reason == "IN_RECOVERY":
+        detail = ("Kart kurtarma modunda (RECOVERY): araç güvenli noktaya götürülüyor, "
+                  "komut kabul edilmiyor.")
+    else:
+        detail = ""
+    return f"{head} {detail}".strip()

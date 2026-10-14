@@ -84,7 +84,7 @@ enums:
       NOT_POSITIVE: 41        # value = istenen (mm/s), lo = 1, hi = 600
       # CONSISTENCY
       TOO_FAR: 50             # value = fark (cm), hi = tolerans (cm), hint = telemetri konumu
-      BELIEF_TOO_OLD: 51      # value = Δt (ms), hi = 10000
+      BELIEF_TOO_OLD: 51      # value = Δt (ms), hi = 5000 (K-049)
       BELIEF_FROM_FUTURE: 52  # value = Δt (ms, negatif), lo = -50
       NO_TELEMETRY: 53        # value = telemetri yaşı (ms), hi = 500
 

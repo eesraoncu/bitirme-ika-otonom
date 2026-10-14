@@ -8,12 +8,18 @@ Karta giden:
 - /goal_pose (PoseStamped, harita çerçevesi) → GOTO_CMD. Konum inancı (CONSISTENCY, RULES
   §3.4) o anki map → base_link'ten, okunduğu an kartın saatiyle (protocol §6.3): RViz'i
   kullanan insanın inancı aracın konumudur. LLM ajanı kendi okuduğu konumu verecek (4.3).
+- /guard/task (std_msgs/String, JSON; ajan, Faz 4.2) → GOTO_CMD, WAIT_CMD, SPEED_LIMIT_CMD,
+  STOP_CMD. Biçim convert.parse_task'ta; inancın ROS zamanı kartın saatine çevrilir (§6.3).
+  Anlaşılamayan görev karta gitmez, ajana hata metni döner.
 - /cmd_vel_nav (Nav2'nin hız komutu) → VELOCITY_CMD.
 - HEARTBEAT 100 ms'de bir, arka planda. Bu düğüm durunca kart 500 ms'de HOLD'a geçer.
 - /guard/reset servisi (std_srvs/Trigger) → RESET_CMD: kart açılışta HOLD'dadır,
   NORMAL'e yalnız bununla geçer (RULES §5). Cevap kartın kararıdır.
 Karttan gelen:
-- VERDICT → /guard/verdict (std_msgs/String, JSON; convert.verdict_text).
+- VERDICT → /guard/verdict (std_msgs/String, JSON; convert.verdict_text): her zaman tam.
+- /guard/task'tan gelen komutun kararı → /guard/feedback (JSON: id, accepted, text). Metin
+  "feedback" parametresine göre: full (D, varsayılan) gerekçe ve ipucuyla, minimal (C) yalnız
+  "Komut reddedildi." (protocol §7.3, K-005). Coğrafi sınır ipucu güvenli noktanın adıyla.
 - HEARTBEAT_ACK → kartın durumu, değiştiğinde günlüğe. STATUS → 10 s'de bir günlüğe.
 
 Kablo çekilirse düğüm çökmez: "bağlantı yok" der, saniyede bir yeniden bağlanmayı
@@ -22,6 +28,7 @@ başladı ya da kalp atışı kesildi, HOLD mandallı): NORMAL'e yine /guard/res
 """
 from __future__ import annotations
 
+import json
 import sys
 import time
 from pathlib import Path
@@ -39,8 +46,10 @@ from tf2_ros import Buffer, TransformException, TransformListener
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[2] / "shared" / "protocol" / "python"))
+sys.path.insert(0, str(HERE.parents[2] / "tools"))
 
 import convert as cv  # noqa: E402
+import gen_site as gs  # noqa: E402
 from ika_protocol import messages as m  # noqa: E402
 from ika_protocol.link import AGENT_PORT, KEY_FILE, LINK_LOST, Heartbeat, Link, open_link  # noqa: E402
 
@@ -61,6 +70,14 @@ class AgentBridge(Node):
         self.create_subscription(PoseStamped, "/goal_pose", self.on_goal_pose, 10)
         self.create_subscription(Twist, "/cmd_vel_nav", self.on_cmd_vel, 10)
         self.create_service(Trigger, "/guard/reset", self.on_reset)
+        self.create_subscription(String, "/guard/task", self.on_task, 10)
+        self.feedback = self.create_publisher(String, "/guard/feedback", 10)
+        mode = self.declare_parameter("feedback", "full").value
+        if mode not in ("full", "minimal"):
+            raise ValueError(f"feedback 'full' (D) ya da 'minimal' (C) olmalı, '{mode}' verildi")
+        self.full_feedback = mode == "full"
+        self.safe_points = gs.load_site()["safe"]     # ipucunu adlandırmak için (K-044)
+        self.pending = {}                             # VERDICT'i beklenen sayaç → görev id'si
         self.state = None
         self.tf = Buffer()
         self.tf_listener = TransformListener(self.tf, self)
@@ -92,6 +109,9 @@ class AgentBridge(Node):
             self.hb.stop()
         self.link.close()
         self.link, self.hb, self.state = None, None, None
+        for task_id in self.pending.values():      # kararı gelmeyecek: ajana söylenir
+            self.reply(task_id, False, "Kartla bağlantı koptu: komutun kararı alınamadı.")
+        self.pending.clear()
 
     def send(self, msg) -> Optional[bytes]:
         """Gönderir; bağlantı yoksa ya da koparsa None."""
@@ -133,6 +153,35 @@ class AgentBridge(Node):
         r = t.rotation
         x, y, _ = cv.pose_to_cm(t.translation.x, t.translation.y, r.x, r.y, r.z, r.w)
         return x, y, self.link.board_now()
+
+    def on_task(self, msg: String) -> None:
+        try:
+            task = cv.parse_task(msg.data)
+        except cv.TaskError as e:
+            self.reply(cv.task_id(msg.data), False, f"Görev anlaşılamadı: {e}. Karta gönderilmedi.")
+            self.get_logger().warn(f"görev anlaşılamadı ({e}): {msg.data[:120]}")
+            return
+        if self.link is None:
+            self.reply(task["id"], False, "Kartla bağlantı yok: komut gönderilmedi.")
+            return
+        ts = 0
+        if "belief" in task:
+            now_s = self.get_clock().now().nanoseconds / 1e9
+            ts = cv.ros_to_board_ms(task["belief"]["stamp"], now_s, self.link.board_now())
+        kind, *args = cv.task_args(task, ts)
+        cmd = {"git": m.GotoCmd, "bekle": m.WaitCmd, "hiz_siniri": m.SpeedLimitCmd,
+               "dur": m.StopCmd}[kind](*args)
+        wire = self.send(cmd)
+        if wire is None:
+            self.reply(task["id"], False, "Kartla bağlantı yok: komut gönderilmedi.")
+            return
+        seq = Link.wire_seq(wire)
+        self.pending[seq] = task["id"]
+        self.get_logger().info(f"görev {task['id']!r} → {cmd.NAME} #{seq} {args}")
+
+    def reply(self, task_id: str, accepted: bool, text: str) -> None:
+        self.feedback.publish(String(data=json.dumps(
+            {"id": task_id, "accepted": accepted, "text": text}, ensure_ascii=False)))
 
     def on_cmd_vel(self, msg: Twist) -> None:
         if self.send(m.VelocityCmd(*cv.twist_to_cmd(msg.linear.x, msg.angular.z))) is not None:
@@ -189,6 +238,12 @@ class AgentBridge(Node):
         self.last_verdict = v
         text = cv.verdict_text(*_verdict_fields(v))
         self.verdicts.publish(String(data=text))
+        task_id = self.pending.pop(v.ref_seq, None)
+        if task_id is not None:
+            _, result, rule, reason, value, lo, hi, hx, hy = _verdict_fields(v)
+            self.reply(task_id, v.result == m.Result.ACCEPTED,
+                       cv.feedback_text(result, rule, reason, value, lo, hi, hx, hy,
+                                        full=self.full_feedback, safe_points=self.safe_points))
         # rclpy aynı satırdan farklı düzeyde günlüğe izin vermez: iki ayrı çağrı
         if v.result == m.Result.ACCEPTED:
             self.get_logger().info(f"VERDICT {text}")

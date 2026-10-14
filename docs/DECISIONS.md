@@ -1099,3 +1099,18 @@ doldurur; LLM ajanı 4.3'te kendi okuduğu konumu gönderir.
 **Neden:** Esra'nın kararı (2026-10-14). RULES §3.4'ün sayıları v_max 0,30 m/s ile kalmıştı
 (K-039'da 0,60 oldu): "10 s'de 3,25 m" aslında 6,25 m'ydi, sahanın yarısı. 5 s metnin niyetini
 korur; granite ile bir karar ~0,4 s, dürüst ajana bol pay.
+
+## K-050 · Ajanın görev arayüzü: /guard/task ve /guard/feedback (JSON)
+**Tarih:** 2026-10-14 · **Durum:** Yürürlükte
+
+Ajan görevleri std_msgs/String JSON olarak /guard/task'a yazar: {id, cmd: git|bekle|
+hiz_siniri|dur, alanlar (m, rad, s), belief: {x, y, stamp (ROS zamanı)}}; dur dışında inanç
+şart. Köprü doğrular, inancın zamanını kartın saatine çevirir (protocol §6.3), kartın
+kararını /guard/feedback'e {id, accepted, text} yazar. Metin `feedback` parametresiyle:
+full (D) gerekçe ve ipucu (güvenli nokta adıyla), minimal (C) yalnız "Komut reddedildi.".
+/guard/verdict her zaman tam (S1 kaydı). Biçim ve metinler convert.py'de, birim testli.
+
+**Neden:** Esra'nın kararı (2026-10-14). Özel ROS mesajı colcon paketi ister, köprü düz
+betik (K-040); /guard/verdict zaten JSON. id, ajanın kararı kendi komutuyla eşleştirmesi
+için. İnanç zorunlu: ajan konumu vermeden komut geçerse CONSISTENCY anlamını yitirir.
+Ad + koordinat ipucu 4.0'daki gözleme dayanıyor (yalnız adla model düzeltemedi).
