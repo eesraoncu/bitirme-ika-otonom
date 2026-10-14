@@ -157,6 +157,12 @@ v'' = clamp(v', −0,60,  +0,60)
 - Görev komutlarında zaman damgası LLM'in düşünmeye başladığı an değil, komutun
   **gönderildiği an**dır. LLM'in saniyelerce düşünmesi tazeliği etkilemez.
 - **Zaman eşitleme** her kalp atışında yapılır, hata birkaç ms (`docs/protocol.md` §6).
+- **Uygulandı (2026-10-14):** kart `firmware/app/rules/freshness/` (yaş işaretli 32 bit fark,
+  saat taşmasında doğru), ajan kanalının her imzalı çerçevesinde, REPLAY'den sonra. Görev
+  komutu ve `SIFIRLA` VERDICT alır (value yaş, lo −50, hi 200), hız komutu ve kalp atışı
+  sessizce düşer, `STATUS.err_fresh` sayılır, ret serisine girmez. Ölçüldü: RTT 7–11 ms;
+  500 ms geri alınmış damga kartta 505–507 ms, 200 ms ileri alınmış −192 ms; Nav2'nin
+  sürüşünde 897 komutta 0 bayat.
 
 ### 3.4 Tutarlılık
 

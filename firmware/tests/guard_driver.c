@@ -11,6 +11,7 @@
  *   wait <seq> <süre_s>        → karar
  *   stop <seq>                 → karar
  *   takehalt                   → "1" HOLD'a girildi, araca HALT(0) gidecek; "0" değil
+ *   fresh <seq> <tip> <now> <ts> → "1" taze; "0 -" bayat, cevap yok; "0 " + karar satırı
  *   lost                       → "ok" (kalp atışı zaman aşımı)
  *   vel <v> <w>                → "v,w" araca giden DRIVE (kırpıldıysa sonunda " c") ya da "-"
  *   speed <seq> <mm_s> [canlı] → karar (hiz_siniri)
@@ -77,7 +78,7 @@ int main(void)
     guard_init(&g);
     while (fgets(line, sizeof line, stdin) != NULL) {
         guard_decision_t d;
-        unsigned long seq;
+        unsigned long seq, now, ts;
         int x, y, yaw, alive, which;
         if (strncmp(line, "init", 4) == 0) {
             guard_init(&g);
@@ -127,6 +128,16 @@ int main(void)
         } else if (sscanf(line, "stop %lu", &seq) == 1) {
             guard_stop(&g, (uint32_t)seq, &d);
             print_decision(&d);
+        } else if (sscanf(line, "fresh %lu %d %lu %lu", &seq, &x, &now, &ts) == 4) {
+            bool reply;
+            if (guard_fresh((uint32_t)seq, (uint8_t)x, (uint32_t)now, (uint32_t)ts, &d, &reply)) {
+                puts("1");
+            } else if (!reply) {
+                puts("0 -");
+            } else {
+                printf("0 ");
+                print_decision(&d);
+            }
         } else if (strncmp(line, "takehalt", 8) == 0) {
             puts(guard_take_halt(&g) ? "1" : "0");
         } else if (strncmp(line, "lost", 4) == 0) {

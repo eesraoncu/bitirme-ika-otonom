@@ -185,8 +185,8 @@ class AgentBridge(Node):
         self.get_logger().info(
             f"kart {s.state.name} · ret serisi {s.reject_streak} · VELOCITY_CMD {self.velocity_sent} "
             f"· kartta: ok {s.frames_ok}, auth {s.err_auth}, replay {s.err_replay}, "
-            f"crc {s.err_crc}, framing {s.err_framing}, kırpılan hız {s.clipped} "
-            f"· PC'de bozuk çerçeve {self.link.rx_errors}")
+            f"crc {s.err_crc}, framing {s.err_framing}, bayat {s.err_fresh}, kırpılan hız {s.clipped} "
+            f"· PC'de bozuk çerçeve {self.link.rx_errors} · saat RTT {self.link.clock_rtt_ms()} ms")
 
 
 def _verdict_fields(v: m.Verdict):

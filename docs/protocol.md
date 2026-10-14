@@ -349,6 +349,11 @@ belirsiz olandır. Hata en fazla RTT/2'dir. USB sanal seri portta RTT birkaç ms
 hata da birkaç ms, 200 ms'lik eşiğin yanında önemsiz. Örnekler saniyede 10 kez yenilendiği
 için kayma hiç birikmez.
 
+**Uygulandı (2026-10-14):** `shared/protocol/python/ika_protocol/link.py` (`Link._clock_sample`,
+`board_now`). Örnek, `HEARTBEAT_ACK` okunduğu anda alınır: geç okunan çerçevenin RTT'si büyük
+çıkar ve en küçük RTT seçilince elenir; RTT > 1 s örnek atılır. İlk ACK'tan önce HELLO'nun
+damgası kaba başlangıçtır. Ölçülen RTT 7–11 ms.
+
 ### 6.3 Kural: `ts_ms` her zaman kartın saat alanındadır
 
 - **Kartın gönderdiği çerçevelerde** doğrudan kartın saatidir.

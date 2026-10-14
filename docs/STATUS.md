@@ -132,8 +132,17 @@ hatalı komut reddedilince ajan gerekçeyi kullanıp kendini düzeltiyor. Sıra 
      yakalandı. Kart: 42 104 B, 0 uyarı; `decision_test` 2/2 (ilk çalıştırmada iki test beklentisi yanlıştı:
      ω rampası ve 3+2 retle kurtarmanın başlaması, kart doğruydu). Uçtan uca: (0,0) → konteyner_onu →
      (0,0), 903 VELOCITY_CMD, **0 kırpma**.
-     **Sırada:** 4.1c FRESHNESS (zaman eşitlemesi, protocol §6), 4.1e CONSISTENCY; sonra 4.2 (ajan
-     köprüsünde görev komutları arayüzü) ve 4.3 (ajan).
+   - **4.1c bitti (2026-10-14):** PC: `Link` her HEARTBEAT_ACK'ta eşitleme örneği alır, son 10'dan en
+     küçük RTT'li (protocol §6.2; önceden yalnız HELLO'dan tahmin ediliyordu, saat kayınca 200 ms eşiği
+     meşru komutları reddederdi). Kart: `rules/freshness` (−50…200 ms, saat taşmasında doğru),
+     `guard_fresh` ajan kanalının her imzalı çerçevesinde REPLAY'den sonra: görev komutu ve SIFIRLA'ya
+     FRESHNESS VERDICT'i (yaş, −50, 200), hız ve kalp atışı sessizce düşer, `err_fresh` sayılır, ret
+     serisine girmez. Ajan köprüsü günlüğünde "bayat" ve "saat RTT". PC: 117 test, 4 hata denemesi
+     yakalandı (biri doğru kodla eşdeğer çıktı, gerçek taşma hatasıyla yeniden). Kart: 42 440 B, 0 uyarı;
+     `link_test`, `decision_test` 2/2 (RTT 11 ms; −500 ms → 505–507, +200 ms → −192). Uçtan uca: 897
+     komutta 0 bayat, 0 kırpma, RTT 7 ms.
+     **Sırada:** 4.1e CONSISTENCY (son kart kuralı; takvim kayarsa ilk kısılacak, plan §7); sonra 4.2
+     (ajan köprüsünde görev komutları arayüzü: WAIT/STOP/hiz_siniri, belief alanları) ve 4.3 (ajan).
    - **Ağ:** okul Wi-Fi'si (GSBWIFI) IP'yi ara ara kaybediyor; o an ROS (CycloneDDS) ve Gazebo
      multicast'i kopuyor, süreçler toparlanmıyor. Kendi bağlantıyla sorun yok. Port 22 orada kapalı.
    - **Teşhis düzeltmesi:** "collision ahead ← AMCL kaybı" (aşağıda, 3.3) yanlıştı: tur 1'de AMCL

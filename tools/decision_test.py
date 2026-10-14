@@ -66,6 +66,17 @@ def send_cmd(agent: Link, msg):
     return verdict_for(agent, seq)
 
 
+def send_shifted(agent: Link, msg, shift_ms: int):
+    """Zaman damgası kartın saatinden shift_ms kaydırılmış çerçeve (tazelik denetimi için).
+    Sayaç ve yazma tek kilitte, Link.send gibi."""
+    with agent.lock:
+        agent.seq += 1
+        f = fr.Frame(msg.ID, agent.seq, (agent.board_now() + shift_ms) & 0xFFFFFFFF, msg.pack())
+        agent.ser.write(agent.encode(f))
+        agent.ser.flush()
+    return verdict_for(agent, f.seq)
+
+
 def goto(x: int, y: int, yaw: int = 0) -> m.GotoCmd:
     # belief alanları tutarlılık kuralı içindir (Faz 4), henüz denetlenmiyor
     return m.GotoCmd(x, y, yaw, 0, 0, 0)
@@ -239,6 +250,37 @@ def run(agent: Link, vehicle: Link, hb: Heartbeat, rep: Report) -> None:
     rep.check(v is not None and v.reason == m.Reason.NOT_POSITIVE, "hiz_siniri(0) → NOT_POSITIVE")
     rep.check(vehicle.wait_for(m.SpeedLimitSet, 0.3) is None, "reddedilen sınır araca gitmedi")
     rep.check(board_state(agent) == m.BoardState.NORMAL, "2 LIMIT reddi: seri 2, kart NORMAL")
+
+    print("Tazelik (RULES §3.3, protocol §6)")
+    st = agent.wait_for(m.Status, 2.5)
+    fresh0 = st[1].err_fresh if st else None
+    rtt = agent.clock_rtt_ms()
+    rep.check(rtt is not None and rtt < 50, "zaman eşitlemesi: kalp atışı örneği var",
+              f"RTT {rtt} ms (hata ≤ RTT/2)")
+    v = send_shifted(agent, goto(*ALLOWED_GOAL), -500)
+    rep.check(v is not None and v.rule == m.Rule.FRESHNESS and v.reason == m.Reason.TOO_OLD
+              and 480 <= v.value <= 560 and (v.lo, v.hi) == (-50, 200),
+              "500 ms bayat GOTO → FRESHNESS / TOO_OLD, yaş ~500, aralık −50…200",
+              "" if v is None else f"{v.reason.name}, {v.value} [{v.lo}, {v.hi}]")
+    v = send_shifted(agent, goto(*ALLOWED_GOAL), +200)
+    rep.check(v is not None and v.reason == m.Reason.FROM_FUTURE and -220 <= v.value <= -180,
+              "200 ms ileriden GOTO → FROM_FUTURE", "" if v is None else f"{v.value}")
+    vehicle.receive(0.1)
+    with agent.lock:
+        agent.seq += 1
+        f = fr.Frame(m.VelocityCmd.ID, agent.seq, (agent.board_now() - 500) & 0xFFFFFFFF,
+                     m.VelocityCmd(30, 0).pack())
+        agent.ser.write(agent.encode(f))
+        agent.ser.flush()
+    rep.check(vehicle.wait_for(m.Drive, 0.3) is None, "bayat VELOCITY_CMD araca gitmedi, VERDICT yok")
+    goals = [c for _, c in vehicle.receive(0.2) if c is m.Goal]
+    rep.check(not goals, "bayat hedefler araca gitmedi", f"{len(goals)} GOAL")
+    st = agent.wait_for(m.Status, 2.5, lambda x: fresh0 is not None and x.err_fresh >= fresh0 + 3)
+    rep.check(st is not None and st[1].err_fresh == fresh0 + 3, "STATUS.err_fresh 3 arttı",
+              f"{fresh0} → {st[1].err_fresh}" if st else "")
+    ack = agent.wait_for(m.HeartbeatAck, 0.5)
+    rep.check(ack is not None and ack[1].reject_streak == 2 and ack[1].state == m.BoardState.NORMAL,
+              "tazelik retleri seriye girmedi (2'de kaldı), kart NORMAL")
 
     print("Bekle ve dur (WAIT_CMD, STOP_CMD)")
     vehicle.receive(0.1)

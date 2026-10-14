@@ -10,6 +10,7 @@ import struct
 import termios
 import threading
 import time
+from collections import deque
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
@@ -27,6 +28,18 @@ KEY_FILE = ROOT / "secrets" / "hmac_key.bin"   # depoya girmez (CLAUDE.md)
 HELLO_BROADCAST_WAIT_S = 1.2   # kart oturum kurulana kadar 500 ms'de bir yayınlar
 REPLY_WAIT_S = 0.3             # cevap beklenen ya da beklenmeyen süre
 STATUS_WAIT_S = 2.5            # STATUS saniyede bir
+
+# Zaman eşitleme (docs/protocol.md §6.2): son CLOCK_SAMPLES örnekten RTT'si en küçük olan.
+# RTT'si CLOCK_MAX_RTT_MS'yi aşan örnek atılır (ör. çerçeve geç okundu, echo eski).
+CLOCK_SAMPLES = 10
+CLOCK_MAX_RTT_MS = 1000
+U32 = 0xFFFFFFFF
+
+
+def pc_ms() -> int:
+    """Köprünün saati, ms (HEARTBEAT.echo_pc_ms ile aynı alan)."""
+    return int(time.monotonic() * 1000) & U32
+
 
 # USB kablosu çekilince seri port bunlardan birini verir (tools/unplug_test.py)
 LINK_LOST = (serial.SerialException, OSError, termios.error)
@@ -54,7 +67,10 @@ class Link:
         self.lock = threading.Lock()
         self.session_id: Optional[int] = None
         self.seq = 0
-        self.board_ms_at: Tuple[int, float] = (0, time.monotonic())
+        # Kartın saati = pc_ms() + clock_offset (mod 2³²). HELLO kaba bir başlangıç verir,
+        # her HEARTBEAT_ACK bir örnek (rtt, offset) ekler (docs/protocol.md §6.2).
+        self.clock_offset = 0
+        self.clock_samples: deque = deque(maxlen=CLOCK_SAMPLES)
 
     # -- alma ------------------------------------------------------------
 
@@ -107,6 +123,8 @@ class Link:
                     # bekleyen eski baytlar olabilir, ardından gelen bozukluk
                     # hâlâ açılışın izidir.
                     self.clean = True
+                    if got[1] is m.HeartbeatAck:
+                        self._clock_sample(got[0], m.HeartbeatAck.unpack(got[0].payload))
                     self.pending.append(got)
         return self.pending.pop(0) if self.pending else None
 
@@ -133,10 +151,26 @@ class Link:
     # -- gönderme ----------------------------------------------------------
 
     def board_now(self) -> int:
-        """Kartın saatinin tahmini. ts_ms kartın saat alanındadır (§6.3).
-        Tazelik henüz denetlenmiyor (Faz 4), yine de doğru alan kullanılır."""
-        ms, at = self.board_ms_at
-        return (ms + int((time.monotonic() - at) * 1000)) & 0xFFFFFFFF
+        """Kartın saatinin tahmini. ts_ms kartın saat alanındadır (§6.3); kart
+        −50 ms ≤ yaş ≤ 200 ms dışını FRESHNESS ile reddeder (RULES §3.3)."""
+        return (pc_ms() + self.clock_offset) & U32
+
+    def _clock_sample(self, f: fr.Frame, ack: m.HeartbeatAck) -> None:
+        """t₀ = echo (gidiş), t₁ = şimdi (varış), T = ACK'ın ts_ms'i (kartın saati).
+        fark = T − (t₀ + t₁)/2; hata en çok RTT/2. Örnekler okunduğu anda alınır:
+        geç okunan çerçevenin RTT'si büyük çıkar, en küçük RTT seçilince elenir."""
+        t1 = pc_ms()
+        rtt = (t1 - ack.echo_pc_ms) & U32
+        if rtt > CLOCK_MAX_RTT_MS:
+            return
+        offset = (f.ts_ms - ack.echo_pc_ms - rtt // 2) & U32
+        with self.lock:
+            self.clock_samples.append((rtt, offset))
+            self.clock_offset = min(self.clock_samples)[1]
+
+    def clock_rtt_ms(self) -> Optional[int]:
+        """Kullanılan örneğin RTT'si (eşitleme hatası ≤ RTT/2); örnek yoksa None."""
+        return min(self.clock_samples)[0] if self.clock_samples else None
 
     def frame(self, msg, *, seq: Optional[int] = None) -> fr.Frame:
         if seq is None:
@@ -189,7 +223,9 @@ class Link:
             changed = hello.session_id != self.session_id
             self.session_id = hello.session_id
             self.seq = hello.last_rx_seq   # köprü bir fazlasından devam eder
-            self.board_ms_at = (f.ts_ms, time.monotonic())
+            # Kaba başlangıç (gecikme bilinmiyor); ilk HEARTBEAT_ACK'tan sonra düzelir
+            self.clock_offset = (f.ts_ms - pc_ms()) & U32
+            self.clock_samples.clear()
         return changed
 
     @staticmethod
@@ -244,7 +280,7 @@ class Heartbeat:
     def _run(self) -> None:
         try:
             while self.running:
-                self.link.send(m.Heartbeat(int(time.monotonic() * 1000) & 0xFFFFFFFF))
+                self.link.send(m.Heartbeat(pc_ms()))
                 self.last_sent = time.monotonic()
                 time.sleep(HEARTBEAT_PERIOD_S)
         except LINK_LOST as e:

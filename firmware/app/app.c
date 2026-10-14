@@ -329,6 +329,15 @@ static void on_heartbeat(channel_t *ch, const frame_t *f)
 static void on_agent_frame(channel_t *ch, const frame_t *f)
 {
     guard_decision_t d;
+    bool reply;
+    /* FRESHNESS: REPLAY'den sonra, mod ve içerik kurallarından önce (RULES §4) */
+    if (!guard_fresh(f->seq, f->type, HAL_GetTick(), f->ts_ms, &d, &reply)) {
+        ch->cnt.err_fresh++;
+        if (reply) {
+            send_decision(ch, &d);
+        }
+        return;
+    }
     switch (f->type) {
     case PROTO_ID_HEARTBEAT:
         on_heartbeat(ch, f);

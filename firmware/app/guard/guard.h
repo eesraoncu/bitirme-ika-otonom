@@ -6,8 +6,9 @@
  * döner, durum nasıl değişir. Donanıma dokunmaz, girdi alır ve karar döndürür:
  * PC'de sınanır (firmware/tests/test_guard.py). Çıktıları göndermek çağıranın işi.
  *
- * AUTH ve REPLAY buraya gelmeden kanal katmanında düşer (K-023). FRESHNESS ve
- * CONSISTENCY Faz 4'ün sonraki adımlarında. */
+ * AUTH ve REPLAY buraya gelmeden kanal katmanında düşer (K-023). FRESHNESS
+ * onlardan sonra, içerik kurallarından önce (guard_fresh). CONSISTENCY Faz 4'ün
+ * sonraki adımında. */
 #ifndef GUARD_H
 #define GUARD_H
 
@@ -47,6 +48,14 @@ void guard_init(guard_t *g);
  * ve başlangıca kurtarma hedefi (RECOVERY_HOME) çıkar (§5.2). */
 void guard_goto(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
                 const proto_goto_cmd_t *cmd, guard_decision_t *out);
+
+/* FRESHNESS (RULES §3.3, §4. adım 4): ajan kanalının her imzalı çerçevesine,
+ * REPLAY'den sonra. Tazeyse true. Değilse false; görev komutu ya da SIFIRLA ise
+ * (VERDICT alanlar, protocol §7.2) *reply true ve out ret kararıdır (value yaş,
+ * lo −50, hi 200). Hız komutu ve kalp atışı sessizce düşer. Ret serisine
+ * sayılmaz (§5.4: taşımanın sorunu). Durumu değiştirmez. */
+bool guard_fresh(uint32_t seq, uint8_t type, uint32_t now_ms, uint32_t ts_ms,
+                 guard_decision_t *out, bool *reply);
 
 /* SPEED_LIMIT_CMD (hiz_siniri): MODE → LIMIT (0 < değer ≤ 600 mm/s). Ret içerik
  * reddidir: seri artar, RECOVERY_REJECT_LIMIT'te kurtarma (guard_goto gibi);

@@ -23,6 +23,7 @@ TESTS = ROOT / "firmware" / "tests"
 PROTO = ROOT / "shared" / "protocol"
 sys.path.insert(0, str(PROTO / "python"))
 
+from ika_protocol import messages as m   # noqa: E402
 from ika_protocol.messages import BoardState, GoalSource, Reason, Result, Rule   # noqa: E402
 
 pytestmark = pytest.mark.skipif(shutil.which("gcc") is None, reason="gcc yok")
@@ -84,7 +85,7 @@ def guard(tmp_path_factory):
          "-I", str(APP), "-I", str(PROTO / "c"), str(TESTS / "guard_driver.c"),
          str(APP / "guard" / "guard.c"), str(APP / "site" / "site.c"),
          str(APP / "rules" / "geofence" / "geofence.c"), str(APP / "recovery" / "recovery.c"),
-         str(APP / "rules" / "limits" / "limits.c"),
+         str(APP / "rules" / "limits" / "limits.c"), str(APP / "rules" / "freshness" / "freshness.c"),
          "-o", str(exe)],
         capture_output=True, text=True)
     assert cc.returncode == 0, "Kartın C kodu katı uyarılarla derlenmedi:\n" + cc.stderr
@@ -417,3 +418,52 @@ def test_fifth_limit_rejection_starts_recovery(guard):
     ds = guard.seq("init", "reset 1 1", *[f"speed {i} 2000" for i in range(2, 7)])
     assert ds[-1].rule == Rule.LIMIT and ds[-1].state == RECOVERY
     assert ds[-1].goal == (*HOME, 0, int(GoalSource.RECOVERY_HOME))
+
+
+# ---- Tazelik (RULES §3.3, protocol §6.4) ----------------------------------------
+
+def _fresh(guard, type_id, now, ts):
+    (out,) = guard.run([f"fresh 7 {type_id} {now} {ts}"])
+    return out
+
+
+@pytest.mark.parametrize("age,ok", [(0, True), (200, True), (201, False), (-50, True), (-51, False)])
+def test_freshness_window(guard, age, ok):
+    out = _fresh(guard, m.GotoCmd.ID, 100000, 100000 - age)
+    assert (out == "1") == ok
+
+
+@pytest.mark.parametrize("now,ts,ok", [
+    (10, 4294967200, True),          # taşma: damga taşmadan 106 ms önce, yaş 106
+    (10, 4294967000, False),         # yaş 306
+    (4294967290, 20, True),          # damga taşmadan sonra, 26 ms ileride: −26
+    (4294967290, 100, False),        # 106 ms ileride
+])
+def test_freshness_wraparound(guard, now, ts, ok):
+    assert (_fresh(guard, m.GotoCmd.ID, now, ts) == "1") == ok
+
+
+@pytest.mark.parametrize("cls", [m.GotoCmd, m.WaitCmd, m.SpeedLimitCmd, m.StopCmd, m.ResetCmd])
+def test_stale_task_command_gets_verdict(guard, cls):
+    out = _fresh(guard, cls.ID, 100000, 99500)
+    assert out.startswith("0 ") and out != "0 -"
+    d = _parse(out[2:])
+    assert rejected(d, Rule.FRESHNESS, Reason.TOO_OLD) and d.ref_seq == 7
+    assert (d.value, d.lo, d.hi) == (500, -50, 200) and d.halt is None
+
+
+def test_future_task_command_reason(guard):
+    d = _parse(_fresh(guard, m.StopCmd.ID, 100000, 100200)[2:])
+    assert rejected(d, Rule.FRESHNESS, Reason.FROM_FUTURE) and d.value == -200
+
+
+@pytest.mark.parametrize("cls", [m.VelocityCmd, m.Heartbeat])
+def test_stale_stream_dropped_silently(guard, cls):
+    assert _fresh(guard, cls.ID, 100000, 99000) == "0 -"
+
+
+def test_freshness_does_not_touch_state_or_streak(guard):
+    out = guard.run(["init", "reset 1 1", "goto 2 9000 0 0",
+                     f"fresh 3 {m.GotoCmd.ID} 100000 90000", "goto 4 9000 0 0"])
+    assert [_parse(out[i]).streak for i in (2, 4)] == [1, 2]       # bayat ret seriye girmedi
+    assert _parse(out[4]).state == NORMAL

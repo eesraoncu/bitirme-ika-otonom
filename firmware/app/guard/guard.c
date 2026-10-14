@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "recovery/recovery.h"
+#include "rules/freshness/freshness.h"
 #include "rules/limits/limits.h"
 
 void guard_init(guard_t *g)
@@ -99,6 +100,41 @@ void guard_goto(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
     out->goal.yaw_mrad = cmd->goal_yaw_mrad;
     out->goal.source = PROTO_GOAL_SOURCE_AGENT;
     g->reject_streak = 0u;
+}
+
+/* VERDICT alan komutlar (protocol §7.2): görev komutları ve SIFIRLA. */
+static bool gets_verdict(uint8_t type)
+{
+    switch (type) {
+    case PROTO_ID_GOTO_CMD:
+    case PROTO_ID_WAIT_CMD:
+    case PROTO_ID_SPEED_LIMIT_CMD:
+    case PROTO_ID_STOP_CMD:
+    case PROTO_ID_RESET_CMD:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool guard_fresh(uint32_t seq, uint8_t type, uint32_t now_ms, uint32_t ts_ms,
+                 guard_decision_t *out, bool *reply)
+{
+    int32_t age;
+    freshness_result_t r = freshness_check(now_ms, ts_ms, &age);
+    *reply = false;
+    if (r == FRESHNESS_OK) {
+        return true;
+    }
+    if (gets_verdict(type)) {
+        verdict(out, seq, PROTO_RESULT_REJECTED, PROTO_RULE_FRESHNESS,
+                r == FRESHNESS_TOO_OLD ? PROTO_REASON_TOO_OLD : PROTO_REASON_FROM_FUTURE);
+        out->verdict.value = age;
+        out->verdict.lo = -FRESHNESS_MAX_FUTURE_MS;
+        out->verdict.hi = FRESHNESS_MAX_AGE_MS;
+        *reply = true;
+    }
+    return false;
 }
 
 void guard_speed_limit(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
