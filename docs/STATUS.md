@@ -76,6 +76,20 @@ hatalı komut reddedilince ajan gerekçeyi kullanıp kendini düzeltiyor. Sıra 
      hiçbir yönde temiz değil (konteyner). RECOVERY bu noktalara gönderirse kart takılır.
      Noktalar yeniden seçilecek + ulaşılabilirlik denetimi (saha üreteci mi Nav2 mi: iki klasöre
      dokunuyor, tasarımı o adımda konuşulacak). Karta yükleme gerekecek (`site_data.c`).
+   - **4.1 sırası değişti (Esra, 2026-10-14): önce 4.1d RECOVERY,** üç parçada: d1 güvenli noktalar +
+     ulaşılabilirlik testi · d2 kart durum makinesi · d3 yükleme + uçtan uca. Yeni geçiş (K-047, d2'de
+     yazılacak): RECOVERY'de telemetri 500 ms gelmezse → HOLD. 180 s süre sınırı **eklenmedi** (Esra):
+     bilinen sınır, Nav2 kurtarma hedefinde vazgeçerse kart RECOVERY'de kalır (çıkış: kalp atışı kaybı).
+   - **d1 bitti (2026-10-14):** güvenli noktalar yeniden seçildi (ölçüt: izin + payın dönüş yarıçapı
+     1,559 m içinde harita engeli ve keepout yok): baslangic (0, 0) · kuzeybati (1,75; 6) ·
+     konteyner_onu (8,5; 1) · kapi_onu (26, 0) · **guney (13; −5,5) yeni** · konteyner_arkasi çıkarıldı
+     (kuzey koridorunda 4 m içinde uygun yer yok). `shared/site/tests/test_safe_points.py`: iz/pay
+     nav2_params'tan, harita ve maske ika_nav/maps'ten okunur; eski noktalarla 3'ünü yakaladı.
+     `site_data.c` yeniden üretildi (maske değişmedi), **karta henüz yüklenmedi (d3)**. Testler: site 24,
+     kart 65, köprü 25. **4.3'e not:** `llm_select_bench.py`'deki "Konteynerin arkasına git" cümlesi artık
+     olmayan yeri bekliyor (K-045 sonuçları eski noktalarla, geçerli); ajan için `places` anahtarı
+     açılınca betik oradan okusun.
+   - **Push bekliyor:** bu ağda GitHub'ın 22. portu kapalı (443 açık); `c20910a` ve sonrası yerelde.
    - **Teşhis düzeltmesi:** "collision ahead ← AMCL kaybı" (aşağıda, 3.3) yanlıştı: tur 1'de AMCL
      0,2 m doğruyken de oldu. Neden: paylı iz keepout'a değiyor (planlayıcı yalnız merkeze bakıyor,
      RPP izin tamamına). Yol yasak bölge köşelerinin yakınından geçince titreme.

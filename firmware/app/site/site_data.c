@@ -23,9 +23,9 @@ const site_t site = {
     .n_safe = 5,
     .safe = {
         {0, 0},   /* baslangic */
-        {800, 760},   /* konteyner_arkasi */
-        {100, 600},   /* kuzeybati */
-        {800, 200},   /* konteyner_onu */
+        {175, 600},   /* kuzeybati */
+        {850, 100},   /* konteyner_onu */
         {2600, 0},   /* kapi_onu */
+        {1300, -550},   /* guney */
     },
 };

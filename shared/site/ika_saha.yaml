@@ -25,9 +25,13 @@ forbidden:             # en çok 4 bölge, her biri en çok 8 köşe (RULES §3.
 
 home: [0, 0]           # aracın başlangıcı: (0, 0), doğuya bakar (K-032)
 
+# Kurtarma hedefleri (RULES §5.3). Her biri araç orada her yönde durup dönebilecek kadar açık
+# olmalı: Nav2'nin izi + payının dönüş yarıçapı (1,56 m) içinde harita engeli ya da keepout
+# yok. Denetim: shared/site/tests/test_safe_points.py. 2026-10-14'te yeniden seçildi: eski
+# konteyner_arkasi (8, 7,6) kuzey sınırına, konteyner_onu (8, 2) konteynere değiyordu.
 safe_points:           # sıra önemli: eşitlikte sıra numarası küçük olan seçilir (RULES §5.3)
-  baslangic:        [0, 0]
-  konteyner_arkasi: [8, 7.6]
-  kuzeybati:        [1, 6]
-  konteyner_onu:    [8, 2]
-  kapi_onu:         [26, 0]
+  baslangic:     [0, 0]
+  kuzeybati:     [1.75, 6]
+  konteyner_onu: [8.5, 1]
+  kapi_onu:      [26, 0]
+  guney:         [13, -5.5]   # personel ile yakıt bölgesinin arası
