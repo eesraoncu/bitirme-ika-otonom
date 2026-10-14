@@ -10,7 +10,8 @@ Karttan gelen (CAN'den geçmiş, onaylı):
 - HALT  → Nav2'nin hedefi iptal edilir (K-042: kart HOLD'a geçince, WAIT ve STOP'ta).
   Bağlantı koptuğunda ve kart yeniden başladığında da iptal edilir: kart o zaman HALT
   gönderememiş olabilir. Böylece SIFIRLA'dan sonra Nav2 eski hedefe kendiliğinden gitmez.
-- SPEED_LIMIT_SET → şimdilik yalnızca günlüğe (kart tarafı Faz 4'ün LIMIT adımında).
+- SPEED_LIMIT_SET → Nav2'nin /speed_limit konusu (m/s, yüzde değil): ajanın hiz_siniri'ni
+  denetleyici uygular. Kartın kendi sınırı (±0,6) ayrı kalır (RULES §1, K-012).
 Karta giden:
 - TELEMETRY 20 Hz: AMCL'nin map → base_link'i (K-040 karar 4). Dönüşüm yoksa gönderilmez.
 
@@ -30,6 +31,7 @@ from typing import Optional
 import rclpy
 from geometry_msgs.msg import PoseStamped, Twist
 from nav2_msgs.action import NavigateToPose
+from nav2_msgs.msg import SpeedLimit
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.signals import SignalHandlerOptions
@@ -57,6 +59,7 @@ class VehicleBridge(Node):
         self.key = key
         self.link: Optional[Link] = None
         self.cmd_vel = self.create_publisher(Twist, "/cmd_vel", 10)
+        self.speed_limit = self.create_publisher(SpeedLimit, "/speed_limit", 10)
         self.nav = ActionClient(self, NavigateToPose, "navigate_to_pose")
         self.tf = Buffer()
         self.tf_listener = TransformListener(self.tf, self)
@@ -116,7 +119,7 @@ class VehicleBridge(Node):
             elif cls is m.Halt:
                 self.cancel_goal(f"HALT ({msg.duration_s} s)")
             elif cls is m.SpeedLimitSet:
-                self.get_logger().info(f"{cls.NAME} {msg} (Faz 4'te uygulanacak)")
+                self.on_speed_limit(msg)
 
     def on_drive(self, d: m.Drive) -> None:
         v, w = cv.cmd_to_twist(d.v_mm_s, d.w_mrad_s)
@@ -142,6 +145,14 @@ class VehicleBridge(Node):
         self.goals += 1
         self.get_logger().info(f"GOAL → Nav2: ({x:.2f}, {y:.2f}) m, {g.yaw_mrad} mrad, "
                                f"kaynak {g.source.name}")
+
+    def on_speed_limit(self, s: m.SpeedLimitSet) -> None:
+        msg = SpeedLimit()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.percentage = False
+        msg.speed_limit = s.limit_mm_s / 1000.0
+        self.speed_limit.publish(msg)
+        self.get_logger().info(f"hız sınırı → Nav2: {msg.speed_limit:.3f} m/s")
 
     def on_goal_response(self, gen: int, fut) -> None:
         handle = fut.result()

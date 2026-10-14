@@ -141,6 +141,9 @@ v'' = clamp(v', −0,60,  +0,60)
   kendi zamanlayıcısıyla sabit 20 Hz yayınlar (aralık en çok 52 ms); onsuz kurtarma
   hareketleri 10 Hz geliyordu (`behavior_server` `cycle_frequency`). Frekans değişirse bu
   değerler güncellenir.
+- **Kartta uygulandı (2026-10-14):** `firmware/app/rules/limits/` (mm/s, mrad/s, tamsayı;
+  adım 30 mm/s · 60 mrad/s). Nav2'nin normal sürüşünde 903 komutta 0 kırpma (K-046'nın amacı:
+  Nav2'nin çıktısı kırpılmaz). Kırpmalar `STATUS.clipped`'te.
 
 ### 3.3 Tazelik
 

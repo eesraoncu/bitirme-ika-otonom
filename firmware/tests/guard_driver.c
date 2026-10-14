@@ -12,13 +12,16 @@
  *   stop <seq>                 → karar
  *   takehalt                   → "1" HOLD'a girildi, araca HALT(0) gidecek; "0" değil
  *   lost                       → "ok" (kalp atışı zaman aşımı)
- *   vel <v> <w>                → "v,w" araca giden DRIVE ya da aktarılmıyorsa "-"
+ *   vel <v> <w>                → "v,w" araca giden DRIVE (kırpıldıysa sonunda " c") ya da "-"
+ *   speed <seq> <mm_s> [canlı] → karar (hiz_siniri)
  *   nearest <0|1> <x> <y>      → "<x> <y>"; 0: güvenli noktasız harita
  *   tel <x> <y> <canlı 0|1>    → "<goal|-> <state>" (araç konumu, TELEMETRY)
  *   tick <now_ms> <tel_yaşı_ms> → "<state>" (her döngüdeki zaman denetimi)
  * Karar satırı:
  *   <ref_seq> <result> <rule> <reason> <hint_x> <hint_y> <goal|-> <state> <streak> <halt|->
- *   goal: "x,y,yaw,source" ya da hedef gönderilmiyorsa "-"; halt: HALT'ın süresi ya da "-" */
+ *   <speed|-> <value> <lo> <hi>
+ *   goal: "x,y,yaw,source" ya da hedef gönderilmiyorsa "-"; halt: HALT'ın süresi ya da "-";
+ *   speed: SPEED_LIMIT_SET değeri ya da "-"; value/lo/hi: VERDICT'in alanları */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,10 +59,16 @@ static void print_decision(const guard_decision_t *d)
     }
     printf(" %u %u ", g.state, g.reject_streak);
     if (d->send_halt) {
-        printf("%u\n", d->halt.duration_s);
+        printf("%u ", d->halt.duration_s);
     } else {
-        puts("-");
+        printf("- ");
     }
+    if (d->send_speed_limit) {
+        printf("%u ", d->speed_limit.limit_mm_s);
+    } else {
+        printf("- ");
+    }
+    printf("%ld %ld %ld\n", (long)d->verdict.value, (long)d->verdict.lo, (long)d->verdict.hi);
 }
 
 int main(void)
@@ -87,8 +96,9 @@ int main(void)
         } else if (sscanf(line, "vel %d %d", &x, &y) == 2) {
             proto_velocity_cmd_t cmd = { .v_mm_s = (int16_t)x, .w_mrad_s = (int16_t)y };
             proto_drive_t drive;
-            if (guard_velocity(&g, &cmd, &drive)) {
-                printf("%d,%d\n", drive.v_mm_s, drive.w_mrad_s);
+            bool clipped = false;
+            if (guard_velocity(&g, &cmd, &drive, &clipped)) {
+                printf("%d,%d%s\n", drive.v_mm_s, drive.w_mrad_s, clipped ? " c" : "");
             } else {
                 puts("-");
             }
@@ -103,6 +113,13 @@ int main(void)
         } else if (sscanf(line, "tick %lu %d", &seq, &x) == 2) {
             guard_tick(&g, (uint32_t)seq, (uint32_t)x);
             printf("%u\n", g.state);
+        } else if (sscanf(line, "speed %lu %d %d", &seq, &x, &alive) >= 2) {
+            if (sscanf(line, "speed %lu %d %d", &seq, &x, &alive) == 2) {
+                alive = 1;
+            }
+            proto_speed_limit_cmd_t cmd = { .limit_mm_s = (uint16_t)x };
+            guard_speed_limit(&g, &test_site, (uint32_t)seq, alive != 0, &cmd, &d);
+            print_decision(&d);
         } else if (sscanf(line, "wait %lu %d", &seq, &x) == 2) {
             proto_wait_cmd_t cmd = { .duration_s = (uint16_t)x };
             guard_wait(&g, (uint32_t)seq, &cmd, &d);

@@ -6,8 +6,8 @@
  * döner, durum nasıl değişir. Donanıma dokunmaz, girdi alır ve karar döndürür:
  * PC'de sınanır (firmware/tests/test_guard.py). Çıktıları göndermek çağıranın işi.
  *
- * AUTH ve REPLAY buraya gelmeden kanal katmanında düşer (K-023). FRESHNESS,
- * LIMIT ve CONSISTENCY Faz 4'ün sonraki adımlarında. */
+ * AUTH ve REPLAY buraya gelmeden kanal katmanında düşer (K-023). FRESHNESS ve
+ * CONSISTENCY Faz 4'ün sonraki adımlarında. */
 #ifndef GUARD_H
 #define GUARD_H
 
@@ -24,6 +24,8 @@ typedef struct {
     bool recovery_timed;         /* girişten sonraki ilk guard_tick'te true olur */
     uint32_t recovery_t0_ms;     /* o tick'in zamanı */
     bool halt_pending;           /* HOLD'a girildi, araca bir kez HALT(0) gidecek (K-042) */
+    int16_t prev_v_mm_s;         /* araca son GÖNDERİLEN hız (RULES §3.2); HOLD'da 0 */
+    int16_t prev_w_mrad_s;
 } guard_t;
 
 typedef struct {
@@ -32,6 +34,8 @@ typedef struct {
     proto_goal_t goal;
     bool send_halt;          /* WAIT/STOP: araca HALT(süre) gider, Nav2 hedefi iptal */
     proto_halt_t halt;
+    bool send_speed_limit;   /* hiz_siniri kabul: araca SPEED_LIMIT_SET (Nav2'ye) */
+    proto_speed_limit_set_t speed_limit;
 } guard_decision_t;
 
 /* Kart her zaman HOLD'da açılır (§5.2). */
@@ -43,6 +47,13 @@ void guard_init(guard_t *g);
  * ve başlangıca kurtarma hedefi (RECOVERY_HOME) çıkar (§5.2). */
 void guard_goto(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
                 const proto_goto_cmd_t *cmd, guard_decision_t *out);
+
+/* SPEED_LIMIT_CMD (hiz_siniri): MODE → LIMIT (0 < değer ≤ 600 mm/s). Ret içerik
+ * reddidir: seri artar, RECOVERY_REJECT_LIMIT'te kurtarma (guard_goto gibi);
+ * VERDICT'te value istenen, lo..hi izinli aralık. Kabulde araca SPEED_LIMIT_SET,
+ * seri sıfırlanır. */
+void guard_speed_limit(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
+                       const proto_speed_limit_cmd_t *cmd, guard_decision_t *out);
 
 /* WAIT_CMD (bekle): görev komutu, NORMAL dışında MODE ile ret. Kabulde araca
  * HALT(süre): Nav2'nin hedefi iptal edilir, araç durur. Kabul ret serisini
@@ -58,12 +69,12 @@ void guard_stop(guard_t *g, uint32_t seq, guard_decision_t *out);
  * edilir, HOLD → NORMAL. */
 void guard_reset(guard_t *g, uint32_t seq, bool heartbeat_alive, guard_decision_t *out);
 
-/* VELOCITY_CMD (K-031, asgari aktarma): NORMAL ve RECOVERY'de araca DRIVE
- * olarak aynen gider (true, out doldurulur): kurtarmada aracı hedefe Nav2
- * götürür (§5.2). HOLD'da gitmez (false), araca giden sıfır hızı app.c
- * gönderir. VERDICT yoktur (docs/protocol.md §7.2). Kırpma (LIMIT, §3.2)
- * Faz 4'ün sonraki adımında. */
-bool guard_velocity(const guard_t *g, const proto_velocity_cmd_t *cmd, proto_drive_t *out);
+/* VELOCITY_CMD: NORMAL ve RECOVERY'de kırpılıp (LIMIT, §3.2, K-046) araca DRIVE
+ * olarak gider (true, out doldurulur): kurtarmada aracı hedefe Nav2 götürür
+ * (§5.2). Kırpıldıysa *clipped true (STATUS.clipped). HOLD'da gitmez (false),
+ * araca giden sıfır hızı app.c gönderir. VERDICT yoktur (docs/protocol.md §7.2). */
+bool guard_velocity(guard_t *g, const proto_velocity_cmd_t *cmd, proto_drive_t *out,
+                    bool *clipped);
 
 /* Kalp atışı zaman aşımı: NORMAL ya da RECOVERY → HOLD. Mandallıdır, kalp
  * atışı geri gelince kendiliğinden NORMAL'e dönülmez (§5.2). */

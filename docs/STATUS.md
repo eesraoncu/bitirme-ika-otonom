@@ -123,7 +123,17 @@ hatalı komut reddedilince ajan gerekçeyi kullanıp kendini düzeltiyor. Sıra 
      Uçtan uca: yoldayken ajan köprüsü kapandı → 0,61 s'de Nav2 hedefi iptal, araç durdu (5 s'de 0 cm);
      yeniden bağlanıp SIFIRLA → araç 15 s kıpırdamadı, Nav2'de açık hedef yok. (A'daki açık hedef sorunu
      kapandı.) Ajanın WAIT/STOP göndermesi 4.2/4.3'te (ajan köprüsünde henüz arayüz yok).
-     **Sırada:** 4.1a LIMIT (hız kırpma K-046 kuralıyla, SPEED_LIMIT_CMD), 4.1c FRESHNESS, 4.1e CONSISTENCY.
+   - **4.1a bitti (2026-10-14):** `firmware/app/rules/limits/` (`limit_axis`: yalnız hızlanma, adım
+     30 mm/s · 60 mrad/s, ±600; `limit_speed_cmd`: 0 < değer ≤ 600). `guard_velocity` kırpıyor (son
+     GÖNDERİLEN komuta göre, HOLD'da 0), NORMAL ve RECOVERY'de; `STATUS.clipped` sayılıyor. **K-031'in
+     asgari aktarması bitti.** `guard_speed_limit`: MODE → LIMIT (VERDICT'te istenen, 1–600), ret içerik
+     reddi (seri, 5'te kurtarma), kabulde SPEED_LIMIT_SET; `vehicle_bridge` bunu Nav2'nin `/speed_limit`'ine
+     (m/s) yayımlar. Ajan köprüsünün günlüğünde "kırpılan hız". PC: 99 test, kasıtlı 4 hatanın 4'ü
+     yakalandı. Kart: 42 104 B, 0 uyarı; `decision_test` 2/2 (ilk çalıştırmada iki test beklentisi yanlıştı:
+     ω rampası ve 3+2 retle kurtarmanın başlaması, kart doğruydu). Uçtan uca: (0,0) → konteyner_onu →
+     (0,0), 903 VELOCITY_CMD, **0 kırpma**.
+     **Sırada:** 4.1c FRESHNESS (zaman eşitlemesi, protocol §6), 4.1e CONSISTENCY; sonra 4.2 (ajan
+     köprüsünde görev komutları arayüzü) ve 4.3 (ajan).
    - **Ağ:** okul Wi-Fi'si (GSBWIFI) IP'yi ara ara kaybediyor; o an ROS (CycloneDDS) ve Gazebo
      multicast'i kopuyor, süreçler toparlanmıyor. Kendi bağlantıyla sorun yok. Port 22 orada kapalı.
    - **Teşhis düzeltmesi:** "collision ahead ← AMCL kaybı" (aşağıda, 3.3) yanlıştı: tur 1'de AMCL

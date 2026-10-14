@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "recovery/recovery.h"
+#include "rules/limits/limits.h"
 
 void guard_init(guard_t *g)
 {
@@ -39,13 +40,8 @@ static void enter_hold(guard_t *g)
         g->halt_pending = true;
     }
     g->state = PROTO_BOARD_STATE_HOLD;
-}
-
-static void content_rejected(guard_t *g)
-{
-    if (g->reject_streak < UINT8_MAX) {
-        g->reject_streak++;
-    }
+    g->prev_v_mm_s = 0;          /* HOLD araca sıfır hız gönderir (§3.2) */
+    g->prev_w_mrad_s = 0;
 }
 
 /* NORMAL → RECOVERY: hedef hatırlanır ve araca gidecek GOAL'e yazılır. Varış
@@ -60,6 +56,20 @@ static void enter_recovery(guard_t *g, geo_point_t target, uint8_t source, proto
     goal->y_cm = target.y_cm;
     goal->yaw_mrad = 0;
     goal->source = source;
+}
+
+/* İçerik reddi (GEOFENCE, LIMIT; §5.4): seri artar, sınıra ulaşınca ve kanal
+ * canlıysa NORMAL → RECOVERY, aynı kararda başlangıca kurtarma hedefi. */
+static void content_rejected(guard_t *g, const site_t *s, bool heartbeat_alive,
+                             guard_decision_t *out)
+{
+    if (g->reject_streak < UINT8_MAX) {
+        g->reject_streak++;
+    }
+    if (g->reject_streak >= RECOVERY_REJECT_LIMIT && heartbeat_alive) {
+        enter_recovery(g, s->home, PROTO_GOAL_SOURCE_RECOVERY_HOME, &out->goal);
+        out->send_goal = true;
+    }
 }
 
 void guard_goto(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
@@ -78,11 +88,7 @@ void guard_goto(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
         geo_point_t hint = site_nearest_safe(s, goal);
         out->verdict.hint_x_cm = hint.x_cm;
         out->verdict.hint_y_cm = hint.y_cm;
-        content_rejected(g);
-        if (g->reject_streak >= RECOVERY_REJECT_LIMIT && heartbeat_alive) {
-            enter_recovery(g, s->home, PROTO_GOAL_SOURCE_RECOVERY_HOME, &out->goal);
-            out->send_goal = true;
-        }
+        content_rejected(g, s, heartbeat_alive, out);
         return;
     }
 
@@ -92,6 +98,28 @@ void guard_goto(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
     out->goal.y_cm = cmd->goal_y_cm;
     out->goal.yaw_mrad = cmd->goal_yaw_mrad;
     out->goal.source = PROTO_GOAL_SOURCE_AGENT;
+    g->reject_streak = 0u;
+}
+
+void guard_speed_limit(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
+                       const proto_speed_limit_cmd_t *cmd, guard_decision_t *out)
+{
+    if (mode_rejects(g, seq, out)) {
+        return;
+    }
+    limit_result_t r = limit_speed_cmd(cmd->limit_mm_s);
+    if (r != LIMIT_OK) {
+        verdict(out, seq, PROTO_RESULT_REJECTED, PROTO_RULE_LIMIT,
+                r == LIMIT_NOT_POSITIVE ? PROTO_REASON_NOT_POSITIVE : PROTO_REASON_ABOVE_MAX);
+        out->verdict.value = cmd->limit_mm_s;
+        out->verdict.lo = 1;
+        out->verdict.hi = LIMIT_V_MAX_MM_S;
+        content_rejected(g, s, heartbeat_alive, out);
+        return;
+    }
+    verdict(out, seq, PROTO_RESULT_ACCEPTED, PROTO_RULE_NONE, PROTO_REASON_NONE);
+    out->send_speed_limit = true;
+    out->speed_limit.limit_mm_s = cmd->limit_mm_s;
     g->reject_streak = 0u;
 }
 
@@ -132,13 +160,17 @@ void guard_reset(guard_t *g, uint32_t seq, bool heartbeat_alive, guard_decision_
     g->reject_streak = 0u;
 }
 
-bool guard_velocity(const guard_t *g, const proto_velocity_cmd_t *cmd, proto_drive_t *out)
+bool guard_velocity(guard_t *g, const proto_velocity_cmd_t *cmd, proto_drive_t *out,
+                    bool *clipped)
 {
     if (g->state == PROTO_BOARD_STATE_HOLD) {
         return false;
     }
-    out->v_mm_s = cmd->v_mm_s;
-    out->w_mrad_s = cmd->w_mrad_s;
+    out->v_mm_s = limit_axis(cmd->v_mm_s, g->prev_v_mm_s, LIMIT_DV_MM_S, LIMIT_V_MAX_MM_S);
+    out->w_mrad_s = limit_axis(cmd->w_mrad_s, g->prev_w_mrad_s, LIMIT_DW_MRAD_S, LIMIT_W_MAX_MRAD_S);
+    *clipped = out->v_mm_s != cmd->v_mm_s || out->w_mrad_s != cmd->w_mrad_s;
+    g->prev_v_mm_s = out->v_mm_s;
+    g->prev_w_mrad_s = out->w_mrad_s;
     return true;
 }
 

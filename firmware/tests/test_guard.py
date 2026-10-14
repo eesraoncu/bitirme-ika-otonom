@@ -42,13 +42,18 @@ class Decision:
     state: int
     streak: int
     halt: Optional[int]
+    speed: Optional[int]
+    value: int
+    lo: int
+    hi: int
 
 
 def _parse(line: str) -> Decision:
     f = line.split()
     goal = None if f[6] == "-" else tuple(int(v) for v in f[6].split(","))
     return Decision(int(f[0]), int(f[1]), int(f[2]), int(f[3]), (int(f[4]), int(f[5])),
-                    goal, int(f[7]), int(f[8]), None if f[9] == "-" else int(f[9]))
+                    goal, int(f[7]), int(f[8]), None if f[9] == "-" else int(f[9]),
+                    None if f[10] == "-" else int(f[10]), int(f[11]), int(f[12]), int(f[13]))
 
 
 class Guard:
@@ -67,7 +72,7 @@ class Guard:
     def seq(self, *cmds: str) -> List[Decision]:
         """Komutları tek bir sürücü çalıştırmasında, sırayla verir."""
         return [_parse(o) for c, o in zip(cmds, self.run(list(cmds)))
-                if c.startswith(("goto", "reset", "wait", "stop"))]
+                if c.startswith(("goto", "reset", "wait", "stop", "speed"))]
 
 
 @pytest.fixture(scope="module")
@@ -79,6 +84,7 @@ def guard(tmp_path_factory):
          "-I", str(APP), "-I", str(PROTO / "c"), str(TESTS / "guard_driver.c"),
          str(APP / "guard" / "guard.c"), str(APP / "site" / "site.c"),
          str(APP / "rules" / "geofence" / "geofence.c"), str(APP / "recovery" / "recovery.c"),
+         str(APP / "rules" / "limits" / "limits.c"),
          "-o", str(exe)],
         capture_output=True, text=True)
     assert cc.returncode == 0, "Kartın C kodu katı uyarılarla derlenmedi:\n" + cc.stderr
@@ -181,16 +187,16 @@ def test_nearest_safe(guard, which, p, expected):
 
 # ---- Hız komutu (K-031, asgari aktarma) ----------------------------------------
 
-def test_velocity_forwarded_only_in_normal(guard):
+def test_velocity_forwarded_only_outside_hold(guard):
     out = guard.run(["vel 300 -500",            # HOLD'da açılır: aktarılmaz
                      "reset 1 1",
-                     "vel 300 -500",            # NORMAL: aynen
-                     "vel -32768 32767",        # uç değerler, kırpma Faz 4'te
+                     "vel 300 -500",            # 0'dan: hızlanma adımı 30 / 60 (K-046)
+                     "vel -32768 32767",        # işaret değişimi serbest, sonra ±600
                      "vel 0 0",
                      "lost",
                      "vel 300 -500"])           # kalp atışı kesildi: HOLD, aktarılmaz
     assert out[0] == "-"
-    assert out[2:5] == ["300,-500", "-32768,32767", "0,0"]
+    assert out[2:5] == ["30,-60 c", "-600,600 c", "0,0"]
     assert out[6] == "-"
 
 
@@ -244,7 +250,7 @@ def test_recovery_rejects_agent_but_passes_velocity(guard):
     goto, reset = _parse(out[3]), _parse(out[4])
     assert rejected(goto, Rule.MODE, Reason.IN_RECOVERY) and goto.streak == 0   # MODE sayılmaz
     assert rejected(reset, Rule.MODE, Reason.NOT_IN_HOLD) and reset.state == RECOVERY
-    assert out[5] == "200,-100"
+    assert out[5] == "30,-60 c"                  # RECOVERY'de de kırpılarak geçer
 
 
 def test_arrival_within_35_cm_enters_hold(guard):
@@ -350,3 +356,64 @@ def test_stop_in_recovery_does_not_double_halt(guard):
     # STOP kararı HALT(0)'ı kendisi taşır: HOLD girişi ayrıca HALT kurmaz
     out = guard.run(["init", "reset 1 1", "tel 700 700 1", "stop 2", "takehalt"])
     assert _parse(out[3]).halt == 0 and out[4] == "0"
+
+
+# ---- Fiziksel limitler (RULES §3.2, K-046) ---------------------------------------
+
+def _vel(guard, *cmds):
+    return guard.run(["init", "reset 1 1", *[f"vel {v} {w}" for v, w in cmds]])[2:]
+
+
+def test_acceleration_step_boundary(guard):
+    # adım tam 30 mm/s ve 60 mrad/s geçer, bir fazlası kırpılır
+    assert _vel(guard, (30, 60), (61, 121), (91, 181)) == ["30,60", "60,120 c", "90,180 c"]
+
+
+def test_ramp_reaches_max_and_caps(guard):
+    out = _vel(guard, *[(1000, 0)] * 21)
+    assert out[19] == "600,0 c" and out[20] == "600,0 c"     # 20 adımda 600, sonra ±600 sınırı
+
+
+def test_deceleration_and_sign_change_are_free(guard):
+    out = _vel(guard, (30, 0), (60, 0), (90, 0), (0, 0), (30, 0), (-30, 0), (-200, 0))
+    # 90 → 0 (durma) ve 30 → −30 (işaret değişimi) serbest; −30 → −200 hızlanma: −60
+    assert out[3:] == ["0,0", "30,0", "-30,0", "-60,0 c"]
+
+
+def test_speed_cap_applies_even_when_decelerating(guard):
+    # yön değişiminde büyüklük ±600'ü aşamaz (bilinen sınır yalnız ivme için)
+    out = _vel(guard, (30, 60), (-32768, -32768))
+    assert out[1] == "-600,-600 c"
+
+
+def test_hold_resets_previous_command(guard):
+    out = guard.run(["init", "reset 1 1", "vel 30 0", "vel 60 0", "lost", "reset 2 1", "vel 300 0"])
+    assert out[6] == "30,0 c"                    # HOLD sıfır hız gönderdi: v_önceki = 0
+
+
+@pytest.mark.parametrize("mm,reason", [(0, Reason.NOT_POSITIVE), (601, Reason.ABOVE_MAX),
+                                       (65535, Reason.ABOVE_MAX)])
+def test_speed_limit_rejected_with_range(guard, mm, reason):
+    _, d = guard.seq("init", "reset 1 1", f"speed 5 {mm}")
+    assert rejected(d, Rule.LIMIT, reason) and d.speed is None
+    assert (d.value, d.lo, d.hi) == (mm, 1, 600) and d.streak == 1
+
+
+@pytest.mark.parametrize("mm", [1, 300, 600])
+def test_speed_limit_accepted(guard, mm):
+    _, d = guard.seq("init", "reset 1 1", f"speed 5 {mm}")
+    assert accepted(d) and d.speed == mm and d.goal is None
+
+
+def test_speed_limit_mode_and_streak(guard):
+    ds = guard.seq("init", "speed 1 300",                          # HOLD: MODE, sayılmaz
+                   "reset 2 1", "speed 3 900", "goto 4 9000 0 0",   # LIMIT ve GEOFENCE birlikte sayılır
+                   "speed 5 300")                                  # kabul: sıfırlar
+    assert rejected(ds[0], Rule.MODE, Reason.IN_HOLD) and ds[0].streak == 0
+    assert [d.streak for d in ds[2:]] == [1, 2, 0]
+
+
+def test_fifth_limit_rejection_starts_recovery(guard):
+    ds = guard.seq("init", "reset 1 1", *[f"speed {i} 2000" for i in range(2, 7)])
+    assert ds[-1].rule == Rule.LIMIT and ds[-1].state == RECOVERY
+    assert ds[-1].goal == (*HOME, 0, int(GoalSource.RECOVERY_HOME))

@@ -203,13 +203,42 @@ def run(agent: Link, vehicle: Link, hb: Heartbeat, rep: Report) -> None:
     st = agent.wait_for(m.Status, 2.5, lambda s: s.telemetry_age_ms < 1100)
     rep.check(st is not None, "telemetri yaşı düştü", f"{st[1].telemetry_age_ms} ms" if st else "")
 
-    print("Hız komutu (K-031)")
+    print("Hız komutu: kırpma (RULES §3.2, K-046)")
+    st = agent.wait_for(m.Status, 2.5)
+    clipped0 = st[1].clipped if st else None
     vehicle.receive(0.2)
-    agent.send(m.VelocityCmd(300, 100))
-    got = vehicle.wait_for(m.Drive, 0.5)
-    rep.check(got is not None and (got[1].v_mm_s, got[1].w_mrad_s) == (300, 100),
-              "NORMAL'de VELOCITY_CMD aynen DRIVE olarak araca", str(got[1]) if got else "gelmedi")
+    sent = [(300, 100)] * 4 + [(0, 0), (30, 60)]
+    # ω 100'e 60'tan tek adımda (+40 ≤ 60) çıkar: yalnız ilk komutta açısal kırpma var
+    want = [(30, 60), (60, 100), (90, 100), (120, 100), (0, 0), (30, 60)]
+    got = []
+    for v, w in sent:
+        agent.send(m.VelocityCmd(v, w))
+        d = vehicle.wait_for(m.Drive, 0.5)
+        got.append(None if d is None else (d[1].v_mm_s, d[1].w_mrad_s))
+    rep.check(got == want, "hızlanma adım başına 30 mm/s · 60 mrad/s; durma serbest", str(got))
     rep.check(agent.wait_for(m.Verdict, 0.3) is None, "VELOCITY_CMD'ye VERDICT yok")
+    st = agent.wait_for(m.Status, 2.5, lambda x: clipped0 is not None and x.clipped >= clipped0 + 4)
+    rep.check(st is not None and st[1].clipped == clipped0 + 4, "STATUS.clipped 4 arttı",
+              f"{clipped0} → {st[1].clipped}" if st else "")
+
+    print("Hız sınırı (hiz_siniri, LIMIT)")
+    vehicle.receive(0.1)
+    # Önce kabul: "Hedefler"deki 3 ret seriyi 3'te bıraktı; 2 ret daha kurtarmayı başlatırdı
+    v = send_cmd(agent, m.SpeedLimitCmd(300, 0, 0, 0))
+    sl = vehicle.wait_for(m.SpeedLimitSet, 0.5)
+    rep.check(v is not None and v.result == m.Result.ACCEPTED and sl is not None
+              and sl[1].limit_mm_s == 300, "hiz_siniri(0,3) kabul, araca SPEED_LIMIT_SET(300)")
+    ack = agent.wait_for(m.HeartbeatAck, 0.5)
+    rep.check(ack is not None and ack[1].reject_streak == 0, "kabul ret serisini sıfırladı")
+    v = send_cmd(agent, m.SpeedLimitCmd(900, 0, 0, 0))
+    rep.check(v is not None and v.rule == m.Rule.LIMIT and v.reason == m.Reason.ABOVE_MAX
+              and (v.value, v.lo, v.hi) == (900, 1, 600),
+              "hiz_siniri(0,9) → LIMIT / ABOVE_MAX, istenen 900, aralık 1–600",
+              "" if v is None else f"{v.reason.name}, {v.value} [{v.lo}, {v.hi}]")
+    v = send_cmd(agent, m.SpeedLimitCmd(0, 0, 0, 0))
+    rep.check(v is not None and v.reason == m.Reason.NOT_POSITIVE, "hiz_siniri(0) → NOT_POSITIVE")
+    rep.check(vehicle.wait_for(m.SpeedLimitSet, 0.3) is None, "reddedilen sınır araca gitmedi")
+    rep.check(board_state(agent) == m.BoardState.NORMAL, "2 LIMIT reddi: seri 2, kart NORMAL")
 
     print("Bekle ve dur (WAIT_CMD, STOP_CMD)")
     vehicle.receive(0.1)
@@ -311,8 +340,8 @@ def recovery(agent: Link, vehicle: Link, tel: TelemetryStream, rep: Report) -> N
     rep.check(v is not None and v.rule == m.Rule.MODE and v.reason == m.Reason.IN_RECOVERY,
               "RECOVERY'de GOTO → MODE / IN_RECOVERY")
     agent.send(m.VelocityCmd(300, 100))
-    got = vehicle.wait_for(m.Drive, 0.5, lambda d: (d.v_mm_s, d.w_mrad_s) == (300, 100))
-    rep.check(got is not None, "RECOVERY'de VELOCITY_CMD araca geçiyor (Nav2 götürür)")
+    got = vehicle.wait_for(m.Drive, 0.5, lambda d: (d.v_mm_s, d.w_mrad_s) == (30, 60))
+    rep.check(got is not None, "RECOVERY'de VELOCITY_CMD kırpılarak araca geçiyor (Nav2 götürür)")
     vehicle.receive(0.1)
     tel.pos = (safe[0] + 21, safe[1] + 28)            # 21² + 28² = 35²: sınır dahil
     h = vehicle.wait_for(m.Halt, 0.5)

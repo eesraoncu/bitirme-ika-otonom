@@ -286,6 +286,11 @@ static void send_decision(channel_t *ch, const guard_decision_t *d)
         proto_halt_encode(&d->halt, h);
         guard_can_send(PROTO_CAN_ID_HALT, h, sizeof h);
     }
+    if (d->send_speed_limit) {
+        uint8_t l[PROTO_SIZE_SPEED_LIMIT_SET];
+        proto_speed_limit_set_encode(&d->speed_limit, l);
+        guard_can_send(PROTO_CAN_ID_SPEED_LIMIT_SET, l, sizeof l);
+    }
 }
 
 /* K-042: HOLD'a girildiyse araca bir kez HALT(0), köprü Nav2'nin hedefini
@@ -338,6 +343,15 @@ static void on_agent_frame(channel_t *ch, const frame_t *f)
         timing_record(&goto_timing, ch->frame_t0);
         break;
     }
+    case PROTO_ID_SPEED_LIMIT_CMD: {
+        proto_speed_limit_cmd_t cmd;
+        if (!proto_speed_limit_cmd_decode(f->payload, f->payload_len, &cmd)) {
+            return;
+        }
+        guard_speed_limit(&guard, &site, f->seq, heartbeat_alive(), &cmd, &d);
+        send_decision(ch, &d);
+        break;
+    }
     case PROTO_ID_WAIT_CMD: {
         proto_wait_cmd_t cmd;
         if (!proto_wait_cmd_decode(f->payload, f->payload_len, &cmd)) {
@@ -356,12 +370,16 @@ static void on_agent_frame(channel_t *ch, const frame_t *f)
         send_decision(ch, &d);
         break;
     case PROTO_ID_VELOCITY_CMD: {
-        /* K-031: NORMAL'de DRIVE olarak araca, VERDICT yok. */
+        /* NORMAL ve RECOVERY'de kırpılıp (K-046) DRIVE olarak araca, VERDICT yok. */
         proto_velocity_cmd_t cmd;
         proto_drive_t drive;
+        bool clipped = false;
         if (!proto_velocity_cmd_decode(f->payload, f->payload_len, &cmd) ||
-            !guard_velocity(&guard, &cmd, &drive)) {
+            !guard_velocity(&guard, &cmd, &drive, &clipped)) {
             return;
+        }
+        if (clipped) {
+            ch->cnt.clipped++;
         }
         uint8_t p[PROTO_SIZE_DRIVE];
         proto_drive_encode(&drive, p);
@@ -369,7 +387,6 @@ static void on_agent_frame(channel_t *ch, const frame_t *f)
         break;
     }
     default:
-        /* SPEED_LIMIT_CMD Faz 4'ün sonraki adımında (LIMIT). */
         break;
     }
 }
