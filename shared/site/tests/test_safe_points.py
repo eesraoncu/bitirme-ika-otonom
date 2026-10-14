@@ -80,3 +80,44 @@ def test_safe_points_and_home_rotation_clear(obstacles):
 def test_detects_blocked_point(obstacles, name, x, y):
     # denetimin kendisi çalışıyor mu: 2026-10-14'te Nav2'nin ulaşamadığı noktalar yakalanmalı
     assert clearance(obstacles, x, y) < rotation_radius(), name
+
+
+# ---- Ajanın yer adları (places, K-044, Faz 4.3) ---------------------------------
+# Güvenli noktalardan farklı: her yönde değil, kendi varış yönünde iz temiz olmalı.
+
+def footprint_margin(obstacles: np.ndarray, x: float, y: float, yaw: float) -> float:
+    """Paylı iz dikdörtgeninin (yaw yönünde) en yakın dolu hücreye uzaklığı, içerideyse < 0."""
+    p = yaml.safe_load(NAV2_PARAMS.read_text(encoding="utf-8"))
+    local = p["local_costmap"]["local_costmap"]["ros__parameters"]
+    pad = local["footprint_padding"]
+    fp = yaml.safe_load(local["footprint"])
+    front = max(a for a, _ in fp) + pad
+    back = min(a for a, _ in fp) - pad
+    half = max(abs(b) for _, b in fp) + pad
+    c, s = math.cos(yaw), math.sin(yaw)
+    dx, dy = obstacles[:, 0] - x, obstacles[:, 1] - y
+    lx, ly = dx * c + dy * s, -dx * s + dy * c
+    out_x = np.maximum(np.maximum(back - lx, lx - front), 0)
+    out_y = np.maximum(np.abs(ly) - half, 0)
+    d = np.hypot(out_x, out_y) - 0.05 * math.sqrt(2) / 2      # hücrenin kenarı, güvenli yön
+    inside = (lx >= back) & (lx <= front) & (np.abs(ly) <= half)
+    return float(np.where(inside, -1.0, d).min())
+
+
+def test_places_footprint_clear_at_heading(obstacles):
+    places = gs.load_site()["places"]
+    assert places, "places boş"
+    short = {name: round(footprint_margin(obstacles, x / 100, y / 100, yaw / 1000), 3)
+             for name, (x, y, yaw) in places.items()
+             if footprint_margin(obstacles, x / 100, y / 100, yaw / 1000) <= 0}
+    assert not short, f"izi engele/keepout'a değen yerler (boşluk, m): {short}"
+
+
+def test_places_check_catches_bad_heading(obstacles):
+    # 2026-10-14 tur 1: (8; 7,6) 43,5° yönle kuzey sınırına taşıyordu
+    assert footprint_margin(obstacles, 8.0, 7.6, math.radians(43.5)) <= 0
+
+
+def test_places_names_do_not_clash_with_safe_points():
+    site = gs.load_site()
+    assert not set(site["places"]) & set(site["safe"])

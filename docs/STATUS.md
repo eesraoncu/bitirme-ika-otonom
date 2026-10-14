@@ -161,9 +161,20 @@ hatalı komut reddedilince ajan gerekçeyi kullanıp kendini düzeltiyor. Sıra 
      karta gitmedi; hiz_siniri → /speed_limit 0,3; C'de ajan yalnız "Komut reddedildi." gördü,
      /guard/verdict tam kaldı. `messages.yaml` yorumu ve protocol §7.1: BELIEF_TOO_OLD hi 5000
      (şema özeti değişmedi, kart yeniden yüklenmedi).
-     **Sırada: 4.3 ajan** (granite4.1:3b, K-045; `/guard/task` ve `/guard/feedback` ile; inanç anlık
-     konumdan; ret döngüsü en çok 3 deneme, RULES §5.4; birim hatası için araç tanımı) ve **4.4**
-     uçtan uca ("depo arkasına git, 30 s bekle" türü görev).
+   - **4.3 bitti (2026-10-14, K-051):** `ros2_ws/src/llm_agent/agent_core.py` (araç tanımları + istem, tek
+     kaynak; döngü: inanç modelden önce okunan konum, her adım tek araç, en çok 3 ret, metinle bitiş)
+     ve `agent_node.py` (/agent/task → /guard/task, varış Nav2'den, bekle süreyle, /agent/log JSON).
+     `ika_saha.yaml`'a `places` (konteyner_arkasi (11; 7) 0°, kazi_bati (9; −0,5) 0°, kazi_dogu
+     (20; −0,5) 180°, kazi_kuzeyi (15; 5) 180°, yakit_kuzeyi (22; −2) 0°; gen_site doğrular, site
+     testi iz/yön; site_data.c değişmedi). `llm_select_bench` ajanın tanımlarını ve köprünün gerçek
+     gerekçe metnini kullanıyor: granite 30/31 (sıcaklık 0), 150/155 (0,7 × 5); birim 7/7, ret 8/8 ve
+     40/40; tek hata "konteynerin önü" → konteyner_arkasi. Birim testleri 11, kasıtlı 3 hata yakalandı.
+     **Uçtan uca (plan ölçütü sağlandı):** "Kapı önüne git, orada 30 saniye bekle." → git(kapi_onu)
+     kabul, vardı → bekle(30) kabul → özet; 2 adım, 0 ret. "Kazı alanının ortasına git." → kart
+     GEOFENCE ile reddetti (ipucu konteyner_onu (8,50; 1,00)) → model git(8,5; 1) → kabul, vardı;
+     1 ret, tek denemede düzeltti. Model kararı 0,4–0,65 s.
+     **Sırada: 4.4** birkaç deneme daha (C yapılandırması, hiz_siniri/dur, belirsiz talimat), sonuçlar
+     buraya, sonra `v0.4.0` (Esra, 2026-10-14).
    - **Ağ:** okul Wi-Fi'si (GSBWIFI) IP'yi ara ara kaybediyor; o an ROS (CycloneDDS) ve Gazebo
      multicast'i kopuyor, süreçler toparlanmıyor. Kendi bağlantıyla sorun yok. Port 22 orada kapalı.
    - **Teşhis düzeltmesi:** "collision ahead ← AMCL kaybı" (aşağıda, 3.3) yanlıştı: tur 1'de AMCL

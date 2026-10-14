@@ -13,7 +13,7 @@ sıcaklık 0'da seed'ler aynı cevabı verir, > 0'da kararlılığı ölçer. C�
 (yer, koordinat, birim, dur, bileşik, ret); tablo kategori başına doğruyu da verir.
 "GPU payı" /api/ps'ten: modelin VRAM'deki oranı.
 
-Araç tanımları burada TASLAK. 4.3'te ajana (llm_agent) taşınır, bu betik oradan okur.
+Araç tanımları ve sistem istemi ajanın kendisinden (ros2_ws/src/llm_agent/agent_core.py).
 """
 from __future__ import annotations
 
@@ -36,45 +36,17 @@ FIRST_SEED = 42
 TIMEOUT_S = 300
 
 SITE = gs.load_site()
-PLACES = list(SITE["safe"])   # adlı yerler ika_saha.yaml'dan (K-044)
 
-SYSTEM = (
-    "Sen bir insansız kara aracını (İKA) yöneten görev ajanısın. Kullanıcının Türkçe "
-    "talimatını yalnızca verilen araçları çağırarak yerine getir. Yer adı verilmişse "
-    "'yer' alanını kullan, koordinat verilmişse 'x' ve 'y' alanlarını (metre) kullan. "
-    "Bir komut reddedilirse gelen gerekçeyi okuyup düzeltilmiş yeni bir komut ver."
-)
+# Sistem istemi, araç tanımları ve yer adları ajanın kendisinden (tek kaynak, Faz 4.3):
+# ölçülen, ajanın gerçekten kullandığıdır.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ros2_ws" / "src" / "llm_agent"))
+import agent_core as ac  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ros2_ws" / "src" / "guard_bridge"))
+import convert as cv  # noqa: E402
 
-TOOLS = [
-    {"type": "function", "function": {
-        "name": "git",
-        "description": "Aracı bir hedefe gönder. Ya 'yer' ya da 'x' ile 'y' verilir.",
-        "parameters": {"type": "object", "properties": {
-            "yer": {"type": "string", "enum": PLACES, "description": "Kayıtlı yerin adı"},
-            "x": {"type": "number", "description": "Hedefin x koordinatı, metre"},
-            "y": {"type": "number", "description": "Hedefin y koordinatı, metre"},
-        }},
-    }},
-    {"type": "function", "function": {
-        "name": "bekle",
-        "description": "Olduğun yerde belirtilen süre bekle.",
-        "parameters": {"type": "object", "required": ["sure_s"], "properties": {
-            "sure_s": {"type": "number", "description": "Bekleme süresi, saniye"},
-        }},
-    }},
-    {"type": "function", "function": {
-        "name": "hiz_siniri",
-        "description": "Aracın en yüksek hızını sınırla.",
-        "parameters": {"type": "object", "required": ["deger_mps"], "properties": {
-            "deger_mps": {"type": "number", "description": "Hız sınırı, m/s"},
-        }},
-    }},
-    {"type": "function", "function": {
-        "name": "dur",
-        "description": "Aracı hemen durdur.",
-        "parameters": {"type": "object", "properties": {}},
-    }},
-]
+PLACES = sorted(ac.places_from_site(SITE))   # güvenli noktalar + places (K-044)
+SYSTEM = ac.SYSTEM
+TOOLS = ac.tool_definitions(PLACES)
 
 
 def _num(v):
@@ -103,7 +75,8 @@ def _rejected(call, verdict):
     return [
         {"role": "assistant", "content": "",
          "tool_calls": [{"function": {"name": name, "arguments": args}}]},
-        {"role": "tool", "tool_name": name, "content": json.dumps(verdict, ensure_ascii=False)},
+        {"role": "tool", "tool_name": name,
+         "content": verdict if isinstance(verdict, str) else json.dumps(verdict, ensure_ascii=False)},
     ]
 
 
@@ -117,20 +90,20 @@ def speed(v):
 
 def geofence_case(cid, text, x, y, reason):
     """Hedefi reddedilmiş bir 'git'; ipucu kartın hesabıyla (gen_site.nearest_safe) bulunur.
-    Gerekçenin ajana hangi biçimde gideceği 4.2'de kesinleşir; burada ad + koordinat."""
+    Gerekçe, ajanın gerçekte gördüğü köprü metni (convert.feedback_text, D, K-050)."""
     safe = SITE["safe"]
     hint = gs.nearest_safe(list(safe.values()), SITE["home"], (round(x * 100), round(y * 100)))
     name = next(n for n, p in safe.items() if p == hint)
     hx, hy = hint[0] / 100, hint[1] / 100
-    verdict = {"karar": "REDDEDILDI", "kural": "GEOFENCE", "neden": reason,
-               "en_yakin_guvenli_nokta": {"ad": name, "x": hx, "y": hy}}
+    verdict = cv.feedback_text("REJECTED", "GEOFENCE", reason, 0, 0, 0, hint[0], hint[1],
+                               full=True, safe_points=safe)
     return ("ret", cid, text, _rejected(("git", {"x": x, "y": y}), verdict),
             "git", lambda a: a.get("yer") == name or go_xy(hx, hy)(a))
 
 
 def limit_case(cid, text, v):
-    verdict = {"karar": "REDDEDILDI", "kural": "LIMIT", "neden": "ABOVE_MAX",
-               "istenen_mps": v, "izinli_aralik_mps": [0, 0.6]}
+    verdict = cv.feedback_text("REJECTED", "LIMIT", "ABOVE_MAX", round(v * 1000), 1, 600, 0, 0,
+                               full=True)
     return ("ret", cid, text, _rejected(("hiz_siniri", {"deger_mps": v}), verdict),
             "hiz_siniri", lambda a: 0 < (_num(a.get("deger_mps")) or 0) <= 0.6)
 

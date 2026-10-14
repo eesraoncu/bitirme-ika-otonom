@@ -36,3 +36,14 @@ safe_points:           # sıra önemli: eşitlikte sıra numarası küçük olan
   kuzeybati:     [1.75, 6]
   konteyner_onu: [8.5, 1]
   kapi_onu:      [26, 0]
+
+# Ajanın yer adları (K-044, Faz 4.3): ajan git(yer) ile bunlara ve güvenli noktalara gider.
+# Kartın verisi değil (site_data.c'ye girmez). [x, y (m), varış yönü (derece)]. Ölçüt: aracın
+# paylı izi bu yönde engele ya da keepout'a değmez (shared/site/tests/test_safe_points.py);
+# noktaya giden YOL denetlenmiyor, uçtan uca denenmeli (guney'in dersi).
+places:
+  konteyner_arkasi: [11, 7, 0]       # iz boşluğu 0,70 m
+  kazi_bati:        [9, -0.5, 0]     # 1,91 m
+  kazi_dogu:        [20, -0.5, 180]  # 1,91 m
+  kazi_kuzeyi:      [15, 5, 180]     # 1,65 m
+  yakit_kuzeyi:     [22, -2, 0]      # 0,65 m

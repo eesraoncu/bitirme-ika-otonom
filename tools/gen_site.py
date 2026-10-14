@@ -225,15 +225,31 @@ def build(src: Dict) -> Dict:
             raise SiteError(f"safe_points: '{name}' küçük harf, rakam ve _ olmalı")
         safe[name] = point_cm(_point(f"safe_points.{name}", raw))
 
+    # Ajanın yer adları (K-044, Faz 4.3): kartın değil ajanın verisi, site_data.c'ye girmez.
+    # [x, y, varış yönü (derece)]; güvenli noktalar da yer adıdır, adlar çakışmamalı.
+    places = {}
+    for name, raw in (src.get("places") or {}).items():
+        if not NAME.match(str(name)):
+            raise SiteError(f"places: '{name}' küçük harf, rakam ve _ olmalı")
+        if name in safe:
+            raise SiteError(f"places.{name}: güvenli noktayla aynı ad")
+        try:
+            x, y, yaw_deg = (float(v) for v in raw)
+        except (TypeError, ValueError):
+            raise SiteError(f"places.{name}: [x, y, yön_derece] olmalı")
+        yaw = math.atan2(math.sin(math.radians(yaw_deg)), math.cos(math.radians(yaw_deg)))
+        places[name] = (*point_cm((x, y)), round(yaw * 1000))
+
     forb_list = list(forbidden_cm.values())
-    for name, p in [("home", home)] + [(f"safe_points.{n}", p) for n, p in safe.items()]:
+    for name, p in ([("home", home)] + [(f"safe_points.{n}", p) for n, p in safe.items()]
+                    + [(f"places.{n}", p[:2]) for n, p in places.items()]):
         verdict = geofence_cm(allowed_cm, forb_list, p)
         if verdict != OK:
             why = "izinli alanın dışında" if verdict == OUTSIDE_ALLOWED else "yasak bölgede"
             raise SiteError(f"{name} ({p[0]}, {p[1]}) cm, paydan sonra {why}")
 
     return {"margin_m": margin, "allowed": allowed_cm, "forbidden": forbidden_cm,
-            "home": home, "safe": safe}
+            "home": home, "safe": safe, "places": places}
 
 
 # ---- çıktılar ---------------------------------------------------------------

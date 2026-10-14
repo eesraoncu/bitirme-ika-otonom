@@ -1114,3 +1114,16 @@ full (D) gerekçe ve ipucu (güvenli nokta adıyla), minimal (C) yalnız "Komut 
 betik (K-040); /guard/verdict zaten JSON. id, ajanın kararı kendi komutuyla eşleştirmesi
 için. İnanç zorunlu: ajan konumu vermeden komut geçerse CONSISTENCY anlamını yitirir.
 Ad + koordinat ipucu 4.0'daki gözleme dayanıyor (yalnız adla model düzeltemedi).
+
+## K-051 · Ajan: places, tek adım tek araç, inanç modelden önce, 3 ret
+**Tarih:** 2026-10-14 · **Durum:** Yürürlükte
+
+ros2_ws/src/llm_agent: agent_core (araç tanımları + istem, tek kaynak; llm_select_bench de
+buradan okur) ve agent_node (/agent/task → /guard/task, /agent/log). Her adımda tek araç; inanç
+modeli çağırmadan önce okunan konum (Δt = düşünme süresi, RULES §3.4); görev başına en çok 3 ret.
+Yer adları: güvenli noktalar + ika_saha.yaml'da places (ajanın, kartın değil; [x, y, yön]).
+Geliştirmede sıcaklık 0, seed 42 (Faz 5'in değeri ayrı).
+
+**Neden:** Esra'nın kararları (2026-10-14). İstem ve araç açıklaması ölçümle düzeltildi:
+"yapılamıyorsa özet yaz" cümlesi ret sonrası düzeltmeyi 8/8'den 5/8'e düşürüyordu; "reddedilirse
+özet yazma, düzelt" ve dakika örnekleriyle granite 30/31 (0,7 × 5'te 150/155).
