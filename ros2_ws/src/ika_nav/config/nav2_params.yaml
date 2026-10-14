@@ -123,7 +123,7 @@ planner_server:                    # global plan: haritada hedefe en ucuz yol
       use_astar: false
       allow_unknown: true          # haritada görülmemiş (gri) iç köşeler geçilebilir
 
-controller_server:                 # yolu izleyen hız komutları → /cmd_vel_raw → monitör → kart
+controller_server:                 # yolu izleyen hız komutları → /cmd_vel_raw → yumuşatıcı → monitör → kart
   ros__parameters:
     use_sim_time: true
     controller_frequency: 20.0     # RULES §3.2 Nav2'nin 20 Hz olduğuna dayanır
@@ -268,12 +268,31 @@ local_costmap:
                                    # kademeli pahalı şerit oluşmaz
         cost_scaling_factor: 3.0
 
-collision_monitor:                 # Nav2'nin kendi çarpışma bekçisi (K-041): /cmd_vel_raw → /cmd_vel_nav
+# Nav2'nin ivmesini sınırlar (K-046): /cmd_vel_raw → /cmd_vel_smoothed → monitör. Denetleyici
+# doğrusal ivmeyi sınırlamıyor: kalkışta 0 → 0,5 m/s tek adımda (10 m/s², 2026-10-14 ölçümü).
+# Monitörden ÖNCE: çarpışma bekçisinin ani durdurması yumuşatılmaz.
+velocity_smoother:
+  ros__parameters:
+    use_sim_time: true
+    smoothing_frequency: 20.0      # sabit 20 Hz çıkış (RULES §3.2'nin 50 ms'i; kurtarmalar 10 Hz)
+    scale_velocities: false
+    feedback: "OPEN_LOOP"          # son GÖNDERİLEN komuta göre: kartın v_önceki tanımı
+    max_velocity: [0.5, 0.0, 0.6]  # bağlayıcı değil; hız sınırı denetleyicide ve bekçide
+    min_velocity: [-0.5, 0.0, -0.6]
+    max_accel: [0.5, 0.0, 1.0]     # bekçi 1,2 katı: 0,6 m/s² · 1,2 rad/s² (RULES §1)
+    # Fiilen sınırsız: durma tek adımda (0,5 m/s × 50 ms = 10 m/s²). Yavaşlamayı sınırlamak durmayı
+    # geciktirir: -1,0 iken RPP'nin "collision ahead" durdurmasında araç 12 cm daha ilerleyip
+    # keepout'a girdi, kurtulamadı (2026-10-14). Bekçi de yavaşlamayı kırpmaz (RULES §3.2).
+    max_decel: [-10.0, 0.0, -20.0]
+    deadband_velocity: [0.0, 0.0, 0.0]
+    velocity_timeout: 1.0          # 1 s komut gelmezse sıfır yayınlar
+
+collision_monitor:                 # Nav2'nin kendi çarpışma bekçisi (K-041): /cmd_vel_smoothed → /cmd_vel_nav
   ros__parameters:
     use_sim_time: true
     base_frame_id: "base_link"
     odom_frame_id: "odom"
-    cmd_vel_in_topic: "/cmd_vel_raw"
+    cmd_vel_in_topic: "/cmd_vel_smoothed"
     cmd_vel_out_topic: "/cmd_vel_nav"   # → agent_bridge → kart
     transform_tolerance: 0.5
     source_timeout: 1.0            # lidar 1 s susarsa hız sıfırlanır

@@ -17,8 +17,8 @@ Bekçinin limiti **Nav2'nin kendi ayarının üstünde, platformun tavanının a
 |---|---|---|---|
 | Doğrusal hız | 0,5 m/s | **0,6 m/s** | 3,6 m/s (13 km/h) |
 | Açısal hız | 0,5 rad/s | **0,6 rad/s** | ~7 rad/s (hesap) |
-| Doğrusal ivme | sınır yok | **ölçülecek** | bilinmiyor |
-| Açısal ivme | 1,0 rad/s² | **1,2 rad/s²** | bilinmiyor |
+| Doğrusal ivme (hızlanma) | 0,5 m/s² | **0,6 m/s²** | bilinmiyor |
+| Açısal ivme (hızlanma) | 1,0 rad/s² | **1,2 rad/s²** | bilinmiyor |
 
 - **Nav2'nin üstünde, çünkü** normal çalışmada Nav2'nin ürettiği komutların hiçbiri
   kırpılmamalı. Aksi hâlde her komut "ihlal" sayılır ve yanlış alarm oranı (S1'in ikinci
@@ -28,16 +28,20 @@ Bekçinin limiti **Nav2'nin kendi ayarının üstünde, platformun tavanının a
   (Faz 5) veri üretebilmesi için bekçinin bir yerde *hayır* diyebilmesi gerekir.
 - Bekçi değerleri Nav2'nin **1,2 katı**. İKA tavanın çok altında: araç 3,6 m/s
   gidebilir, bekçi saha güvenliği için 0,6'da keser.
-- **Doğrusal ivme ölçülecek:** Nav2'nin denetleyicisinde (Regulated Pure Pursuit) doğrusal
-  ivme sınırı yok, hız yumuşatıcı da kullanılmıyor. Faz 4'ten önce bir denemede Nav2'nin
-  `/cmd_vel` çıktısı kaydedilir, en yüksek ivmenin 1,2 katı bekçinin sınırı olur.
-- **Açısal hız da aynı kayıtta doğrulanacak:** Nav2'nin 0,5 rad/s'si yalnız yerinde dönüş
-  ve kurtarma hareketlerinin sınırı. Yol takibinde Pure Pursuit `ω = v × eğrilik` üretir ve
-  bunu sınırlamaz; dar virajda 0,6'yı aşabilir. Aşıyorsa sınır Faz 4'ten önce güncellenir.
+- **İvme Nav2'de yumuşatıcıyla sınırlı, bekçide yalnız hızlanma denetlenir (K-046):**
+  Nav2'nin denetleyicisi (Regulated Pure Pursuit) doğrusal ivmeyi sınırlamıyor: 2026-10-14
+  ölçümünde kalkışta 0 → 0,5 m/s tek adımda (10 m/s²), 1,2 kat kuralı anlamsız sınır verirdi.
+  Nav2'ye `velocity_smoother` eklendi: hızlanma 0,5 m/s² · 1,0 rad/s², yavaşlama sınırsız.
+  Ölçüm (`tools/nav2_accel_bench.py`, 5 150 komut): hızlanma adımı en çok 0,025 m/s, bekçinin
+  sınırını aşan komut 0. Yavaşlama neden kırpılmaz: §3.2.
+- **Açısal hız doğrulandı (2026-10-14):** Nav2'nin 0,5 rad/s'si yalnız yerinde dönüş ve
+  kurtarmanın sınırı; yol takibinde Pure Pursuit `ω = v × eğrilik` üretir. Ölçülen en çok
+  0,556 rad/s (4 bacaklı tur, 4 415 hareket komutu), 0,6'yı aşan yok. Sınır değişmedi.
 
 **Kaynaklar:**
 - Nav2: `ros2_ws/src/ika_nav/config/nav2_params.yaml` (`desired_linear_vel`,
-  `rotate_to_heading_angular_vel`, behavior `max_rotational_vel`, `max_angular_accel`).
+  `rotate_to_heading_angular_vel`, behavior `max_rotational_vel`, velocity_smoother
+  `max_accel`).
 - İKA doğrusal tavanı: Orinium UGV ÇGM, TEKNOFEST 2026 Kritik Tasarım Raporu, §3.1.4
   Tablo-3 "Maksimum Hız 13 km/h". Aynı raporun Şekil 11'inde 15 km/h (düz yol) ve 30 km/h
   da geçiyor; resmî özellik tablosu esas alındı. Sağlama: 2850 rpm, 12:1 redüksiyonla
@@ -104,24 +108,36 @@ yönü boğmak için kullanılabilir hâle getirir (`docs/protocol.md` §4.7).
 
 ### 3.2 Fiziksel limitler: hız komutunda kırpma
 
-Önce ivme, sonra hız kırpılır:
+Önce ivme, sonra hız kırpılır. İvme yalnız **hızlanmada** kırpılır (K-046):
 
 ```
-v'  = clamp(v,  v_önceki − Δv_max,  v_önceki + Δv_max)
+hızlanma (v · v_önceki ≥ 0 ve |v| > |v_önceki|):  v' = clamp(v, v_önceki − Δv_max, v_önceki + Δv_max)
+aksi (yavaşlama, durma, işaret değişimi):          v' = v
 v'' = clamp(v', −0,60,  +0,60)
 (açısal için aynısı: Δω_max ve ±0,6)
 ```
 
+- **Yavaşlama kırpılmaz:** durmayı geciktirmek tehlikelidir (§2: `dur()` hiçbir zaman
+  reddedilmez). Ölçüldü: Nav2'nin yumuşatıcısında yavaşlama −1,0 m/s² ile sınırlıyken RPP'nin
+  "collision ahead" durdurmasında araç 12 cm daha ilerleyip keepout'a girdi ve kurtulamadı.
+- **İşaret değişimi yavaşlama sayılır,** Nav2'nin `velocity_smoother`'ıyla aynı tanım. Böylece
+  Nav2'nin normal çıktısı hiç kırpılmaz (sıfırın ötesini hızlanma sayan tanımla 5 150 komutta
+  2 kırpma olurdu). **Bilinen sınır:** yön değişiminde ani sıçrama (en çok ±0,6 → ∓0,6)
+  sınırlanmaz.
+
 - `v_önceki` = **son gönderilen (kırpılmış) komut**, son *alınan* değil. Aracın gerçekte
   ne duyduğuyla kıyaslanmalı. `BEKLE`'den çıkışta 0 kabul edilir.
 - **İvme, bölme yapmadan, komut başına hız farkı olarak denetlenir**:
-  `Δv_max = a_max × T` (a_max ölçülecek, §1) ·
+  `Δv_max = 0,6 × 0,05 = 0,03 m/s` ·
   `Δω_max = 1,2 × 0,05 = 0,06 rad/s`, burada `T = 50 ms` Nav2'nin 20 Hz'lik periyodu.
   Karşılaştırma için Nav2'nin kendi açısal basamağı 1,0 × 0,05 = 0,05 rad/s.
 - **Neden ölçülen Δt değil sabit T:** gerçek varış aralıkları titrer. 50 ms yerine
   30 ms sonra gelen bir komut, ivmeyi olduğundan yüksek gösterir ve haksız kırpmaya
   yol açar. Sabit T bölme gerektirmez, titremeden etkilenmez ve süresi sabittir.
-  **Varsayım:** Nav2 20 Hz'de çalışıyor. Frekans değişirse bu değerler güncellenir.
+  **Varsayım:** Nav2 20 Hz'de çalışıyor. **Doğrulandı (2026-10-14):** `velocity_smoother`
+  kendi zamanlayıcısıyla sabit 20 Hz yayınlar (aralık en çok 52 ms); onsuz kurtarma
+  hareketleri 10 Hz geliyordu (`behavior_server` `cycle_frequency`). Frekans değişirse bu
+  değerler güncellenir.
 
 ### 3.3 Tazelik
 
@@ -314,7 +330,7 @@ karşılaştırılabilir.
 | Geofence çokgenlerinin koordinatları | Faz 3 | Harita çıkınca |
 | Başlangıç ve güvenli noktalar | Faz 3 | `places.yaml` ile birlikte |
 | Varış toleransı > Nav2 `xy_goal_tolerance` | Faz 3 | §5.3 |
-| Nav2 frekansının 20 Hz olduğu | Faz 3 | §3.2 buna dayanıyor |
+| ~~Nav2 frekansının 20 Hz olduğu~~ | ✅ 2026-10-14 | §3.2; `velocity_smoother` güvencesinde (K-046) |
 | Kablo çekme testinde kartın beslenmesi | Faz 2 | STATUS'ta "Bilinen engeller" |
 
 ## 8. Kapsam dışı

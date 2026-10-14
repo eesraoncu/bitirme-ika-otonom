@@ -3,7 +3,7 @@
 > Bu dosya her çalışma oturumunun **başında okunur**, **sonunda güncellenir**.
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
-**Son güncelleme:** 2026-10-13
+**Son güncelleme:** 2026-10-14
 **Bulunduğumuz faz:** **Faz 4 başladı** (plan onaylandı 2026-10-13, sıra 4.0 → 4.4). Faz 3 bitti (`v0.3.0`): 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor. Açık: AMCL kaybı (aşağıda)
 
 ---
@@ -54,6 +54,32 @@ hatalı komut reddedilince ajan gerekçeyi kullanıp kendini düzeltiyor. Sıra 
      tekrarladı, ad + koordinat verilince düzeltti (tek örnek, kanıt değil). Gerekçe ajana ad + koordinat
      ile verilsin.
    - **4.3'e not:** granite'in birim hatası araç tanımı/istemle denenecek (ör. `bekle`'de dakika).
+   - **İvme ölçümü bitti → K-046 (2026-10-14), 4.0 BİTTİ.** `tools/nav2_accel_bench.py`: hedefler
+     /goal_pose'tan (karttan geçerek), `/cmd_vel_raw`, `/cmd_vel_smoothed`, `/cmd_vel_nav` kaydı; kart
+     bağlı, NORMAL (kırpma yok, komutlar aynen geçiyor). Rota güvenli noktalar değil, iz hesabıyla
+     temiz açık alan noktaları (aşağıdaki bulgu): (0,0) → (13,−5,5) → (24,−0,5) → (10,0) → (2,0,5).
+
+     | Tur | Nav2 | Sonuç | Hızlanma adımı v / ω | collision ahead |
+     |---|---|---|---|---|
+     | 1 | yumuşatıcısız, güvenli noktalar | konteyner_arkasi'nda vazgeçti | 0,5 / 0,55 | 128 |
+     | 2 | yumuşatıcısız | 4/4 | 0,5 (10 m/s²) / 0,72 | 21 |
+     | 3 | yumuşatıcı, yavaşlama −1,0 | 1. hedefte vazgeçti (12 cm kayıp keepout'a girdi) | 0,025 / 0,05 | 97 |
+     | 4 | yumuşatıcı, yavaşlama sınırsız | **4/4** | **0,025 / 0,05** (işaret değişimi hariç) | **0** |
+
+     Doğrulananlar: çıkış sabit 20 Hz (aralık ≤ 52 ms; yumuşatıcısız kurtarmalar 10 Hz geliyordu);
+     yol takibinde |ω| en çok 0,556 < 0,6; tipik ivme (%99) ~0,6 m/s². Tur 4'te neden hiç collision
+     ahead olmadığı açıklanmadı.
+   - **AÇIK, 4.1 RECOVERY'ye bağlı: güvenli noktaların bir kısmına Nav2 ulaşamıyor.** İz (+0,3 pay)
+     harita ve keepout maskesiyle karşılaştırıldı: `baslangic`, `kapi_onu` temiz; `konteyner_arkasi`
+     (8; 7,6) paylı kuzey sınırına (y 8,59) 0°'de 12 cm, 10°'de değiyor (tur 1'in nedeni);
+     `kuzeybati` (1, 6) 0°'de haritadaki engele değiyor, 75°'de temiz; `konteyner_onu` (8, 2)
+     hiçbir yönde temiz değil (konteyner). RECOVERY bu noktalara gönderirse kart takılır.
+     Noktalar yeniden seçilecek + ulaşılabilirlik denetimi (saha üreteci mi Nav2 mi: iki klasöre
+     dokunuyor, tasarımı o adımda konuşulacak). Karta yükleme gerekecek (`site_data.c`).
+   - **Teşhis düzeltmesi:** "collision ahead ← AMCL kaybı" (aşağıda, 3.3) yanlıştı: tur 1'de AMCL
+     0,2 m doğruyken de oldu. Neden: paylı iz keepout'a değiyor (planlayıcı yalnız merkeze bakıyor,
+     RPP izin tamamına). Yol yasak bölge köşelerinin yakınından geçince titreme.
+   - Bozuk çerçeve bu oturumda da: PC'de 3, kartta `framing 1` (açılışta).
    - **Açık (karar Esra'nın):** sıcaklık 0 + sabit seed'de tekrarlar birebir aynı cevap verdi; K-015'teki
      senaryo başına 20 tekrar bu ayarla anlamsız. Faz 5 için sıcaklık > 0 ya da farklı seed gerekli.
    - Araç tanımları şimdilik betikte taslak; 4.3'te `llm_agent`'a taşınacak, betik oradan okuyacak.
@@ -120,6 +146,7 @@ incelendi ve `main`'e birleştirildi (fast-forward, push edilmedi). Karta hiçbi
      boyut/orijin değişince gider, gerisi `/local_costmap/costmap_updates`'e (1,67 Hz, canlı).
      Okunan "99" değerleri bekleyen eski tam haritadandı. Ders: bir konunun susması donma değildir,
      önce yayın biçimine bak. "Collision ahead" büyük olasılıkla AMCL kaybından (aşağıda). K-038 geçerli.
+     **(2026-10-14: bu tahmin yanlış çıktı, yukarıda 4.0'a bakın.)**
    - **AMCL ~14 m kayboldu, araç personel yasak bölgesine girdi → nedeni bulundu, önlendi (K-041):**
      Gazebo (3,52, −5,95), AMCL (12,64, 5,29). Zincir ölçüldü (`tools/amcl_push_bench.py`):
      araç konteynere dayanınca odometri 60 s'de 15 m "ilerledi", AMCL 5,7–14,1 m koptu ve
@@ -712,7 +739,7 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
         belgesi): RViz hedefi karttan geçip araca ulaşıyor, izinli bölge dışındaki hedef
         reddediliyor, kartın kablosu çekilince araç duruyor
 - [ ] **Faz 4** (plan onaylandı 2026-10-13; ayrıntı yukarıda "Sırada"):
-  - [ ] **4.0 Hazırlık:** ~~NVIDIA sürücüsü~~, ~~Ollama~~, ~~model seçimi (K-045)~~; kalan: bekçi ivmesi ölçümü
+  - [x] **4.0 Hazırlık** (2026-10-14): NVIDIA sürücüsü, Ollama, model seçimi (K-045), ivme (K-046)
   - [ ] **4.1 Kart, kalan kurallar:** LIMIT ve `VELOCITY_CMD` kırpma (asgari aktarma Faz 3'te,
         K-031), `WAIT_CMD`/`SPEED_LIMIT_CMD`/`STOP_CMD`, FRESHNESS (zaman eşitlemesi), araç
         konumunun coğrafi sınır denetimi, RECOVERY (üst üste 5 içerik reddi), K-042 `HALT(0)`,

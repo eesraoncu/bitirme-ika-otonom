@@ -1042,3 +1042,21 @@ araçlar, ilgisiz `hiz_siniri`). qwen3.5:2b retten sonra araç çağırmıyor; p
 Türkçe araç çağırmayı ölçen yayımlanmış kıyaslama bulunamadı, seçim kendi ölçümümüzle.
 
 Açık: Faz 5'te sıcaklık ve seed (sıcaklık 0 + sabit seed'de tekrarlar birebir aynı; K-015).
+
+## K-046 · Nav2'ye hız yumuşatıcı; bekçi yalnız hızlanmayı kırpar
+**Tarih:** 2026-10-14 · **Durum:** Yürürlükte
+
+Hız yolu: denetleyici, kurtarma → `/cmd_vel_raw` → `velocity_smoother` → `/cmd_vel_smoothed`
+→ `collision_monitor` → `/cmd_vel_nav` → kart. Yumuşatıcı: hızlanma 0,5 m/s² · 1,0 rad/s²,
+yavaşlama fiilen sınırsız, OPEN_LOOP, sabit 20 Hz. Bekçi 1,2 katı: 0,6 m/s² · 1,2 rad/s²
+(adım başına 0,03 m/s · 0,06 rad/s). Bekçi yalnız hızlanmayı kırpar: aynı işaret ve büyüyen
+büyüklük; yavaşlama, durma ve işaret değişimi serbest (yumuşatıcıyla aynı tanım). RULES §1, §3.2.
+
+**Neden:** Esra'nın kararı (2026-10-14), ölçüme dayanarak (`tools/nav2_accel_bench.py`):
+- RPP doğrusal ivmeyi sınırlamıyor: kalkışta 0 → 0,5 m/s tek adımda (10 m/s²); 1,2 kat kuralı
+  (K-012) anlamsız sınır verirdi. Yumuşatıcıyla 5 150 komutta hızlanma adımı en çok 0,025 m/s.
+- Yavaşlamayı sınırlamak durmayı geciktirir: yumuşatıcıda −1,0 m/s² iken RPP'nin durdurmasında
+  araç 12 cm ilerleyip keepout'a girdi, kurtulamadı. RULES §2: durmak her zaman güvenli.
+- İşaret değişimini yavaşlama saymak Nav2'nin normal çıktısını kırpmamak için (bölünmüş tanımla
+  5 150'de 2 kırpma olurdu). Bilinen sınır: yön değişiminde ani sıçrama sınırlanmaz.
+- Yan kazanç: kurtarma hareketleri (10 Hz) artık karta 20 Hz ulaşıyor; §3.2'nin 50 ms'i güvencede.
