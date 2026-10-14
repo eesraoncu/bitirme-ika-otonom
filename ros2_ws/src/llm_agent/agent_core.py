@@ -53,6 +53,9 @@ def places_from_site(site: dict) -> Dict[str, Place]:
 def tool_definitions(place_names: List[str]) -> List[dict]:
     """Ollama/OpenAI biçiminde araç tanımları."""
     return [
+        # Tek araç, yer ve x/y seçenekleri yan yana: ikiye ayrılınca (git_yer / git_koordinat)
+        # granite yer adlarını koordinat aracına (0, 0) yazdı, 30/31 → 25/31 (2026-10-14).
+        # Model iki alanı birlikte doldurursa tool_call_to_task çözer.
         {"type": "function", "function": {
             "name": "git",
             "description": "Aracı bir hedefe gönder. Ya 'yer' ya da 'x' ile 'y' verilir.",
@@ -117,18 +120,32 @@ def _num(args: dict, key: str) -> float:
     return v
 
 
+FILLER_TOL_M = 0.5
+
+
+def _filler_xy(x: float, y: float, belief: Observation) -> bool:
+    """yer ile birlikte gelen koordinat dolgu mu: (0, 0) ya da aracın o anki konumu (modeller
+    bağlamdaki konumu kopyalıyor). Kayıtlarda görülen biçimler (2026-10-14)."""
+    return (x, y) == (0.0, 0.0) or math.hypot(x - belief.x, y - belief.y) <= FILLER_TOL_M
+
+
 def tool_call_to_task(name: str, args: dict, places: Dict[str, Place], belief: Observation,
                       task_id: str) -> dict:
     """Modelin araç çağrısı → /guard/task JSON'u (K-050)."""
     b = {"x": belief.x, "y": belief.y, "stamp": belief.stamp}
     if name == "git":
-        if args.get("yer"):
-            if args["yer"] not in places:
-                raise ToolError(f"'{args['yer']}' kayıtlı bir yer değil")
-            x, y, yaw = places[args["yer"]]
-        else:
-            x, y, yaw = _num(args, "x"), _num(args, "y"), 0.0
-        return {"id": task_id, "cmd": "git", "x": x, "y": y, "yaw": yaw, "belief": b}
+        yer = args.get("yer")
+        has_xy = args.get("x") is not None and args.get("y") is not None
+        if yer and has_xy and not _filler_xy(_num(args, "x"), _num(args, "y"), belief):
+            raise ToolError("ya 'yer' ya da 'x' ile 'y' ver, ikisini birden verdin")
+        if yer:
+            if yer not in places:
+                raise ToolError(f"'{yer}' kayıtlı bir yer değil")
+            x, y, yaw = places[yer]
+            # "yer" köprüye gitmez (K-050 biçimi), kayıt ve varış metni için
+            return {"id": task_id, "cmd": "git", "x": x, "y": y, "yaw": yaw, "yer": yer, "belief": b}
+        return {"id": task_id, "cmd": "git", "x": _num(args, "x"), "y": _num(args, "y"),
+                "yaw": 0.0, "belief": b}
     if name == "bekle":
         return {"id": task_id, "cmd": "bekle", "sure_s": _num(args, "sure_s"), "belief": b}
     if name == "hiz_siniri":

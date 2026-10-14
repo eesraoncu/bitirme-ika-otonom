@@ -65,7 +65,7 @@ def test_git_by_place_carries_place_heading_and_belief():
     out = run(FakeChat(call("git", yer="kazi_dogu"), say("Vardım.")), world)
     assert out == {"status": "bitti", "summary": "Vardım.", "steps": 1, "rejections": 0}
     (t,) = world.tasks
-    assert (t["cmd"], t["x"], t["y"], t["yaw"]) == ("git", 20.0, -0.5, math.pi)
+    assert (t["cmd"], t["x"], t["y"], t["yaw"], t["yer"]) == ("git", 20.0, -0.5, math.pi, "kazi_dogu")
     # inanç, modeli çağırmadan ÖNCE alınan konum (ilk observe: t = 101)
     assert t["belief"] == {"x": 1.0, "y": 2.0, "stamp": 101.0} and t["id"] == "r1s1"
 
@@ -140,3 +140,23 @@ def test_places_from_site_merges_safe_points_and_places():
     assert places["kazi_dogu"][2] == pytest.approx(math.pi, abs=1e-3)
     tools = ac.tool_definitions(sorted(places))
     assert tools[0]["function"]["parameters"]["properties"]["yer"]["enum"] == sorted(places)
+    assert [t["function"]["name"] for t in tools] == ["git", "bekle", "hiz_siniri", "dur"]
+
+
+@pytest.mark.parametrize("args,where", [
+    ({"yer": "kapi_onu", "x": 0, "y": 0}, (26.0, 0.0)),            # (0, 0) dolgu: yer
+    ({"yer": "kapi_onu", "x": 1.2, "y": 2.3}, (26.0, 0.0)),        # o anki konum (1, 2) ±0,5: yer
+])
+def test_git_with_filler_coordinates_uses_place(args, where):
+    world = FakeWorld((True, "ok"))
+    run(FakeChat(call("git", **args), say("tamam")), world)
+    assert (world.tasks[0]["x"], world.tasks[0]["y"]) == where and world.tasks[0]["yer"] == "kapi_onu"
+
+
+def test_git_with_conflicting_place_and_coordinates_is_not_sent():
+    # 2026-10-14 C denemesi: {yer: baslangic, x: 14,5, y: 0}; ajan tahmin etmez, modele sorar
+    world = FakeWorld((True, "ok"))
+    chat = FakeChat(call("git", yer="baslangic", x=14.5, y=0), call("git", x=14.5, y=0), say("tamam"))
+    out = run(chat, world)
+    assert len(world.tasks) == 1 and world.tasks[0]["x"] == 14.5 and out["rejections"] == 0
+    assert "ikisini birden" in [m for m in chat.seen[1] if m["role"] == "tool"][0]["content"]

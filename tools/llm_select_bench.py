@@ -188,7 +188,7 @@ def grade(msg, want_tool, check):
             args = json.loads(args)
         except json.JSONDecodeError:
             return "cagri_yok", fn
-    if fn.get("name") != want_tool:
+    if fn.get("name") not in (want_tool if isinstance(want_tool, tuple) else (want_tool,)):
         return "yanlis_arac", fn
     return ("dogru" if check(args) else "yanlis_arguman"), fn
 

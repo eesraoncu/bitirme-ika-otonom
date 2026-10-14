@@ -1127,3 +1127,15 @@ Geliştirmede sıcaklık 0, seed 42 (Faz 5'in değeri ayrı).
 **Neden:** Esra'nın kararları (2026-10-14). İstem ve araç açıklaması ölçümle düzeltildi:
 "yapılamıyorsa özet yaz" cümlesi ret sonrası düzeltmeyi 8/8'den 5/8'e düşürüyordu; "reddedilirse
 özet yazma, düzelt" ve dakika örnekleriyle granite 30/31 (0,7 × 5'te 150/155).
+
+## K-052 · git tek araç; yer ile x/y çelişirse karta gitmez
+**Tarih:** 2026-10-14 · **Durum:** Yürürlükte
+
+Ajanın git aracı tek kalır (yer ya da x/y). Model ikisini birlikte verirse: koordinat (0, 0) ya da
+aracın o anki konumu (±0,5 m) ise dolgu sayılır, yer kullanılır; değilse çağrı geçersizdir, karta
+gitmez, modele "ikisini birden verdin" döner (ret sayılmaz). Varış metni hedefi yazar.
+
+**Neden:** Esra'nın kararı (2026-10-14). C denemesinde model {yer: baslangic, x: 14,5, y: 0}
+verdi, ajan yer'i seçti, araç kazı yerine başlangıca gitti ve model "kazıya ulaştı" diye özetledi.
+İkiye ayırmak (git_yer / git_koordinat) granite'i 30/31'den 25/31'e düşürdü: yer adlarını
+koordinat aracına (0, 0) yazdı. Ajan tahmin etmez, belirsizliği modele geri verir.

@@ -103,7 +103,10 @@ class RosWorld:
             return False, fb["text"]
         cmd = task["cmd"]
         if cmd == "git":
-            return True, f"{fb['text']} {self._arrival(known)}"
+            target = f"({task['x']:.2f}; {task['y']:.2f})".replace(".", ",")
+            if task.get("yer"):
+                target = f"{task['yer']} {target}"
+            return True, f"{fb['text']} {self._arrival(known, target)}"
         if cmd == "bekle":
             time.sleep(task["sure_s"])
             return True, f"{fb['text']} {task['sure_s']:g} saniye beklendi."
@@ -111,15 +114,15 @@ class RosWorld:
             return True, f"{fb['text']} Hız sınırı {task['deger_mps']:g} m/s yapıldı."
         return True, f"{fb['text']} Araç durduruldu."
 
-    def _arrival(self, known) -> str:
+    def _arrival(self, known, target: str) -> str:
         new = lambda: [s for g, s in self.status.items() if g not in known] or None  # noqa: E731
         if self._wait(new, GOAL_APPEAR_S) is None:
-            return "Ancak hedef Nav2'ye ulaşmadı."
+            return f"Ancak hedef ({target}) Nav2'ye ulaşmadı."
         done = self._wait(lambda: next((TERMINAL[s] for s in (new() or []) if s in TERMINAL), None),
                           GOAL_TIMEOUT_S)
         if done == "vardı":
-            return "Hedefe varıldı."
-        return f"Araç hedefe varamadı (Nav2: {done or 'zaman aşımı'})."
+            return f"Hedefe varıldı: {target}."
+        return f"Araç hedefe varamadı: {target} (Nav2: {done or 'zaman aşımı'})."
 
 
 class AgentNode(Node):
