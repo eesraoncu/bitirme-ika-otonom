@@ -32,6 +32,15 @@ static bool mode_rejects(const guard_t *g, uint32_t seq, guard_decision_t *out)
     return true;
 }
 
+/* HOLD'a her geçiş buradan: araca bir kez HALT(0) gidecek (K-042). */
+static void enter_hold(guard_t *g)
+{
+    if (g->state != PROTO_BOARD_STATE_HOLD) {
+        g->halt_pending = true;
+    }
+    g->state = PROTO_BOARD_STATE_HOLD;
+}
+
 static void content_rejected(guard_t *g)
 {
     if (g->reject_streak < UINT8_MAX) {
@@ -86,6 +95,28 @@ void guard_goto(guard_t *g, const site_t *s, uint32_t seq, bool heartbeat_alive,
     g->reject_streak = 0u;
 }
 
+void guard_wait(guard_t *g, uint32_t seq, const proto_wait_cmd_t *cmd, guard_decision_t *out)
+{
+    if (mode_rejects(g, seq, out)) {
+        return;
+    }
+    verdict(out, seq, PROTO_RESULT_ACCEPTED, PROTO_RULE_NONE, PROTO_REASON_NONE);
+    out->send_halt = true;
+    out->halt.duration_s = cmd->duration_s;
+    g->reject_streak = 0u;
+}
+
+void guard_stop(guard_t *g, uint32_t seq, guard_decision_t *out)
+{
+    verdict(out, seq, PROTO_RESULT_ACCEPTED, PROTO_RULE_NONE, PROTO_REASON_NONE);
+    out->send_halt = true;
+    out->halt.duration_s = 0u;
+    if (g->state == PROTO_BOARD_STATE_RECOVERY) {
+        enter_hold(g);
+        g->halt_pending = false;     /* HALT(0) bu kararla zaten gidiyor */
+    }
+}
+
 void guard_reset(guard_t *g, uint32_t seq, bool heartbeat_alive, guard_decision_t *out)
 {
     if (g->state != PROTO_BOARD_STATE_HOLD) {
@@ -113,7 +144,14 @@ bool guard_velocity(const guard_t *g, const proto_velocity_cmd_t *cmd, proto_dri
 
 void guard_heartbeat_lost(guard_t *g)
 {
-    g->state = PROTO_BOARD_STATE_HOLD;
+    enter_hold(g);
+}
+
+bool guard_take_halt(guard_t *g)
+{
+    bool pending = g->halt_pending;
+    g->halt_pending = false;
+    return pending;
 }
 
 bool guard_telemetry(guard_t *g, const site_t *s, const proto_telemetry_t *tel,
@@ -122,7 +160,7 @@ bool guard_telemetry(guard_t *g, const site_t *s, const proto_telemetry_t *tel,
     geo_point_t pos = { tel->x_cm, tel->y_cm };
     if (g->state == PROTO_BOARD_STATE_RECOVERY) {
         if (recovery_arrived(pos, g->recovery_goal)) {
-            g->state = PROTO_BOARD_STATE_HOLD;
+            enter_hold(g);
         }
         return false;
     }
@@ -145,6 +183,6 @@ void guard_tick(guard_t *g, uint32_t now_ms, uint32_t telemetry_age_ms)
     }
     if (telemetry_age_ms > RECOVERY_TELEMETRY_TIMEOUT_MS ||
         now_ms - g->recovery_t0_ms > RECOVERY_TIMEOUT_MS) {
-        g->state = PROTO_BOARD_STATE_HOLD;
+        enter_hold(g);
     }
 }

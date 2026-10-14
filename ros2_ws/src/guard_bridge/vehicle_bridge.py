@@ -7,7 +7,10 @@ Kullanım (depo kökünden; bridge.launch.py ikisini birlikte başlatır):
 Karttan gelen (CAN'den geçmiş, onaylı):
 - GOAL  → Nav2'nin NavigateToPose eylemi (harita çerçevesi). Yeni hedef eskisinin yerine geçer.
 - DRIVE → /cmd_vel (Gazebo). /cmd_vel'e yazan TEK düğüm budur (K-040 karar 1).
-- HALT, SPEED_LIMIT_SET → şimdilik yalnızca günlüğe (kart tarafı Faz 4'te).
+- HALT  → Nav2'nin hedefi iptal edilir (K-042: kart HOLD'a geçince, WAIT ve STOP'ta).
+  Bağlantı koptuğunda ve kart yeniden başladığında da iptal edilir: kart o zaman HALT
+  gönderememiş olabilir. Böylece SIFIRLA'dan sonra Nav2 eski hedefe kendiliğinden gitmez.
+- SPEED_LIMIT_SET → şimdilik yalnızca günlüğe (kart tarafı Faz 4'ün LIMIT adımında).
 Karta giden:
 - TELEMETRY 20 Hz: AMCL'nin map → base_link'i (K-040 karar 4). Dönüşüm yoksa gönderilmez.
 
@@ -61,6 +64,11 @@ class VehicleBridge(Node):
         self.moving = False           # son yayımlanan hız sıfırdan farklı mı
         self.goals = 0
         self.drives = 0
+        # Nav2'deki hedef. Gönderim ile kabul arasında iptal istenebilir: her hedefin bir
+        # sırası var, kabul geldiğinde sırası iptal edilmişse hemen iptal edilir.
+        self.goal_handle = None
+        self.goal_gen = 0
+        self.cancelled_gen = 0
         self.telemetry_sent = 0
         self.create_timer(READ_PERIOD_S, self.read)
         self.create_timer(TELEMETRY_PERIOD_S, self.send_telemetry)
@@ -85,6 +93,7 @@ class VehicleBridge(Node):
         self.get_logger().error(f"araç kanalı koptu ({why}): yeniden bağlanılacak")
         self.link.close()
         self.link = None
+        self.cancel_goal("araç kanalı koptu")
 
     # -- karttan -----------------------------------------------------------
 
@@ -104,7 +113,9 @@ class VehicleBridge(Node):
                 self.on_goal(msg)
             elif cls is m.Hello:
                 self.on_hello(f, msg)
-            elif cls in (m.Halt, m.SpeedLimitSet):
+            elif cls is m.Halt:
+                self.cancel_goal(f"HALT ({msg.duration_s} s)")
+            elif cls is m.SpeedLimitSet:
                 self.get_logger().info(f"{cls.NAME} {msg} (Faz 4'te uygulanacak)")
 
     def on_drive(self, d: m.Drive) -> None:
@@ -124,15 +135,37 @@ class VehicleBridge(Node):
         goal.pose.header.stamp = self.get_clock().now().to_msg()
         goal.pose.pose.position.x, goal.pose.pose.position.y = x, y
         goal.pose.pose.orientation.z, goal.pose.pose.orientation.w = qz, qw
-        self.nav.send_goal_async(goal)
+        self.goal_gen += 1
+        gen = self.goal_gen
+        self.nav.send_goal_async(goal).add_done_callback(
+            lambda fut: self.on_goal_response(gen, fut))
         self.goals += 1
         self.get_logger().info(f"GOAL → Nav2: ({x:.2f}, {y:.2f}) m, {g.yaw_mrad} mrad, "
                                f"kaynak {g.source.name}")
+
+    def on_goal_response(self, gen: int, fut) -> None:
+        handle = fut.result()
+        if handle is None or not handle.accepted:
+            return
+        if gen <= self.cancelled_gen:            # kabul gelmeden iptal istenmişti
+            handle.cancel_goal_async()
+            return
+        if gen == self.goal_gen:                 # daha yeni bir hedef gönderilmediyse
+            self.goal_handle = handle
+
+    def cancel_goal(self, why: str) -> None:
+        """K-042: Nav2'nin hedefini iptal et (yoksa ya da bitmişse zararsız)."""
+        self.cancelled_gen = self.goal_gen
+        if self.goal_handle is not None:
+            self.goal_handle.cancel_goal_async()
+            self.goal_handle = None
+            self.get_logger().info(f"Nav2 hedefi iptal: {why}")
 
     def on_hello(self, f, hello: m.Hello) -> None:
         # Kart yeniden başladıysa yeni oturuma geçilir (protocol §5)
         if self.link.adopt_hello(f, hello):
             self.get_logger().warn(f"yeni oturum 0x{hello.session_id:08X} (kart yeniden başladı)")
+            self.cancel_goal("kart yeniden başladı")
 
     # -- karta ---------------------------------------------------------------
 

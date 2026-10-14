@@ -114,8 +114,16 @@ hatalı komut reddedilince ajan gerekçeyi kullanıp kendini düzeltiyor. Sıra 
      Nav2 için zor bölge; `nav2_accel_bench.py` turunun 1. bacağı (13; −5,5) da oradan geçiyor.
      Kalan seçenekler (seçilmedi): iz payını küçültmek (K-038 yeniden), Smac Hybrid-A*.
      test_safe_points noktanın kendisini denetliyor, noktaya giden yolu değil.
-   - **AÇIK, 4.1b:** kart varışta HOLD'a geçince Nav2'nin hedefi açık kalıyor (A'da 120 s'de bitmedi);
-     K-042 (HOLD'da Nav2 hedefini iptal) çözecek.
+   - **4.1b bitti (2026-10-14, K-048, K-042 uygulandı):** kart: `guard_wait` (WAIT → HALT(süre), NORMAL
+     dışında MODE), `guard_stop` (her durumda kabul, HALT(0); RECOVERY'de → HOLD; ret serisini
+     sıfırlamaz), HOLD'a her girişte tek HALT(0) (`enter_hold` + `guard_take_halt`). `vehicle_bridge`:
+     HALT'ta, kanal kopunca, kart yeniden başlayınca Nav2 hedefini iptal (kabulden önce gelen iptal de
+     yakalanır). PC: 86 test, kasıtlı 4 hatanın 4'ü yakalandı. Kart: 41 276 B, 0 uyarı; `decision_test`
+     2/2 (HALT(30), HALT(0), kalp atışında tek HALT 525 ms, varışta HALT, RECOVERY'de STOP → HOLD).
+     Uçtan uca: yoldayken ajan köprüsü kapandı → 0,61 s'de Nav2 hedefi iptal, araç durdu (5 s'de 0 cm);
+     yeniden bağlanıp SIFIRLA → araç 15 s kıpırdamadı, Nav2'de açık hedef yok. (A'daki açık hedef sorunu
+     kapandı.) Ajanın WAIT/STOP göndermesi 4.2/4.3'te (ajan köprüsünde henüz arayüz yok).
+     **Sırada:** 4.1a LIMIT (hız kırpma K-046 kuralıyla, SPEED_LIMIT_CMD), 4.1c FRESHNESS, 4.1e CONSISTENCY.
    - **Ağ:** okul Wi-Fi'si (GSBWIFI) IP'yi ara ara kaybediyor; o an ROS (CycloneDDS) ve Gazebo
      multicast'i kopuyor, süreçler toparlanmıyor. Kendi bağlantıyla sorun yok. Port 22 orada kapalı.
    - **Teşhis düzeltmesi:** "collision ahead ← AMCL kaybı" (aşağıda, 3.3) yanlıştı: tur 1'de AMCL

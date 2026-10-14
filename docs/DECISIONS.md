@@ -1073,3 +1073,18 @@ kalmasın). Süre girişten sonraki ilk döngüde başlar, her girişte yeniden.
 (2) önce eklenmedi; uçtan uca denemede Nav2 kurtarma hedefinde (kazı köşesi) vazgeçti, kart
 süresiz RECOVERY'de kaldı ve ajanın her komutu IN_RECOVERY ile reddedildi: Faz 5'in otomatik
 koşuları kilitlenirdi. Sınırla aynı durumda kart 180 s'de HOLD'a geçti (doğrulandı).
+
+## K-048 · STOP (dur) kurtarmayı bitirir, ret serisini sıfırlamaz
+**Tarih:** 2026-10-14 · **Durum:** Yürürlükte
+
+STOP_CMD her durumda kabul edilir ve araca HALT(0) gider (RULES §2). RECOVERY'de kurtarma
+biter: kart HOLD'a geçer (çıkış SIFIRLA). STOP ret serisini sıfırlamaz. WAIT_CMD görev
+komutudur: NORMAL dışında MODE ile ret, kabulde HALT(süre) ve ret serisi sıfırlanır.
+K-042 uygulandı: HOLD'a her girişte kart bir kez HALT(0) gönderir, araç köprüsü Nav2 hedefini
+iptal eder (HALT'ta, bağlantı kopunca, kart yeniden başlayınca).
+
+**Neden:** Esra'nın kararı (2026-10-14). RECOVERY'de STOP aracı durdurur; kart RECOVERY'de
+kalsa 180 s boşuna beklerdi. HOLD daha kısıtlayıcı, ajan bununla kurtarmadan kaçamaz.
+STOP seriyi sıfırlasaydı ajan araya "dur" koyarak 5. reddi hiç görmez, kurtarma tetiklenmezdi.
+Doğrulandı: yoldayken ajan köprüsü kapandı → 0,61 s'de Nav2 hedefi iptal, araç durdu;
+SIFIRLA'dan sonra araç kıpırdamadı.

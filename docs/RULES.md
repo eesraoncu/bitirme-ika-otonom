@@ -78,7 +78,10 @@ güvenlidir. Kırpma olayları yine de kaydedilir (`STATUS.clipped`).
 
 **`dur()` hiçbir zaman içerik kuralıyla ya da `MODE` ile reddedilmez.** Durmak her
 durumda güvenlidir. Konum inancı bile taşımaz, çünkü tutarlılık denetimi bir durdurma
-komutunu engellememeli. Yalnızca `AUTH`, `REPLAY` ve `FRESHNESS` uygulanır.
+komutunu engellememeli. Yalnızca `AUTH`, `REPLAY` ve `FRESHNESS` uygulanır. Araca `HALT(0)`
+gider (Nav2 hedefi iptal). `RECOVERY`'de kurtarmayı bitirir (`HOLD`), ret serisini
+sıfırlamaz (K-048). `bekle()` ise görev komutudur: `NORMAL` dışında `MODE` ile ret, kabulde
+`HALT(süre)`.
 
 **`AUTH` ve `REPLAY` retlerinde karttan hiçbir cevap çıkmaz.** Yalnızca `STATUS`
 sayaçları artar. İmzası tutmayan bir göndericiye neyin yanlış olduğunu söylemek
@@ -266,12 +269,15 @@ engel riski yüzünden kullanılmaz.
 | `NORMAL` → `HOLD` | kalp atışı zaman aşımı · araç yasak bölgede ve kanal ölü |
 | `NORMAL` → `RECOVERY` (hedef: **başlangıç**) | üst üste 5 içerik reddi, kanal canlı |
 | `NORMAL` → `RECOVERY` (hedef: **en yakın güvenli nokta**) | araç yasak bölgede, kanal canlı |
-| `RECOVERY` → `HOLD` | hedefe varıldı (≤ 0,35 m) · kalp atışı zaman aşımı · telemetri 500 ms yok · 180 s geçti (K-047) |
+| `RECOVERY` → `HOLD` | hedefe varıldı (≤ 0,35 m) · kalp atışı zaman aşımı · telemetri 500 ms yok · 180 s geçti (K-047) · `dur()` (K-048) |
 | `HOLD` → `NORMAL` | yalnızca imzalı **`SIFIRLA`** komutu, kalp atışı canlıyken |
 
 - **Kurtarma her zaman `HOLD`'da biter. `NORMAL`'e dönüşün tek yolu `SIFIRLA`.**
   Kalp atışının geri gelmesi tek başına yetmez (mandallı arıza). Bağlantı gidip gelirken
   aracın kendiliğinden yeniden hareketlenmesi istenmez.
+- **`HOLD`'a her girişte araca bir kez `HALT(0)` gider (K-042):** araç köprüsü Nav2'nin
+  hedefini iptal eder; bağlantı kopunca ve kart yeniden başlayınca da. Böylece `SIFIRLA`'dan
+  sonra araç, ajan yeni hedef verip kart onaylayana kadar kıpırdamaz (doğrulandı 2026-10-14).
 - **`HOLD`'da sıfır hız sürekli gönderilir**, çünkü araç tarafının son komutu tutup
   tutmadığına güvenilmez.
 - **Açılışta `HOLD`**, çünkü kart yeniden başladığında sayaç durumu sıfırlanmıştır.
@@ -301,7 +307,8 @@ engel riski yüzünden kullanılmaz.
   `GEOFENCE`, `LIMIT`, `CONSISTENCY`. Bunlar ajanın *niyetinin* hatalı olduğunu gösterir.
 - **Saymadıkları:** `AUTH`, `REPLAY`, CRC (§4'teki güvenlik ilkesi) · `FRESHNESS`
   (ajanın değil, taşımanın sorunu) · `MODE` (ajanın hatası değil, kartın durumu).
-- Kabul edilen bir görev komutuyla ya da `SIFIRLA` ile sıfırlanır.
+- Kabul edilen bir görev komutuyla ya da `SIFIRLA` ile sıfırlanır. **`dur()` hariç (K-048):**
+  araya "dur" koyarak kurtarmadan kaçılamaz.
 - **Faz 4'e not:** ajanın görev başına deneme üst sınırı **≤ 4** olmalı. Seçilen değer: **3**.
   5 ya da daha fazla olursa, gerekçeyi kullanıp kendini düzelten dürüst bir ajan kurtarmayı
   tetikler ve S3 ölçümü bozulur.

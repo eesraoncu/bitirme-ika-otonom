@@ -281,6 +281,25 @@ static void send_decision(channel_t *ch, const guard_decision_t *d)
         proto_goal_encode(&d->goal, g);
         guard_can_send(PROTO_CAN_ID_GOAL, g, sizeof g);
     }
+    if (d->send_halt) {
+        uint8_t h[PROTO_SIZE_HALT];
+        proto_halt_encode(&d->halt, h);
+        guard_can_send(PROTO_CAN_ID_HALT, h, sizeof h);
+    }
+}
+
+/* K-042: HOLD'a girildiyse araca bir kez HALT(0), köprü Nav2'nin hedefini
+ * iptal eder. HOLD'daki 20 Hz sıfır hız aracı durdurur; HALT, Nav2'nin eski
+ * hedefe SIFIRLA'dan sonra kendiliğinden devam etmesini önler. */
+static void halt_on_hold(void)
+{
+    if (!guard_take_halt(&guard)) {
+        return;
+    }
+    proto_halt_t halt = { .duration_s = 0u };
+    uint8_t h[PROTO_SIZE_HALT];
+    proto_halt_encode(&halt, h);
+    guard_can_send(PROTO_CAN_ID_HALT, h, sizeof h);
 }
 
 static void on_heartbeat(channel_t *ch, const frame_t *f)
@@ -319,6 +338,19 @@ static void on_agent_frame(channel_t *ch, const frame_t *f)
         timing_record(&goto_timing, ch->frame_t0);
         break;
     }
+    case PROTO_ID_WAIT_CMD: {
+        proto_wait_cmd_t cmd;
+        if (!proto_wait_cmd_decode(f->payload, f->payload_len, &cmd)) {
+            return;
+        }
+        guard_wait(&guard, f->seq, &cmd, &d);
+        send_decision(ch, &d);
+        break;
+    }
+    case PROTO_ID_STOP_CMD:
+        guard_stop(&guard, f->seq, &d);
+        send_decision(ch, &d);
+        break;
     case PROTO_ID_RESET_CMD:
         guard_reset(&guard, f->seq, heartbeat_alive(), &d);
         send_decision(ch, &d);
@@ -337,7 +369,7 @@ static void on_agent_frame(channel_t *ch, const frame_t *f)
         break;
     }
     default:
-        /* WAIT_CMD, SPEED_LIMIT_CMD, STOP_CMD Faz 4'te. */
+        /* SPEED_LIMIT_CMD Faz 4'ün sonraki adımında (LIMIT). */
         break;
     }
 }
@@ -424,6 +456,7 @@ void app_loop(void)
     channel_poll(&vehicle_ch, now, &board, on_vehicle_frame);
     guard_can_poll(now);
     guard_tick(&guard, now, telemetry_age_ms(now));
+    halt_on_hold();
     hold_drive(now);
     vehicle_node_poll(&vehicle_ch);
     channel_service(&agent_ch, now, &board);

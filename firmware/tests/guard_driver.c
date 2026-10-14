@@ -8,14 +8,17 @@
  *   init                       → "ok"
  *   goto <seq> <x> <y> <yaw> [canlı 0|1]  → karar (canlı verilmezse 1)
  *   reset <seq> <canlı 0|1>    → karar
+ *   wait <seq> <süre_s>        → karar
+ *   stop <seq>                 → karar
+ *   takehalt                   → "1" HOLD'a girildi, araca HALT(0) gidecek; "0" değil
  *   lost                       → "ok" (kalp atışı zaman aşımı)
  *   vel <v> <w>                → "v,w" araca giden DRIVE ya da aktarılmıyorsa "-"
  *   nearest <0|1> <x> <y>      → "<x> <y>"; 0: güvenli noktasız harita
  *   tel <x> <y> <canlı 0|1>    → "<goal|-> <state>" (araç konumu, TELEMETRY)
  *   tick <now_ms> <tel_yaşı_ms> → "<state>" (her döngüdeki zaman denetimi)
  * Karar satırı:
- *   <ref_seq> <result> <rule> <reason> <hint_x> <hint_y> <goal|-> <state> <streak>
- *   goal: "x,y,yaw,source" ya da hedef gönderilmiyorsa "-" */
+ *   <ref_seq> <result> <rule> <reason> <hint_x> <hint_y> <goal|-> <state> <streak> <halt|->
+ *   goal: "x,y,yaw,source" ya da hedef gönderilmiyorsa "-"; halt: HALT'ın süresi ya da "-" */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,7 +54,12 @@ static void print_decision(const guard_decision_t *d)
     } else {
         printf("-");
     }
-    printf(" %u %u\n", g.state, g.reject_streak);
+    printf(" %u %u ", g.state, g.reject_streak);
+    if (d->send_halt) {
+        printf("%u\n", d->halt.duration_s);
+    } else {
+        puts("-");
+    }
 }
 
 int main(void)
@@ -95,6 +103,15 @@ int main(void)
         } else if (sscanf(line, "tick %lu %d", &seq, &x) == 2) {
             guard_tick(&g, (uint32_t)seq, (uint32_t)x);
             printf("%u\n", g.state);
+        } else if (sscanf(line, "wait %lu %d", &seq, &x) == 2) {
+            proto_wait_cmd_t cmd = { .duration_s = (uint16_t)x };
+            guard_wait(&g, (uint32_t)seq, &cmd, &d);
+            print_decision(&d);
+        } else if (sscanf(line, "stop %lu", &seq) == 1) {
+            guard_stop(&g, (uint32_t)seq, &d);
+            print_decision(&d);
+        } else if (strncmp(line, "takehalt", 8) == 0) {
+            puts(guard_take_halt(&g) ? "1" : "0");
         } else if (strncmp(line, "lost", 4) == 0) {
             guard_heartbeat_lost(&g);
             puts("ok");

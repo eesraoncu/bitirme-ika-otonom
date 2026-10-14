@@ -211,17 +211,40 @@ def run(agent: Link, vehicle: Link, hb: Heartbeat, rep: Report) -> None:
               "NORMAL'de VELOCITY_CMD aynen DRIVE olarak araca", str(got[1]) if got else "gelmedi")
     rep.check(agent.wait_for(m.Verdict, 0.3) is None, "VELOCITY_CMD'ye VERDICT yok")
 
+    print("Bekle ve dur (WAIT_CMD, STOP_CMD)")
+    vehicle.receive(0.1)
+    v = send_cmd(agent, m.WaitCmd(30, 0, 0, 0))
+    h = vehicle.wait_for(m.Halt, 0.5)
+    rep.check(v is not None and v.result == m.Result.ACCEPTED and h is not None
+              and h[1].duration_s == 30, "WAIT(30) kabul, araca HALT(30)", str(h[1]) if h else "")
+    v = send_cmd(agent, m.StopCmd())
+    h = vehicle.wait_for(m.Halt, 0.5)
+    rep.check(v is not None and v.result == m.Result.ACCEPTED and h is not None
+              and h[1].duration_s == 0, "STOP kabul, araca HALT(0)", str(h[1]) if h else "")
+    rep.check(board_state(agent) == m.BoardState.NORMAL, "NORMAL'de STOP durumu değiştirmedi")
+
     print("Kalp atışı kesildi")
     vehicle.receive(0.2)   # tampon boşalsın: ilk DRIVE kesintiden sonrakini göstersin
     last = hb.stop()
-    got = vehicle.wait_for(m.Drive, 1.5)
+    # HOLD'a girişte kart önce HALT(0), aynı döngüde ilk sıfır DRIVE'ı gönderir. wait_for
+    # beklediğinden öncekileri attığı için önce HALT beklenir.
+    got = vehicle.wait_for(m.Halt, 1.5)
     gap_ms = (time.monotonic() - last) * 1000 if got else None
-    rep.check(got is not None and 480 <= gap_ms <= 650,
-              "son kalp atışından ~500 ms sonra sıfır hız başladı",
+    rep.check(got is not None and got[1].duration_s == 0 and 480 <= gap_ms <= 650,
+              "son kalp atışından ~500 ms sonra HOLD: araca HALT(0) (K-042)",
               f"{gap_ms:.0f} ms" if gap_ms else "gelmedi")
+    rest = vehicle.receive(0.3)
+    drives = [m.Drive.unpack(f.payload) for f, c in rest if c is m.Drive]
+    rep.check(drives and all((d.v_mm_s, d.w_mrad_s) == (0, 0) for d in drives),
+              "ardından sıfır hız", f"{len(drives)} DRIVE")
+    rep.check(not any(c is m.Halt for _, c in rest), "HALT yalnız bir kez")
     rep.check(reaches_state(agent, m.BoardState.HOLD), "kart HOLD'da")
     v = send_cmd(agent, goto(*ALLOWED_GOAL))
     rep.check(v is not None and v.reason == m.Reason.IN_HOLD, "HOLD'da hedef reddedildi")
+    v = send_cmd(agent, m.WaitCmd(30, 0, 0, 0))
+    rep.check(v is not None and v.reason == m.Reason.IN_HOLD, "HOLD'da WAIT → MODE / IN_HOLD")
+    v = send_cmd(agent, m.StopCmd())
+    rep.check(v is not None and v.result == m.Result.ACCEPTED, "HOLD'da STOP yine kabul")
     vehicle.receive(0.2)
     agent.send(m.VelocityCmd(300, 100))
     drives = [m.Drive.unpack(f.payload) for f, c in vehicle.receive(0.5) if c is m.Drive]
@@ -290,8 +313,10 @@ def recovery(agent: Link, vehicle: Link, tel: TelemetryStream, rep: Report) -> N
     agent.send(m.VelocityCmd(300, 100))
     got = vehicle.wait_for(m.Drive, 0.5, lambda d: (d.v_mm_s, d.w_mrad_s) == (300, 100))
     rep.check(got is not None, "RECOVERY'de VELOCITY_CMD araca geçiyor (Nav2 götürür)")
+    vehicle.receive(0.1)
     tel.pos = (safe[0] + 21, safe[1] + 28)            # 21² + 28² = 35²: sınır dahil
-    time.sleep(0.2)
+    h = vehicle.wait_for(m.Halt, 0.5)
+    rep.check(h is not None and h[1].duration_s == 0, "varışta araca HALT(0): Nav2 hedefi iptal (K-042)")
     rep.check(holds_with_zero_drive(agent, vehicle), "hedefe 35 cm: HOLD, 20 Hz sıfır hız")
     tel.stop()
 
@@ -326,6 +351,17 @@ def recovery(agent: Link, vehicle: Link, tel: TelemetryStream, rep: Report) -> N
     tel.pos = home
     time.sleep(0.2)
     rep.check(holds_with_zero_drive(agent, vehicle), "başlangıca vardı: HOLD")
+    tel.stop()
+
+    print("Kurtarma 4: RECOVERY'de dur (K-048)")
+    reset_to_normal(agent, rep)
+    tel.start(inside_forbidden)
+    rep.check(wait_goal(vehicle, m.GoalSource.RECOVERY_SAFE) is not None, "RECOVERY'ye girdi")
+    v = send_cmd(agent, m.StopCmd())
+    h = vehicle.wait_for(m.Halt, 0.5)
+    rep.check(v is not None and v.result == m.Result.ACCEPTED and h is not None
+              and h[1].duration_s == 0, "RECOVERY'de STOP kabul, HALT(0)")
+    rep.check(board_state(agent) == m.BoardState.HOLD, "kurtarma bitti: HOLD")
 
 
 if __name__ == "__main__":

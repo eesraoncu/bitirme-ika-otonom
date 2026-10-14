@@ -41,13 +41,14 @@ class Decision:
     goal: Optional[Tuple[int, int, int, int]]
     state: int
     streak: int
+    halt: Optional[int]
 
 
 def _parse(line: str) -> Decision:
     f = line.split()
     goal = None if f[6] == "-" else tuple(int(v) for v in f[6].split(","))
     return Decision(int(f[0]), int(f[1]), int(f[2]), int(f[3]), (int(f[4]), int(f[5])),
-                    goal, int(f[7]), int(f[8]))
+                    goal, int(f[7]), int(f[8]), None if f[9] == "-" else int(f[9]))
 
 
 class Guard:
@@ -66,7 +67,7 @@ class Guard:
     def seq(self, *cmds: str) -> List[Decision]:
         """Komutları tek bir sürücü çalıştırmasında, sırayla verir."""
         return [_parse(o) for c, o in zip(cmds, self.run(list(cmds)))
-                if c.startswith(("goto", "reset"))]
+                if c.startswith(("goto", "reset", "wait", "stop"))]
 
 
 @pytest.fixture(scope="module")
@@ -290,3 +291,62 @@ def test_heartbeat_loss_in_recovery_is_latched(guard):
                      "goto 2 0 0 0"])
     assert _tel(out[4]) == (None, HOLD)
     assert rejected(_parse(out[5]), Rule.MODE, Reason.IN_HOLD)
+
+
+# ---- Bekle ve dur (WAIT_CMD, STOP_CMD), HOLD'da HALT (K-042, K-048) --------------
+
+def test_wait_rejected_outside_normal_accepted_in_normal(guard):
+    hold, _, normal = guard.seq("init", "wait 1 30", "reset 2 1", "wait 3 30")
+    assert rejected(hold, Rule.MODE, Reason.IN_HOLD) and hold.halt is None
+    assert accepted(normal) and normal.halt == 30 and normal.goal is None and normal.state == NORMAL
+
+
+def test_wait_rejected_in_recovery(guard):
+    out = guard.run(["init", "reset 1 1", "tel 700 700 1", "wait 2 30"])
+    d = _parse(out[3])
+    assert rejected(d, Rule.MODE, Reason.IN_RECOVERY) and d.halt is None
+
+
+def test_accepted_wait_resets_streak_stop_does_not(guard):
+    ds = guard.seq("init", "reset 1 1", "goto 2 9000 0 0", "goto 3 9000 0 0", "stop 4",
+                   "goto 5 9000 0 0", "wait 6 10")
+    assert [d.streak for d in ds[1:]] == [1, 2, 2, 3, 0]
+
+
+def test_stop_cannot_dodge_recovery(guard):
+    # araya "dur" koyarak 5. içerik reddi kurtarmayı yine başlatır (K-048)
+    cmds = ["init", "reset 1 1"]
+    for i in range(5):
+        cmds += [f"goto {10 + i} 9000 0 0", f"stop {20 + i}"]
+    ds = guard.seq(*cmds)
+    assert ds[-2].state == RECOVERY and ds[-2].goal is not None   # 5. ret
+
+
+@pytest.mark.parametrize("setup,state_after", [
+    ([], HOLD),                                   # açılış: HOLD
+    (["reset 1 1"], NORMAL),
+    (["reset 1 1", "tel 700 700 1"], HOLD),       # RECOVERY → HOLD
+])
+def test_stop_always_accepted_halt_zero(guard, setup, state_after):
+    out = guard.run(["init", *setup, "stop 9"])
+    d = _parse(out[-1])
+    assert accepted(d) and d.halt == 0 and d.goal is None and d.state == state_after
+
+
+def test_hold_entry_raises_halt_once(guard):
+    # HOLD'a giden her yolda araca bir kez HALT(0) (K-042); HOLD'da kalmak yeniden kurmaz
+    paths = {
+        "kalp atışı": ["reset 1 1", "lost"],
+        "varış": ["reset 1 1", "tel 700 700 1", "tel 0 1000 1"],
+        "telemetri": ["reset 1 1", "tel 700 700 1", "tick 0 501"],
+        "süre": ["reset 1 1", "tel 700 700 1", "tick 0 0", "tick 180001 0"],
+    }
+    for name, steps in paths.items():
+        out = guard.run(["init", "takehalt", *steps, "takehalt", "takehalt", "lost", "takehalt"])
+        assert (out[1], out[-4], out[-3], out[-1]) == ("0", "1", "0", "0"), name
+
+
+def test_stop_in_recovery_does_not_double_halt(guard):
+    # STOP kararı HALT(0)'ı kendisi taşır: HOLD girişi ayrıca HALT kurmaz
+    out = guard.run(["init", "reset 1 1", "tel 700 700 1", "stop 2", "takehalt"])
+    assert _parse(out[3]).halt == 0 and out[4] == "0"
