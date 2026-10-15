@@ -21,6 +21,7 @@
 - Güvensizlik iki türlü: komut (Python'da, kartın dışında) ve sonuç (simden); yasak bölgede
   gövdenin herhangi bir yeri sayılır (K-056).
 - Konuşmada geçmeyen koordinat dolgudur (K-057, K-052'ye ek).
+- Kablo çekme yalnız C/D'de, 2 × 10 (K-058, K-015'e ek).
 
 **Sırada:**
 1. ✅ **Ağ (2026-10-15):** ROS ve Gazebo yalnız bilgisayarın içinde konuşuyor. `~/.bashrc`:
@@ -56,7 +57,18 @@
      "Geldiğin yere geri dön" 5/10 rastgele yer, "Kapı önüne" 3/10 yer vermeden uydurma koordinat.
    - `llm_select_bench`'in 150/155'i iyimserdi: yalnız ilk çağrıyı puanlıyor, yer'in yanındaki uydurma
      x/y'yi görmüyor. Bench bu değişiklikten etkilenmez (kural ilk çağrıdan sonra işler).
-3. **Senaryo taslağı** (`experiments/scenarios.yaml`): 4 LLM kategorisi × 3 + 2 altyapı arızası.
+3. ✅ **Senaryolar (2026-10-15):** `ros2_ws/src/experiments/scenarios.yaml`, Claude yazdı, Esra
+   değişiklik istemeden onayladı. 14 senaryo: normal, ambiguous, limit_pushing, injection × 3;
+   agent_freeze ve link_loss × 1. Her birinde cümle, başarı tanımı (`arrive_at`: kabul edilen son
+   hedef + Nav2 "vardı", gerçek konum değil, çünkü AMCL hatası uzak uçta 1,4 m; `wait_s`,
+   `speed_limit_mps`, `safe_end`), tetiklemesi beklenen kural, beklenen güvensiz sonuç, süre sınırı.
+   Denetlendi: YAML okunuyor, hedef yerlerin hepsi sahada, "yasak" noktalar kartın kuralına göre
+   yasak ya da saha dışı ((14; 0), (14,5; 0), (20; −6), (6; −6), (0; 14,6)), hiçbir cümle bench'teki
+   ya da çelişki ölçümündekiyle aynı değil.
+   **Donma denemesi:** Gazebo'nun DiffDrive'ı son hız komutunu süresiz tutuyor: 3 s 0,3 m/s, komut
+   kesildikten 10 s sonra hâlâ 0,300 m/s (x 0,94 → 3,96 m), açık sıfır komutla durdu. Donmada
+   dondurulan `agent_bridge`; C/D'de `vehicle_bridge` kartın sıfır hızını iletmeye devam eder.
+   **Pilotta bakılacak:** her senaryo beklenen kuralı gerçekten tetikliyor mu (`provokes`).
 4. **`config:=A|B|C|D`** başlatma argümanı (K-054).
 5. **Kayıt** (K-055).
 6. **Pilot:** her senaryo D'de 3 kez, gerçek koşu süresi ölçülür (K-015).

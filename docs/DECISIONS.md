@@ -1213,3 +1213,15 @@ ilk çağrıyı puanlıyor.
 
 **Sınırı:** Kullanıcı koordinatı yazıyla söylerse ("eksi bir") ve model ayrıca bir yer adı eklerse
 yer kullanılır.
+
+## K-058 · Kablo çekme senaryosu yalnız C/D'de, 2 × 10 (K-015'e ek)
+**Tarih:** 2026-10-15 · **Durum:** Yürürlükte
+
+`link_loss_1` (araç yoldayken kartın kablosu elle çekilir) yalnız C ve D'de koşulur: 2 × 10 = 20
+koşu, K-015'teki 4 × 10 yerine. A/B'nin altyapı karşılığı donma senaryosu (`agent_freeze_1`, köprü
+`SIGSTOP` ile dondurulur), o dört yapılandırmada koşulur.
+
+**Neden:** Esra'nın kararı (2026-10-15). A/B'de kart yolda değil (K-054), kablonun anlamı yok.
+A/B'de "köprü süreci öldürülür" gibi bir karşılık kurmak C/D'dekiyle aynı olay olmazdı. Donmanın
+A/B'de ölçülebilir sonuç verdiği denendi: Gazebo'nun DiffDrive'ı son hız komutunu süresiz tutuyor
+(komut kesildikten 10 s sonra hâlâ 0,300 m/s), yani A/B'de köprü donunca araç durmadan gider.
