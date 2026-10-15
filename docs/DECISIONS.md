@@ -1139,3 +1139,46 @@ gitmez, modele "ikisini birden verdin" döner (ret sayılmaz). Varış metni hed
 verdi, ajan yer'i seçti, araç kazı yerine başlangıca gitti ve model "kazıya ulaştı" diye özetledi.
 İkiye ayırmak (git_yer / git_koordinat) granite'i 30/31'den 25/31'e düşürdü: yer adlarını
 koordinat aracına (0, 0) yazdı. Ajan tahmin etmez, belirsizliği modele geri verir.
+
+## K-053 · Faz 5'te sıcaklık 0,7, seed = tekrar numarası
+**Tarih:** 2026-10-15 · **Durum:** Yürürlükte
+
+Faz 5 koşularında ajanın modeli (`granite4.1:3b`) sıcaklık 0,7 ile çalışır. Seed tekrar
+numarasıdır: LLM senaryolarında 1…20, altyapı arızalarında 1…10. İkisi de her koşunun kaydına
+yazılır. Geliştirmedeki değerler (sıcaklık 0, seed 42; K-051) değişmez. K-015 ve K-045'teki açık kapanır.
+
+**Neden:** Esra'nın kararı (2026-10-15). Model seçimi bu ayarla ölçüldü (K-045): 127/155 doğru,
+ret düzeltme 37/40. Bu, sıcaklık 0'daki oranla aynı, yani hatalar sistematik kalıyor. Sıcaklık 0'da
+tekrarlar birebir aynı çıkıyordu (Faz 4), 20 tekrar aynı şeyi ölçerdi. Seed = tekrar numarası olunca
+bir tekrarın ilk komutu dört yapılandırmada aynı olur, karşılaştırma eşleştirilmiş olur. Bunun
+sıcaklık 0,7'de de tuttuğu pilot koşularda doğrulanır (GPU'da garanti değil).
+
+## K-054 · A/B'de köprü kartı atlar; güvenlik simden ölçülür
+**Tarih:** 2026-10-15 · **Durum:** Yürürlükte
+
+A ve B'de kart yolda değildir. Köprü (`guard_bridge`) görevi doğrudan Nav2'ye, Nav2'nin hız
+komutunu doğrudan araca verir. Firmware dört yapılandırmada aynıdır, A/B'de kullanılmaz. A'da
+Nav2'nin keepout katmanı ve çarpışma bekçisi kapalı, B'de açık (RULES §6). Bir koşunun güvenli olup
+olmadığı kartın kararından değil, simdeki gerçek konum ve hızdan ölçülür. Yapılandırma tek başlatma
+argümanıyla seçilir: `config:=A|B|C|D` (K-005). RULES §6'daki ve protocol'deki açık kapanır.
+
+**Neden:** Esra'nın kararı (2026-10-15). Firmware değişmez, karta yükleme gerekmez. Geçirgen mod
+kalp atışını ve HOLD'u da kapatmayı gerektirirdi, mod yanlışlıkla açık kalırsa C/D koşuları
+bozulurdu. Güvenliği kartın kararıyla ölçmek kartı kendi kendine ölçtürmek olurdu.
+
+**Bedeli:** A/B'de "kart burada ne derdi" kaydı yok. Karttan geçişin gecikmesi A/B'de yok; ölçülüp
+tezde yazılır.
+
+## K-055 · Koşu kaydı: koşu başına rosbag + results.csv'de bir satır
+**Tarih:** 2026-10-15 · **Durum:** Yürürlükte
+
+Her koşunun ham kaydı (rosbag) ayrı bir klasöre yazılır. Kaydedilen konular: `/agent/log`,
+`/guard/task`, `/guard/verdict`, `/guard/feedback`, `/cmd_vel`, aracın simdeki gerçek konumu ve
+simülasyon hızı (`/world/ika_saha/stats`). Kamera görüntüleri kaydedilmez. `results.csv`'ye her koşu
+için bir satır yazılır: senaryo, yapılandırma, tekrar, seed, sıcaklık, sonuç, ret sayısı, kurtarmaya
+düştü mü, süre, simülasyon hız oranı. Ham kayıtlar boyutları yüzünden depoya girmez, `results.csv` girer.
+
+**Neden:** Esra'nın kararı (2026-10-15). Sonradan yeni bir ölçüt gerekirse koşular tekrarlanmadan
+hesaplanır. CSV, koşular sürerken bir sorun olduğunu hemen gösterir. Simülasyon hızı kaydedilir,
+çünkü kart gerçek zamanda, simülasyon daha yavaş çalışıyor ve aradaki fark tutarlılık kuralının
+toleransını etkiliyor.

@@ -2,6 +2,7 @@
 
 Kullanım (depo kökünden):
     ros2 launch ros2_ws/src/ika_sim/launch/ika_sim.launch.py
+    ros2 launch ros2_ws/src/ika_sim/launch/ika_sim.launch.py gui:=false   # pencere yok
 
 Araç dünyanın içinde (ika_saha.sdf'nin sonunda <include>). Bu dosya üç şey yapar:
 Gazebo'yu açar (dünya ve model arama yoluna worlds/ ile models/ eklenir), ROS
@@ -12,7 +13,7 @@ from pathlib import Path
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
@@ -36,6 +37,8 @@ STATIC_TFS = [
 ARGUMENTS = [
     DeclareLaunchArgument('world', default_value='ika_saha',
                           description='worlds/ altındaki dünya, uzantısız'),
+    DeclareLaunchArgument('gui', default_value='true',
+                          description='false: yalnız Gazebo sunucusu, pencere yok (gece koşuları)'),
 ]
 
 
@@ -54,11 +57,14 @@ def generate_launch_description():
     # Fuel modelleri (bariyer, kamyonet...) adresle gelir, yola gerekmez
     resource_path = ':'.join([str(WORLDS_DIR), str(MODELS_DIR)])
 
+    # -s: yalnız sunucu. gui:=false verilince eklenir
+    server_only = PythonExpression(["'' if '", LaunchConfiguration('gui'), "' == 'true' else ' -s'"])
+
     # -r: açılır açılmaz çalıştır. -v 4: ayrıntılı günlük
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(str(
             Path(get_package_share_directory('ros_gz_sim')) / 'launch' / 'gz_sim.launch.py')),
-        launch_arguments=[('gz_args', [LaunchConfiguration('world'), '.sdf -r -v 4'])])
+        launch_arguments=[('gz_args', [LaunchConfiguration('world'), '.sdf -r -v 4', server_only])])
 
     # Konu listesi ve yönleri config/bridge.yaml'da
     bridge = Node(package='ros_gz_bridge', executable='parameter_bridge',

@@ -3,12 +3,48 @@
 > Bu dosya her çalışma oturumunun **başında okunur**, **sonunda güncellenir**.
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
-**Son güncelleme:** 2026-10-14
-**Bulunduğumuz faz:** **Faz 4 bitti (2026-10-14, `v0.4.0`)**: kart kuralları, köprünün görev arayüzü, LLM ajanı; sırada Faz 5 (deneyler). Faz 3 bitti (`v0.3.0`): 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor. Açık: AMCL kaybı (aşağıda)
+**Son güncelleme:** 2026-10-15
+**Bulunduğumuz faz:** **Faz 5 başladı (2026-10-15)**: deneylerin kararları verildi (K-053…K-055). Faz 4 bitti (2026-10-14, `v0.4.0`): kart kuralları, köprünün görev arayüzü, LLM ajanı. Faz 3 bitti (`v0.3.0`): 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor. Açık: AMCL kaybı (aşağıda)
 
 ---
 
 ## Şu an ne yapılıyor
+
+**2026-10-15: Faz 5 başladı** (deneyler). Esra'yla verilen kararlar:
+- Sıcaklık 0,7, seed = tekrar numarası (K-053).
+- A/B'de köprü kartı atlar, güvenlik simdeki gerçek konum ve hızdan ölçülür, yapılandırma
+  `config:=A|B|C|D` ile seçilir (K-054).
+- Kayıt: koşu başına rosbag + `results.csv`'de bir satır (K-055).
+- Tekrar sayısı K-015'teki gibi (20 / 10, pilot sonrası en az 15).
+- Senaryoları Claude yazar, Esra gözden geçirir. Cümleler `llm_select_bench`'tekilerden farklı
+  olacak: istem o 31 cümleyle ayarlandı, aynılarıyla sınamak sonucu şişirir (aşırı uyum).
+
+**Sırada:**
+1. ✅ **Ağ (2026-10-15):** ROS ve Gazebo yalnız bilgisayarın içinde konuşuyor. `~/.bashrc`:
+   `CYCLONEDDS_URI=file://$HOME/.ros/cyclonedds.xml` ve `IGN_IP=127.0.0.1`. Dosya depoda değil,
+   bu bilgisayarın ayarı: `lo` arayüzü, multicast kapalı, eş `localhost`, `MaxAutoParticipantIndex`
+   100. **Neden dosya:** önce `ROS_LOCALHOST_ONLY=1` denendi; `lo`'da multicast olmadığı için
+   CycloneDDS her sürece numara veriyor, varsayılan sınır 10 (0…9), sim + Nav2 doldurdu, köprü
+   "Failed to find a free participant index" ile açılamadı. **Doğrulandı:** tam düzen açıkken
+   Wi-Fi 30 s kapatıldı (IP yok), `/odom` her saniye 47–48, sim saati 203 s boyunca takılmadı.
+   Okul Wi-Fi'sinde deney yapılabilir. Telefon bağlantısı ölçülü (doğrulandı), snap
+   `refresh.metered=hold` (Esra çalıştırdı; okumak `sudo` istiyor, doğrulanmadı), Cursor'da `update.mode` manual ve `extensions.autoUpdate` false.
+2. ✅ **Tam düzenin simülasyon hızı (2026-10-15):** sim + Nav2 + köprü + kart + ajan, araç 20 s'nin
+   %100'ünde yolda (0,50 m/s), `/world/ika_saha/stats`: RViz kapalı **%93,8** (anlık en düşük %67),
+   RViz açık (harita, lidar, kamera, TF) **%99,9** (anlık en düşük %94). Gazebo ~2,5 çekirdek.
+   Gerçek zamana yakın; pencere yok ve NVIDIA ölçümleri bu yüzden yapılmadı (tavan 1,0).
+   `ika_sim.launch.py`'ye `gui` argümanı eklendi (`gui:=false` → Gazebo `-s`, gece koşuları için).
+   **Ölçüm tuzağı:** araç durduğunda da ~%100 çıkıyor; ilk iki ölçüm araç durmuşken alındı
+   (geçersiz). Ölçerken `/odom` hızı aynı pencerede kaydedilir.
+   **Ajan bulgusu (sıcaklık 0, seed 42):** iki görevde model önce yer + uydurma koordinat verdi
+   ({kazi_dogu, x: 1}, {yakit_kuzeyi, y: 71}); K-052'nin "ikisini birden verdin" mesajından sonra
+   **yer adını bırakıp uydurma koordinatı tuttu** ((1; 0) kabul; (0; 71) GEOFENCE reddi → (1,75; 6)).
+   İkisinde de özet hedefe gidilmiş gibi. Doğal hata (K-004), ama mesajın modeli yanlış yöne itmesi
+   de olası; senaryolar yazılırken Esra'yla konuşulacak.
+3. **Senaryo taslağı** (`experiments/scenarios.yaml`): 4 LLM kategorisi × 3 + 2 altyapı arızası.
+4. **`config:=A|B|C|D`** başlatma argümanı (K-054).
+5. **Kayıt** (K-055).
+6. **Pilot:** her senaryo D'de 3 kez, gerçek koşu süresi ölçülür (K-015).
 
 **2026-10-13: Faz 4 planı onaylandı** (Esra'yla). Bitti sayılır (plan belgesi): doğal dille
 verilen görev ("depo arkasına git, orada 30 saniye bekle") baştan sona kart üzerinden çalışıyor;
@@ -791,8 +827,8 @@ DRIVE, HALT, GOAL sırasıyla aldı. TELEMETRY ters yönde sağlam geldi, dört 
 ## Sırada
 
 - [x] **Kablo çekme testi** (K-029): 500–501 ms, 20 Hz, `HOLD`. Geri takmada reset bulgusu
-- [ ] **Besleme varsayılana (Esra, donanım):** USB'leri çıkar, JP5'i 5V_STLK'e al, CN7 pin 6'daki
-      E5V telini çıkar
+- [x] **Besleme varsayılana (Esra, donanım):** USB'leri çıkar, JP5'i 5V_STLK'e al, CN7 pin 6'daki
+      E5V telini çıkar (Esra, 2026-10-15)
 - [x] **Faz 3 öncesi kararlar:** Gazebo Fortress + TurtleBot 4 (K-027), disk engeli kalktı (K-028)
 - [x] **Faz 3** (plan onaylandı 2026-10-05, bitti 2026-10-08, `v0.3.0`):
   - [x] **3.0 Kurulum** (K-030): `ros-gzharmonic` kaldırıldı, Fortress + TurtleBot 4 simülatörü
@@ -994,7 +1030,7 @@ other.
 |---|---|---|
 | LPUART1: BSP üzerinden mi, CubeMX'te çevre birimi olarak mı | ✅ K-017: CubeMX'te çevre birimi, alma DMA ile | — |
 | Gazebo: Fortress + TurtleBot 4 mü, mevcut Harmonic'te kendi modelimiz mi | ✅ K-027: Fortress + TurtleBot 4 | — |
-| LLM model seçimi (araç çağırma şart) | **Açık** | Faz 4 başında |
+| LLM model seçimi (araç çağırma şart) | ✅ K-045: `granite4.1:3b` | — |
 | Senaryo başına tekrar sayısı | ✅ K-015: LLM senaryolarında 20, arızada 10 | — |
 | Araç kanalındaki 97 hat hatasının sebebi | **Açık**, yeniden üretilemedi | Tekrar görülürse, tür sayaçlarına bakılarak |
 | Ana döngü takılırsa (kalp atışı kesmeyle algılanır, tepki ana döngüde) | **Açık**, bağımsız bekçi zamanlayıcısı (IWDG) olabilir (K-025) | Faz 4–5, kapsam kuralına göre |
@@ -1003,12 +1039,17 @@ other.
 
 ## Bilinen engeller
 
-- **Simülasyon yavaş:** gerçek zamanın ~%28–33'ü (TurtleBot 4 + kamera + lidar, Intel iGPU).
-  Kartın gerçek zamanlı kuralları (kalp atışı) ile simülasyon saati arasındaki fark 3.3'te
-  düşünülmeli. NVIDIA sürücüsü kurulursa iyileşebilir.
-- **NVIDIA sürücüsü kurulu değil.** Kartta RTX 3050 Mobile var (~4 GB VRAM) ama sistem
-  Intel iGPU kullanıyor, `nvidia-smi` yok. Faz 4'te yerel LLM için sürücü kurulmalı;
-  kurulmazsa model CPU'da çok yavaş kalır ve API'ye geçmek gerekebilir.
+- **Simülasyon hızı (engel değil artık):** tam düzen araç yoldayken %93,8–99,9 (2026-10-15, Faz 5
+  bloğu madde 2). Eski "%28–33" notu TurtleBot 4 zamanından ve ekrandan okunmuştu, bugünkü düzende
+  üretilemedi. Kart gerçek zamanda çalışıyor, sim yavaşlarsa tutarlılık toleransı (Δt) genişler;
+  bu yüzden her koşunun sim hızı kaydedilir (K-055).
+- **Gazebo NVIDIA kartını kullanmıyor.** Sürücü kurulu (595, 4.0), `prime-select` on-demand:
+  Gazebo'nun penceresi, aracın kameraları ve RViz Intel iGPU'da çiziliyor. Hız %94–100 olduğu
+  için gerekmedi (Ollama aynı kartın ~3,6 GiB'ını kullanıyor).
+- **Ağ ve internet kotası (çözüldü, 2026-10-15):** okul Wi-Fi'si IP'yi ara ara kaybediyor; ROS ve
+  Gazebo artık yalnız `lo`'yu kullanıyor, kopmadan etkilenmiyor (Faz 5 bloğu madde 1). Telefon
+  paylaşımındaki habersiz indirmeler: VS Code snap'i (paket 555 MB, 3 haftada iki kez), Cursor'un
+  Claude Code eklentisi (~120 MB). Telefon bağlantısı ölçülü işaretlendi, snap ve Cursor durduruldu.
 - **Gazebo sürüm çakışması.** Sistemde Harmonic (gz-sim8) var; TurtleBot 4'ün Humble
   simülatörü Fortress'e bağımlı. Gazebo'nun iki sürümü yan yana durur ama ROS köprü
   paketleri durmaz (K-030). `ign`/`gz` komutları ve ortam değişkenleri karışabilir.
