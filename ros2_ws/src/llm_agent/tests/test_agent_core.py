@@ -146,6 +146,7 @@ def test_places_from_site_merges_safe_points_and_places():
 @pytest.mark.parametrize("args,where", [
     ({"yer": "kapi_onu", "x": 0, "y": 0}, (26.0, 0.0)),            # (0, 0) dolgu: yer
     ({"yer": "kapi_onu", "x": 1.2, "y": 2.3}, (26.0, 0.0)),        # o anki konum (1, 2) ±0,5: yer
+    ({"yer": "kapi_onu", "x": 0, "y": 10}, (26.0, 0.0)),           # konuşmada geçmiyor: yer (2026-10-15)
 ])
 def test_git_with_filler_coordinates_uses_place(args, where):
     world = FakeWorld((True, "ok"))
@@ -156,7 +157,35 @@ def test_git_with_filler_coordinates_uses_place(args, where):
 def test_git_with_conflicting_place_and_coordinates_is_not_sent():
     # 2026-10-14 C denemesi: {yer: baslangic, x: 14,5, y: 0}; ajan tahmin etmez, modele sorar
     world = FakeWorld((True, "ok"))
+    # Koordinat kullanıcının cümlesinde geçtiği için dolgu değil
     chat = FakeChat(call("git", yer="baslangic", x=14.5, y=0), call("git", x=14.5, y=0), say("tamam"))
-    out = run(chat, world)
+    out = run(chat, world, text="Kazı alanının ortasına (14,5; 0) git.")
     assert len(world.tasks) == 1 and world.tasks[0]["x"] == 14.5 and out["rejections"] == 0
     assert "ikisini birden" in [m for m in chat.seen[1] if m["role"] == "tool"][0]["content"]
+
+
+def test_only_one_coordinate_mentioned_is_filler():
+    # "10" bekleme süresi, x ile tesadüfen aynı; y uydurma: nokta konuşmada geçmiyor, yer kullanılır
+    world = FakeWorld((True, "ok"))
+    run(FakeChat(call("git", yer="kapi_onu", x=10, y=5), say("tamam")), world,
+        text="Kapı önüne git, orada 10 saniye bekle.")
+    assert (world.tasks[0]["x"], world.tasks[0]["y"]) == (26.0, 0.0)
+
+
+def test_coordinates_from_card_hint_are_not_filler():
+    # Kartın ipucundaki nokta + başka bir yer adı: hangisi kastedildi belli değil, modele sorulur
+    hint = ("Komut reddedildi (GEOFENCE / GOAL_IN_FORBIDDEN). Hedef yasak bölgede. "
+            "En yakın güvenli nokta: konteyner_onu (8,50; 1,00).")
+    world = FakeWorld((False, hint), (True, "ok"))
+    chat = FakeChat(call("git", x=14.5, y=0), call("git", yer="kapi_onu", x=8.5, y=1),
+                    call("git", x=8.5, y=1), say("tamam"))
+    run(chat, world, text="Kazı alanının ortasına (14,5; 0) git.")
+    assert [(t["x"], t["y"]) for t in world.tasks] == [(14.5, 0.0), (8.5, 1.0)]
+    assert "ikisini birden" in [m for m in chat.seen[2] if m["role"] == "tool"][-1]["content"]
+
+
+def test_numbers_in_text():
+    nums = ac._numbers_in("(8,50; -1) ve x 12,5")
+    for want in (8.5, -1.0, 12.5, 8.0, 50.0):
+        assert want in nums
+    assert ac._numbers_in("Kapı önüne git.") == []

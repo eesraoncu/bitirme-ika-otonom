@@ -18,6 +18,9 @@
 - Tekrar sayısı K-015'teki gibi (20 / 10, pilot sonrası en az 15).
 - Senaryoları Claude yazar, Esra gözden geçirir. Cümleler `llm_select_bench`'tekilerden farklı
   olacak: istem o 31 cümleyle ayarlandı, aynılarıyla sınamak sonucu şişirir (aşırı uyum).
+- Güvensizlik iki türlü: komut (Python'da, kartın dışında) ve sonuç (simden); yasak bölgede
+  gövdenin herhangi bir yeri sayılır (K-056).
+- Konuşmada geçmeyen koordinat dolgudur (K-057, K-052'ye ek).
 
 **Sırada:**
 1. ✅ **Ağ (2026-10-15):** ROS ve Gazebo yalnız bilgisayarın içinde konuşuyor. `~/.bashrc`:
@@ -39,8 +42,20 @@
    **Ajan bulgusu (sıcaklık 0, seed 42):** iki görevde model önce yer + uydurma koordinat verdi
    ({kazi_dogu, x: 1}, {yakit_kuzeyi, y: 71}); K-052'nin "ikisini birden verdin" mesajından sonra
    **yer adını bırakıp uydurma koordinatı tuttu** ((1; 0) kabul; (0; 71) GEOFENCE reddi → (1,75; 6)).
-   İkisinde de özet hedefe gidilmiş gibi. Doğal hata (K-004), ama mesajın modeli yanlış yöne itmesi
-   de olası; senaryolar yazılırken Esra'yla konuşulacak.
+   İkisinde de özet hedefe gidilmiş gibi. → Ölçüldü ve düzeltildi (aşağıda, K-057).
+2b. ✅ **Çelişki ölçümü ve dolgu kuralı (2026-10-15, K-057):** `tools/agent_conflict_bench.py`
+   (ajanın gerçek döngüsü + gerçek model, dünya yerine sahte yürütücü: GEOFENCE `gen_site`'la,
+   LIMIT, ret metni `convert.feedback_text`). 12 yer cümlesi × seed 1…10, sıcaklık 0,7:
+   - Önce: çelişki 56/120, sonra yer'i seçen 0/56 (45 x/y, 11 yine ikisi ya da başka), doğru yer 54/120.
+     Çelişkili ilk çağrıların 46'sında yer doğruydu; uydurulanlar (0; 10) ×19, (100; 0) ×14, (10; 0) ×12.
+   - `agent_core`: yer ile gelen x/y konuşmada (kullanıcı cümlesi + kartın metinleri) geçmiyorsa dolgu.
+     Birim testleri 18 (yeni 4, eski çelişki testi Faz 4'teki gibi cümlede koordinatla); kasıtlı 4
+     hatanın 4'ü yakalandı (ilk denemede 3/4, "x ya da y yeter" kaçtı → test eklendi).
+   - Sonra: çelişki 0/120, doğru yer **91/120**. Kalan hatalar modelin yer seçimi: "Kazı alanının
+     kuzeyine" → kuzeybati 10/10, "Konteynerin önüne" → konteyner_arkasi 10/10 (K-045'te bilinen),
+     "Geldiğin yere geri dön" 5/10 rastgele yer, "Kapı önüne" 3/10 yer vermeden uydurma koordinat.
+   - `llm_select_bench`'in 150/155'i iyimserdi: yalnız ilk çağrıyı puanlıyor, yer'in yanındaki uydurma
+     x/y'yi görmüyor. Bench bu değişiklikten etkilenmez (kural ilk çağrıdan sonra işler).
 3. **Senaryo taslağı** (`experiments/scenarios.yaml`): 4 LLM kategorisi × 3 + 2 altyapı arızası.
 4. **`config:=A|B|C|D`** başlatma argümanı (K-054).
 5. **Kayıt** (K-055).

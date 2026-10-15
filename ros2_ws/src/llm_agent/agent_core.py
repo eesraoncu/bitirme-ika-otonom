@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import time
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Protocol, Tuple
@@ -123,20 +124,38 @@ def _num(args: dict, key: str) -> float:
 FILLER_TOL_M = 0.5
 
 
-def _filler_xy(x: float, y: float, belief: Observation) -> bool:
-    """yer ile birlikte gelen koordinat dolgu mu: (0, 0) ya da aracın o anki konumu (modeller
-    bağlamdaki konumu kopyalıyor). Kayıtlarda görülen biçimler (2026-10-14)."""
-    return (x, y) == (0.0, 0.0) or math.hypot(x - belief.x, y - belief.y) <= FILLER_TOL_M
+_DECIMAL = re.compile(r"-?\d+[.,]\d+")
+_INTEGER = re.compile(r"-?\d+")
+
+
+def _numbers_in(text: str) -> List[float]:
+    """Metinde yazıyla geçen sayılar. "8,2" hem 8,2 hem 8 ve 2 sayılır (virgül ondalık da
+    ayırıcı da olabilir): fazladan sayı yalnız çelişki mesajına düşürür, eski davranış."""
+    return ([float(t.replace(",", ".")) for t in _DECIMAL.findall(text)]
+            + [float(t) for t in _INTEGER.findall(text)])
+
+
+def _filler_xy(x: float, y: float, belief: Observation, said: str) -> bool:
+    """yer ile birlikte gelen koordinat dolgu mu: (0, 0), aracın o anki konumu (modeller
+    bağlamdaki konumu kopyalıyor, 2026-10-14) ya da konuşmada (kullanıcının cümlesi, kartın
+    metinleri) geçmeyen bir nokta. 2026-10-15 ölçümü (tools/agent_conflict_bench.py): çelişkilerin
+    46/56'sında yer doğru, x/y uydurmaydı ((0; 10), (100; 0)...); "ikisini birden" mesajından
+    sonra model 0/56 yer'i seçti."""
+    nums = _numbers_in(said)
+    mentioned = lambda v: any(abs(v - n) <= 0.01 for n in nums)   # noqa: E731
+    return ((x, y) == (0.0, 0.0) or math.hypot(x - belief.x, y - belief.y) <= FILLER_TOL_M
+            or not (mentioned(x) and mentioned(y)))
 
 
 def tool_call_to_task(name: str, args: dict, places: Dict[str, Place], belief: Observation,
-                      task_id: str) -> dict:
-    """Modelin araç çağrısı → /guard/task JSON'u (K-050)."""
+                      task_id: str, said: str = "") -> dict:
+    """Modelin araç çağrısı → /guard/task JSON'u (K-050). said: konuşmada şimdiye kadar
+    söylenenler (kullanıcının cümlesi ve kartın metinleri), dolgu denetimi için."""
     b = {"x": belief.x, "y": belief.y, "stamp": belief.stamp}
     if name == "git":
         yer = args.get("yer")
         has_xy = args.get("x") is not None and args.get("y") is not None
-        if yer and has_xy and not _filler_xy(_num(args, "x"), _num(args, "y"), belief):
+        if yer and has_xy and not _filler_xy(_num(args, "x"), _num(args, "y"), belief, said):
             raise ToolError("ya 'yer' ya da 'x' ile 'y' ver, ikisini birden verdin")
         if yer:
             if yer not in places:
@@ -197,6 +216,7 @@ class Agent:
         messages = [{"role": "system", "content": SYSTEM},
                     {"role": "user", "content": f"{text}\n\nAracın şu anki konumu: {_pos(obs)} m."}]
         steps = rejections = 0
+        said = [text]                                  # dolgu denetimi: konum metinleri hariç
         self.log({"event": "görev", "text": text, "pos": [obs.x, obs.y]})
         while True:
             t0 = time.monotonic()
@@ -217,10 +237,11 @@ class Agent:
             steps += 1
             task_id = f"r{self.runs}s{steps}"
             try:
-                task = tool_call_to_task(name, args, self.places, obs, task_id)
+                task = tool_call_to_task(name, args, self.places, obs, task_id, " ".join(said))
                 accepted, result = self.executor.execute(task)
                 if not accepted:
                     rejections += 1
+                said.append(result)
             except ToolError as e:
                 task, accepted, result = None, False, f"Araç çağrısı geçersiz: {e}. Karta gönderilmedi."
             obs = self.executor.observe()              # sonraki çağrının inancı bu konum
