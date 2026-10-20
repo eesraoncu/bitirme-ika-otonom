@@ -1447,7 +1447,8 @@ Kablo senaryosu elle (ekrana "KABLOYU ŞİMDİ ÇEK"), henüz denenmedi. `scenar
 
 Pilot: 14 senaryo D'de seed 1–3, `run.py`, sonuçlar `ros2_ws/src/experiments/results_pilot.csv` (42
 satır; asıl `results.csv`'den ayrı). Kayıt düzeni 42 koşuda sorunsuz: `kart_hold` 0, `kart_hata` 0,
-sim hızı ~1,0. D'de 18 güvensiz komutun 18'i reddedildi, güvensiz sonuç 0. Altyapı: donma ve kablo
+sim hızı ~1,0. D'de 15 güvensiz komutun 15'i reddedildi, güvensiz sonuç 0 (düzeltme 2026-10-20,
+K-068: önce "18" yazılmıştı, senaryo toplamı yanlış toplanmıştı; analiz betiği 15 sayıyor). Altyapı: donma ve kablo
 çekmede araç 0,51–0,56 s'de, 0,22–0,24 m'de durdu (6/6). Koşu başına ortalama ~1,7 dk (açılış dahil).
 
 **Bulgu: yer listesi ve dolgu kuralı ajanı yasak hedeften uzak tutuyor.** Eski cümlelerle GEOFENCE
@@ -1494,3 +1495,31 @@ bozabilir: kaydedilir, `--invalid` yakalar. Kablo koşuları (C/D × 10) ayrıca
 **Neden:** Esra'nın kararı (2026-10-20): başka bilgisayar yok, bilgisayarı kullanması gerekiyor.
 12 çekirdek, 23 GB bellek; tam düzen ~2,5 çekirdek (Gazebo) + GPU (model). Bozulmayı önlemek
 yerine ölçüp tekrarlamak: sim hızı ve kart durumu her koşuda zaten kayıtlı (K-055, K-065).
+
+## K-068 · Analiz: Wilson aralığı, kesin McNemar (eşleştirilmiş), geçersiz koşular dışarıda
+**Tarih:** 2026-10-20 · **Durum:** Yürürlükte
+
+`python3 analysis/analyze.py` → `analysis/out/tablolar.md` (tez için, ondalık virgül), tablo başına
+`.csv`, dört grafik (`.png`). Deney sürerken de çalışır. `analysis/stats.py` (Wilson, McNemar,
+eşleştirme), `analysis/tests/` (16 test, kasıtlı 6 hatanın 6'sı yakalandı).
+
+- **Girdi:** `results.csv`; geçersiz koşular (`schedule.invalid`, K-067) dışarıda ve sayılarak raporlanır.
+- **Oranlar:** %95 Wilson güven aralığı (0/15, 15/15 gibi uçlarda da sınırlar [0, 1] içinde).
+- **Karşılaştırma:** eşleştirilmiş, aynı senaryo + aynı tekrar (seed, K-053); kesin (binom) McNemar,
+  iki yönlü; yalnız sonucu farklı çiftler sayılır. S1: A↔C, A↔D (güvensiz komut araca geçti mi);
+  S2: B↔C, B↔D, A↔D (güvensiz sonuç); S3: C↔D (başarı, kurtarma).
+- **Tablolar:** tamamlanma; S1 yakalama = 1 − geçen/güvensiz komut, haksız ret = normal senaryolarda
+  ret / komut; S2 kategori × yapılandırma güvensiz sonuç, türleri, arızada durma süresi ve yol;
+  S3 başarı, başarılı koşuda süre (ortanca, çeyrekler), ret, geçersiz çağrı, kurtarma, vazgeçme,
+  zaman aşımı; senaryo ayrıntısı.
+- **Grafikler:** dataviz referans paletinin ilk dört kategorik yuvası, yapılandırma her grafikte aynı
+  renkte (A mavi, B turuncu, C su yeşili, D sarı); üçü açık zeminde 3:1'in altında: değerler
+  çubukların üstünde, sayılar tablolar.md'de. Renk doğrulayıcısı çalıştırılamadı (Node yok); palet
+  referansın doğrulanmış sırası.
+
+**Neden:** Esra'nın kararı (2026-10-20): deney eşleştirilmiş tasarlandı (K-053), McNemar bunu kullanır,
+bağımsız gruplar sayan Fisher'dan güçlü. scipy kullanılmadı: sistemdeki 1.8.0 NumPy 1.26 ile
+uyumsuz uyarısı veriyor; iki formül standart Python'la yazıldı ve elle hesaplanmış değerlerle sınandı.
+
+**Sınırı:** Karar süresi (S1'in "ne kadar sürede"si) koşulardan değil Faz 2.6'nın DWT ölçümünden
+(Release 169–177 µs); tabloda yok, tezde ayrıca verilir.

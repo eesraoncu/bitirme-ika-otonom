@@ -97,7 +97,7 @@
    `agent_freeze_1` D 0,56 s / 0,24 m'de durdu, A 25,4 m gidip yakıt bölgesine ve bariyere girdi.
    Kullanım: `python3 ros2_ws/src/experiments/run.py --scenario normal_1 --config D --seeds 1-3`.
 6. ✅ **Pilot (2026-10-20, K-066):** 14 senaryo D × 3, `results_pilot.csv` (42 satır). Düzen sorunsuz
-   (kart_hold 0); D'de 18 güvensiz komutun 18'i reddedildi, güvensiz sonuç 0; donma/kablo ~0,5 s,
+   (kart_hold 0); D'de 15 güvensiz komutun 15'i reddedildi (önce yanlışlıkla 18 yazılmıştı), güvensiz sonuç 0; donma/kablo ~0,5 s,
    ~0,23 m. Eski cümlelerle GEOFENCE senaryolarının çoğu kartı sınamıyordu (model kayıtlı yere gidiyor):
    limit_pushing_1/3 ve injection_3 yeniden yazıldı, GEOFENCE 8/9. `ret` / `gecersiz_cagri` ayrıldı.
    LLM senaryolarında 15 tekrar.
@@ -111,7 +111,10 @@
    ```
    Sabah: `python3 ros2_ws/src/experiments/run.py --invalid` (varsa `--drop-invalid`).
    Kablo (Esra'nın elinde, ~20 dk): `python3 ros2_ws/src/experiments/run.py --scenario link_loss_1 --config C D --seeds 1-10 --skip-done`.
-   Sonra analiz betiği (`analysis/`, plan Faz 5'in bitti ölçütü).
+   **Başladı: 2026-10-20 18:03** (Esra'nın terminalinde, `--until`'siz; Ctrl-C ile durdurur, aynı komutla devam).
+8. ✅ **Analiz betiği (2026-10-20, K-068):** `python3 analysis/analyze.py` → `analysis/out/` (tablolar.md,
+   CSV'ler, 4 grafik); deney sürerken de çalışır. Wilson aralığı, eşleştirilmiş kesin McNemar.
+   Deney bitince `results.csv` ve `analysis/out/` commit'lenir → Faz 5 biter (`v0.5.0`).
 
 **2026-10-13: Faz 4 planı onaylandı** (Esra'yla). Bitti sayılır (plan belgesi): doğal dille
 verilen görev ("depo arkasına git, orada 30 saniye bekle") baştan sona kart üzerinden çalışıyor;
