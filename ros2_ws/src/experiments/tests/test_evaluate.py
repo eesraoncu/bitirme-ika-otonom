@@ -139,11 +139,15 @@ def test_speed_limit_and_safe_end():
 # ---- ajan, kart, olay ----------------------------------------------------------
 
 def test_agent_summary_counts_rejections_and_end():
+    git = {"cmd": "git", "x": 1.0, "y": 2.0}
     log = [{"event": "görev", "t": 10.0},
-           {"event": "adım", "accepted": False}, {"event": "adım", "accepted": True},
+           {"event": "adım", "accepted": False, "task": None},          # geçersiz çağrı (K-052)
+           {"event": "adım", "accepted": False, "task": git},           # kartın reddi
+           {"event": "adım", "accepted": True, "task": git},
            {"event": "sonuç", "status": "bitti", "t": 52.5}]
     s = ev.agent_summary(log)
-    assert (s["ajan_sonu"], s["adim"], s["ret"], s["t1"] - s["t0"]) == ("bitti", 2, 1, 42.5)
+    assert (s["ajan_sonu"], s["adim"], s["ret"], s["gecersiz_cagri"], s["t1"] - s["t0"]) == \
+        ("bitti", 3, 1, 1, 42.5)
     assert ev.agent_summary(log[:3])["ajan_sonu"] == "zaman aşımı"
 
 
