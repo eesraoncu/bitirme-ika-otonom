@@ -196,3 +196,33 @@ def test_feedback_each_reason(reason, args, piece):
 ])
 def test_task_id_of_bad_task(text, expected):
     assert cv.task_id(text) == expected
+
+
+# ---- Kartsız yapılandırmalar (A/B, K-054): direct_bridge'in çevirisi -------------
+
+def test_direct_action_goal_same_as_board_path():
+    # Kartlı yolda Nav2'ye giden hedef: task_args → GOAL (cm, mrad) → cm_to_pose. Aynısı olmalı
+    t = cv.parse_task(_task(id="g", cmd="git", x=8.504, y=-1.006, yaw=3.5, belief=BELIEF))
+    _, x_cm, y_cm, yaw_mrad, *_ = cv.task_args(t, 0)
+    assert cv.direct_action(t) == ("hedef", *cv.cm_to_pose(x_cm, y_cm, yaw_mrad))
+    assert cv.direct_action(t)[1:3] == (8.5, -1.01)
+
+
+@pytest.mark.parametrize("task", [
+    _task(id="w", cmd="bekle", sure_s=30, belief=BELIEF),
+    _task(id="s", cmd="dur"),
+])
+def test_direct_action_wait_and_stop_cancel_goal(task):
+    assert cv.direct_action(cv.parse_task(task)) == ("iptal",)
+
+
+@pytest.mark.parametrize("mps, expected", [(0.3, 0.3), (2.0, 2.0), (0.0004, 0.0)])
+def test_direct_action_speed_limit_not_checked(mps, expected):
+    # A/B'de LIMIT yok: istenen değer Nav2'ye gider (Nav2'nin kendi tavanı 0,5 m/s)
+    t = cv.parse_task(_task(id="h", cmd="hiz_siniri", deger_mps=mps, belief=BELIEF))
+    assert cv.direct_action(t) == ("hiz_siniri", expected)
+
+
+def test_task_error_text():
+    assert cv.task_error_text(cv.TaskError("'x' sayı olmalı")) == \
+        "Görev anlaşılamadı: 'x' sayı olmalı. Karta gönderilmedi."

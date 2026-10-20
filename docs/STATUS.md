@@ -4,7 +4,7 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-10-20
-**Bulunduğumuz faz:** **Faz 5 (2026-10-20):** karar bekleyen işler kapandı (K-059…K-063), sırada `config:=A|B|C|D`. **Faz 5 başladı (2026-10-15)**: deneylerin kararları verildi (K-053…K-055). Faz 4 bitti (2026-10-14, `v0.4.0`): kart kuralları, köprünün görev arayüzü, LLM ajanı. Faz 3 bitti (`v0.3.0`): 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor.
+**Bulunduğumuz faz:** **Faz 5 (2026-10-20):** karar bekleyen işler kapandı (K-059…K-063), `config:=A|B|C|D` bitti (K-064), sırada kayıt (madde 5). **Faz 5 başladı (2026-10-15)**: deneylerin kararları verildi (K-053…K-055). Faz 4 bitti (2026-10-14, `v0.4.0`): kart kuralları, köprünün görev arayüzü, LLM ajanı. Faz 3 bitti (`v0.3.0`): 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor.
 
 ---
 
@@ -83,8 +83,14 @@
      10 cm pay istiyor. `nav2_route_bench` 48/48, `nav2_accel_bench` 20/20 (kazının güneyi dahil).
    - Yeni araç: `tools/nav2_route_bench.py` (yasak noktalara yol yok mu + her yere başlangıçtan
      gidiş-dönüş, plan süresi, kurtarma, collision ahead). Pilottan önce de koşulabilir.
-4. **`config:=A|B|C|D`** başlatma argümanı (K-054).
-5. **Kayıt** (K-055).
+4. ✅ **`config:=A|B|C|D` (2026-10-20, K-064):** `experiments/launch/experiment.launch.py` (simülasyon,
+   Nav2, köprü, ajan; yapılandırma tablosu yalnız orada). `navigation.launch.py` keepout/collision_monitor,
+   `bridge.launch.py` guard/feedback, kartsız köprü `direct_bridge.py`, ortak `nav2_goal.py`. Dördü
+   simülasyonda sınandı (tablo K-064'te). Kullanım:
+   `ros2 launch ros2_ws/src/experiments/launch/experiment.launch.py config:=D seed:=3 gui:=false`,
+   sonra `ros2 service call /guard/reset std_srvs/srv/Trigger`.
+5. **Kayıt** (K-055, K-060: kartın STATUS sayaçları da; K-056: güvensizlik ölçümü). Koşu düzeneği her
+   koşudan önce Nav2'nin ve köprünün hazır olduğunu denetlemeli (K-064 sınırı).
 6. **Pilot:** her senaryo D'de 3 kez, gerçek koşu süresi ölçülür (K-015).
 
 **2026-10-13: Faz 4 planı onaylandı** (Esra'yla). Bitti sayılır (plan belgesi): doğal dille

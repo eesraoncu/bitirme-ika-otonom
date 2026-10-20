@@ -1,0 +1,11 @@
+# navigation.launch.py keepout:=false: nav2_params.yaml'ın üstüne okunur, iki costmap'ten
+# yasak bölge katmanını çıkarır (A yapılandırması, K-054). Geri kalan her şey aynı.
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      plugins: ["static_layer", "inflation_layer"]
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      plugins: ["static_layer", "inflation_layer"]

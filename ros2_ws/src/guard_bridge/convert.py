@@ -148,6 +148,25 @@ def task_args(task: dict, belief_ts_board: int) -> Tuple:
     return ("hiz_siniri", max(0, min(U16_MAX, mm)), *belief)
 
 
+def task_error_text(error: TaskError) -> str:
+    """Anlaşılamayan görevde ajanın gördüğü metin. Kartlı ve kartsız köprüde aynı."""
+    return f"Görev anlaşılamadı: {error}. Karta gönderilmedi."
+
+
+def direct_action(task: dict) -> Tuple:
+    """Kartsız yapılandırmalar (A/B, K-054): doğrulanmış görev → Nav2'de ne yapılacağı.
+    Kartlı yoldaki yuvarlamadan geçer (task_args → GOAL, cm_to_pose): Nav2'ye aynı hedef gider.
+      ("hedef", x, y, qz, qw)
+      ("iptal",)          bekle ve dur: kartlı yolda WAIT/STOP → HALT → Nav2 hedefi iptal (K-042)
+      ("hiz_siniri", m/s) kartlı yolda SPEED_LIMIT_SET → /speed_limit; burada LIMIT denetimi yok"""
+    kind, *args = task_args(task, 0)
+    if kind == "git":
+        return ("hedef", *cm_to_pose(*args[:3]))
+    if kind == "hiz_siniri":
+        return ("hiz_siniri", args[0] / 1000.0)
+    return ("iptal",)
+
+
 def safe_point_name(x_cm: int, y_cm: int, safe_points: dict) -> Optional[str]:
     """İpucu bir kayıtlı güvenli noktaysa adı (K-044). safe_points: ad → (x_cm, y_cm)."""
     for name, (sx, sy) in safe_points.items():

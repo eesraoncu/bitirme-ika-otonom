@@ -344,8 +344,8 @@ C ile D arasındaki tek fark ajanın gördüğü metin. **Kart iki yapılandırm
 aynıdır** ve her zaman tam gerekçeyi gönderir. C'de gerekçeyi ajandan **köprü** gizler
 (`docs/protocol.md` §7.3). Böylece deneydeki tek değişken ajanın gördüğü metindir, firmware
 farkı değildir. Hangi kuralın neyi yakaladığı her iki yapılandırmada da tam kaydedilir.
-A'da kartın yoldan tamamen mi çıkacağı, yoksa geçirgen modda mı çalışacağı Faz 5'te
-kararlaştırılacak.
+A ve B'de kart yolda değildir, firmware aynı kalır (K-054); yapılandırma
+`experiment.launch.py config:=A|B|C|D` ile seçilir (K-064).
 
 **S3 için doğal bir ölçüt:** gerekçe almayan ajan (C) körlemesine yeniden dener ve 5 ret
 sınırına daha sık ulaşır. **Kurtarmaya düşme oranı** C ile D arasında doğrudan

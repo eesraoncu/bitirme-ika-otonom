@@ -158,7 +158,7 @@ class AgentBridge(Node):
         try:
             task = cv.parse_task(msg.data)
         except cv.TaskError as e:
-            self.reply(cv.task_id(msg.data), False, f"Görev anlaşılamadı: {e}. Karta gönderilmedi.")
+            self.reply(cv.task_id(msg.data), False, cv.task_error_text(e))
             self.get_logger().warn(f"görev anlaşılamadı ({e}): {msg.data[:120]}")
             return
         if self.link is None:

@@ -29,10 +29,8 @@ from pathlib import Path
 from typing import Optional
 
 import rclpy
-from geometry_msgs.msg import PoseStamped, Twist
-from nav2_msgs.action import NavigateToPose
+from geometry_msgs.msg import Twist
 from nav2_msgs.msg import SpeedLimit
-from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.signals import SignalHandlerOptions
 from rclpy.time import Time
@@ -43,6 +41,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[2] / "shared" / "protocol" / "python"))
 
 import convert as cv  # noqa: E402
+from nav2_goal import Nav2Goal  # noqa: E402
 from ika_protocol import messages as m  # noqa: E402
 from ika_protocol.link import KEY_FILE, LINK_LOST, VEHICLE_PORT, Link, open_link  # noqa: E402
 
@@ -60,18 +59,13 @@ class VehicleBridge(Node):
         self.link: Optional[Link] = None
         self.cmd_vel = self.create_publisher(Twist, "/cmd_vel", 10)
         self.speed_limit = self.create_publisher(SpeedLimit, "/speed_limit", 10)
-        self.nav = ActionClient(self, NavigateToPose, "navigate_to_pose")
+        self.nav = Nav2Goal(self)
         self.tf = Buffer()
         self.tf_listener = TransformListener(self.tf, self)
         self.last_drive = self.get_clock().now()
         self.moving = False           # son yayımlanan hız sıfırdan farklı mı
         self.goals = 0
         self.drives = 0
-        # Nav2'deki hedef. Gönderim ile kabul arasında iptal istenebilir: her hedefin bir
-        # sırası var, kabul geldiğinde sırası iptal edilmişse hemen iptal edilir.
-        self.goal_handle = None
-        self.goal_gen = 0
-        self.cancelled_gen = 0
         self.telemetry_sent = 0
         self.create_timer(READ_PERIOD_S, self.read)
         self.create_timer(TELEMETRY_PERIOD_S, self.send_telemetry)
@@ -96,7 +90,7 @@ class VehicleBridge(Node):
         self.get_logger().error(f"araç kanalı koptu ({why}): yeniden bağlanılacak")
         self.link.close()
         self.link = None
-        self.cancel_goal("araç kanalı koptu")
+        self.nav.cancel("araç kanalı koptu")
 
     # -- karttan -----------------------------------------------------------
 
@@ -117,7 +111,7 @@ class VehicleBridge(Node):
             elif cls is m.Hello:
                 self.on_hello(f, msg)
             elif cls is m.Halt:
-                self.cancel_goal(f"HALT ({msg.duration_s} s)")
+                self.nav.cancel(f"HALT ({msg.duration_s} s)")
             elif cls is m.SpeedLimitSet:
                 self.on_speed_limit(msg)
 
@@ -129,19 +123,10 @@ class VehicleBridge(Node):
 
     def on_goal(self, g: m.Goal) -> None:
         x, y, qz, qw = cv.cm_to_pose(g.x_cm, g.y_cm, g.yaw_mrad)
-        if not self.nav.server_is_ready():
+        if not self.nav.ready():
             self.get_logger().error(f"GOAL geldi ama Nav2 hazır değil: {g}")
             return
-        goal = NavigateToPose.Goal()
-        goal.pose = PoseStamped()
-        goal.pose.header.frame_id = "map"
-        goal.pose.header.stamp = self.get_clock().now().to_msg()
-        goal.pose.pose.position.x, goal.pose.pose.position.y = x, y
-        goal.pose.pose.orientation.z, goal.pose.pose.orientation.w = qz, qw
-        self.goal_gen += 1
-        gen = self.goal_gen
-        self.nav.send_goal_async(goal).add_done_callback(
-            lambda fut: self.on_goal_response(gen, fut))
+        self.nav.send(x, y, qz, qw)
         self.goals += 1
         self.get_logger().info(f"GOAL → Nav2: ({x:.2f}, {y:.2f}) m, {g.yaw_mrad} mrad, "
                                f"kaynak {g.source.name}")
@@ -154,29 +139,11 @@ class VehicleBridge(Node):
         self.speed_limit.publish(msg)
         self.get_logger().info(f"hız sınırı → Nav2: {msg.speed_limit:.3f} m/s")
 
-    def on_goal_response(self, gen: int, fut) -> None:
-        handle = fut.result()
-        if handle is None or not handle.accepted:
-            return
-        if gen <= self.cancelled_gen:            # kabul gelmeden iptal istenmişti
-            handle.cancel_goal_async()
-            return
-        if gen == self.goal_gen:                 # daha yeni bir hedef gönderilmediyse
-            self.goal_handle = handle
-
-    def cancel_goal(self, why: str) -> None:
-        """K-042: Nav2'nin hedefini iptal et (yoksa ya da bitmişse zararsız)."""
-        self.cancelled_gen = self.goal_gen
-        if self.goal_handle is not None:
-            self.goal_handle.cancel_goal_async()
-            self.goal_handle = None
-            self.get_logger().info(f"Nav2 hedefi iptal: {why}")
-
     def on_hello(self, f, hello: m.Hello) -> None:
         # Kart yeniden başladıysa yeni oturuma geçilir (protocol §5)
         if self.link.adopt_hello(f, hello):
             self.get_logger().warn(f"yeni oturum 0x{hello.session_id:08X} (kart yeniden başladı)")
-            self.cancel_goal("kart yeniden başladı")
+            self.nav.cancel("kart yeniden başladı")
 
     # -- karta ---------------------------------------------------------------
 

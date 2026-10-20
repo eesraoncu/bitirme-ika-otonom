@@ -1345,3 +1345,46 @@ ve AMCL'nin başlangıç pozu, senaryolar.
 **Bedeli:** Gerçek engellere (konteyner, bariyerler) 10 cm daha az pay; K-038'in gerekçesi (harita
 ~0,5 m kaymış, AMCL ~0,3 m yanılıyor, lidar katmanı yok) orada hâlâ geçerli. Konteyner–kazı
 darboğazı (1,24 m) yine kapalı: paylı iz 1,55 m.
+
+## K-064 · Yapılandırma seçimi: experiment.launch.py, kartsız köprü direct_bridge (K-054'e ek)
+**Tarih:** 2026-10-20 · **Durum:** Yürürlükte
+
+`ros2 launch ros2_ws/src/experiments/launch/experiment.launch.py config:=A|B|C|D seed:=N gui:=…`
+simülasyonu, Nav2'yi (10 s sonra), köprüyü ve ajanı (20 s sonra; sıcaklık 0,7, seed, K-053) açar.
+Dört harfin anlamı **yalnız** o dosyadaki `CONFIGS` tablosunda; diğer başlatma dosyaları yapılandırma
+bilmez, kendi düğmelerini alır:
+
+| | `bridge.launch.py` guard | feedback | `navigation.launch.py` keepout | collision_monitor |
+|---|---|---|---|---|
+| A | false (`direct_bridge`) | – | false (`nav2_no_keepout.yaml`) | false (yumuşatıcı → `/cmd_vel_nav`) |
+| B | false | – | true | true |
+| C | true | minimal | true | true |
+| D | true | full | true | true |
+
+Düğmelerin varsayılanı D; eski komutlar aynen çalışır. Yumuşatıcı (K-046) her yapılandırmada var:
+güvenlik katmanı değil.
+
+`direct_bridge` (A/B) kartlı köprünün ajana ve araca dönük yüzünü taklit eder:
+- Geçerli her görev kabul edilir, ajan D'deki kabul metnini görür ("Komut kabul edildi."). Anlaşılamayan
+  görevde kartlı köprüdeki metin (`convert.task_error_text`).
+- git: Nav2 hedefi, kartlı yoldaki cm/mrad yuvarlamasından geçerek (`convert.direct_action`), aynı
+  gönderme/iptal kodu (`nav2_goal.Nav2Goal`, `vehicle_bridge` de kullanır). bekle ve dur: Nav2 hedefi
+  iptal (kartlı yolda WAIT/STOP → HALT → iptal, K-042). hiz_siniri: `/speed_limit`, LIMIT denetimi yok.
+- `/cmd_vel_nav` → `/cmd_vel`, 0,5 s'lik bekçi köpeğiyle (`vehicle_bridge` gibi). Düğüm dondurulunca
+  bekçi köpeği de donar: A/B'de donmada araç son hızla gider (K-058).
+- `/guard/reset` başarı döner (kart yok): koşu düzeneği dört yapılandırmada aynı adımları izler.
+  `/guard/verdict` yayımlanmaz.
+
+**Doğrulama (2026-10-20, simülasyon; C/D'de kart):** dördünde `/cmd_vel`'e tek yayıncı (A/B
+`direct_bridge`, C/D `vehicle_bridge`); çarpışma bekçisi A'da yok, diğerlerinde var; keepout katmanı
+A'da yok. Kartı atlayarak (14,5; 0) ve (20; −6)'ya yol: A'da var (araç kazıya gitti), B/C/D'de yok.
+Köprüye "git (14,5; 0)": A/B "Komut kabul edildi." (B'de Nav2 plan yapamadı), C "Komut reddedildi.",
+D gerekçe + konteyner_onu ipucu. D'de kabul edilen hedef ve dur → HALT(0) → Nav2 iptali. Köprü
+testleri 66 (7 yeni), kasıtlı 4 hatanın 4'ü yakalandı.
+
+**Neden:** Esra'nın kararı (2026-10-20). Yapılandırma tek yerde olunca bir yapılandırmanın anlamını
+değiştirmek tek dosyaya bakmayı gerektirir; düğmeler kendi klasörlerinin kavramı. Simülasyon dahil:
+tek komut her şeyi açar. Gecikmeler sabit, elle açarken de bu sırayla açılıyordu.
+
+**Sınırı:** Sabit gecikmeler yavaş bir açılışta yetmeyebilir; koşu düzeneği (Faz 5 madde 5–6) her
+koşudan önce Nav2'nin ve köprünün hazır olduğunu ayrıca denetlemeli.
