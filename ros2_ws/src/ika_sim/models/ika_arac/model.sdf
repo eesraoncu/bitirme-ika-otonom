@@ -2,7 +2,7 @@
      sim/models/ika_arac/model.sdf (commit 6e6f136, 2026-07-28) ve
      URDF_icin.SLDASM/meshes/ (SolidWorks çıktısı). Gazebo Harmonic için yazılmıştı.
 
-     Fortress'e çevirmek için üç değişiklik yapıldı, ROS için bir tane daha (4);
+     Fortress'e çevirmek için üç değişiklik yapıldı, ROS için iki tane daha (4, 5);
      gerisi kaynakla aynı:
        1. <sdf version> 1.11 → 1.9 (Fortress'in sdformat12'si en çok 1.9 okur)
        2. Mesh yolları file:///home/esra/ugv_telemetry_new/URDF_icin.SLDASM/meshes/
@@ -13,8 +13,11 @@
           eksenleri "z ileri, x sağa, y aşağı"dır (optik çerçeve); araç eksenleri
           "x ileri, y sola, z yukarı". camera_link etiketiyle RTAB-Map derinliği yanlış
           yöne çevirirdi. camera_link → camera_optical_frame dönüşü başlatma dosyasında.
+       5. Sonda OdometryPublisher eklentisi: aracın dünyadaki gerçek pozu ve hızı,
+          /model/ika_arac/ground_truth, 20 Hz (Faz 5'in güvenlik ölçümü, K-054, K-056;
+          köprüde /sim/odom).
      <gz_frame_id> öğesi kaldı: Fortress'in sensör kütüphanesi onu da tanır.
-     Kaynak güncellenirse aynı dört değişiklik yeniden uygulanır.
+     Kaynak güncellenirse aynı beş değişiklik yeniden uygulanır.
 
      Dünyanın Sensors, Imu ve Contact sistemlerini yüklemesi gerekir; model
      kendi sensör sistemini getirmez.
@@ -977,6 +980,19 @@
       <joint_name>KULE_UST_joint</joint_name>
       <topic>/turret/pitch</topic>
       <use_velocity_commands>true</use_velocity_commands><p_gain>5.0</p_gain>
+    </plugin>
+
+    <!-- Değişiklik 5: modelin dünya çerçevesindeki pozu ve hızı, gürültüsüz. Tekerlek
+         odometrisi (DiffDrive, /odom) değil: o kayar. PosePublisher'ın publish_model_pose'u
+         Fortress'te yayımlamadı (2026-10-20); dünyanın bütün pozları koşu başına ~20 MB'tı.
+         tf_topic: varsayılanı /model/ika_arac/pose, kullanılmıyor -->
+    <plugin filename="ignition-gazebo-odometry-publisher-system" name="ignition::gazebo::systems::OdometryPublisher">
+      <odom_frame>world</odom_frame>
+      <robot_base_frame>ika_arac</robot_base_frame>
+      <odom_topic>/model/ika_arac/ground_truth</odom_topic>
+      <tf_topic>/model/ika_arac/ground_truth_tf</tf_topic>
+      <odom_publish_frequency>20</odom_publish_frequency>
+      <dimensions>2</dimensions>
     </plugin>
 
   </model>

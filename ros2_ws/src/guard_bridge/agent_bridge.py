@@ -20,7 +20,8 @@ Karttan gelen:
 - /guard/task'tan gelen komutun kararı → /guard/feedback (JSON: id, accepted, text). Metin
   "feedback" parametresine göre: full (D, varsayılan) gerekçe ve ipucuyla, minimal (C) yalnız
   "Komut reddedildi." (protocol §7.3, K-005). Coğrafi sınır ipucu güvenli noktanın adıyla.
-- HEARTBEAT_ACK → kartın durumu, değiştiğinde günlüğe. STATUS → 10 s'de bir günlüğe.
+- HEARTBEAT_ACK → kartın durumu, değiştiğinde günlüğe. STATUS → 10 s'de bir günlüğe ve her
+  gelişinde (saniyede bir) /guard/status'a (JSON: durum, ret serisi, sayaçlar; Faz 5 kaydı, K-060).
 
 Kablo çekilirse düğüm çökmez: "bağlantı yok" der, saniyede bir yeniden bağlanmayı
 dener; kopukken gelen komutlar atılır. Yeniden bağlanınca kart HOLD'dadır (yeniden
@@ -28,6 +29,7 @@ başladı ya da kalp atışı kesildi, HOLD mandallı): NORMAL'e yine /guard/res
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 import sys
 import time
@@ -72,6 +74,7 @@ class AgentBridge(Node):
         self.create_service(Trigger, "/guard/reset", self.on_reset)
         self.create_subscription(String, "/guard/task", self.on_task, 10)
         self.feedback = self.create_publisher(String, "/guard/feedback", 10)
+        self.status_pub = self.create_publisher(String, "/guard/status", 10)
         mode = self.declare_parameter("feedback", "full").value
         if mode not in ("full", "minimal"):
             raise ValueError(f"feedback 'full' (D) ya da 'minimal' (C) olmalı, '{mode}' verildi")
@@ -230,6 +233,8 @@ class AgentBridge(Node):
                     self.state = msg.state
             elif cls is m.Status:
                 self.last_status = msg
+                self.status_pub.publish(String(data=json.dumps(
+                    {**dataclasses.asdict(msg), "state": msg.state.name})))
             elif cls is m.Hello:
                 if self.link.adopt_hello(f, msg):
                     self.get_logger().warn(f"yeni oturum 0x{msg.session_id:08X} (kart yeniden başladı)")

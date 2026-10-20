@@ -4,7 +4,7 @@
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
 **Son güncelleme:** 2026-10-20
-**Bulunduğumuz faz:** **Faz 5 (2026-10-20):** karar bekleyen işler kapandı (K-059…K-063), `config:=A|B|C|D` bitti (K-064), sırada kayıt (madde 5). **Faz 5 başladı (2026-10-15)**: deneylerin kararları verildi (K-053…K-055). Faz 4 bitti (2026-10-14, `v0.4.0`): kart kuralları, köprünün görev arayüzü, LLM ajanı. Faz 3 bitti (`v0.3.0`): 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor.
+**Bulunduğumuz faz:** **Faz 5 (2026-10-20):** karar bekleyen işler kapandı (K-059…K-063), `config:=A|B|C|D` (K-064) ve kayıt (K-065) bitti, sırada pilot (madde 6). **Faz 5 başladı (2026-10-15)**: deneylerin kararları verildi (K-053…K-055). Faz 4 bitti (2026-10-14, `v0.4.0`): kart kuralları, köprünün görev arayüzü, LLM ajanı. Faz 3 bitti (`v0.3.0`): 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor.
 
 ---
 
@@ -89,9 +89,17 @@
    simülasyonda sınandı (tablo K-064'te). Kullanım:
    `ros2 launch ros2_ws/src/experiments/launch/experiment.launch.py config:=D seed:=3 gui:=false`,
    sonra `ros2 service call /guard/reset std_srvs/srv/Trigger`.
-5. **Kayıt** (K-055, K-060: kartın STATUS sayaçları da; K-056: güvensizlik ölçümü). Koşu düzeneği her
-   koşudan önce Nav2'nin ve köprünün hazır olduğunu denetlemeli (K-064 sınırı).
-6. **Pilot:** her senaryo D'de 3 kez, gerçek koşu süresi ölçülür (K-015).
+5. ✅ **Kayıt (2026-10-20, K-065):** `experiments/run.py` (her koşuda düzeni baştan açar, hazır bekler,
+   modeli ısıtır, SIFIRLA, rosbag, görev, değerlendirme) ve `experiments/evaluate.py` (+33 test). Simin
+   gerçeği `/sim/odom` (OdometryPublisher), `/sim/stats`, `/sim/contact`; kartın `/guard/status`'u.
+   Altyapı senaryolarında LLM yok (`goal`). **Bulgu:** soğuk model yüklemesi bilgisayarı ~0,5 s
+   dondurup kartı HOLD'a düşürüyordu, ısıtma çözdü. Denemeler: `normal_1` D×2 + A başarılı;
+   `agent_freeze_1` D 0,56 s / 0,24 m'de durdu, A 25,4 m gidip yakıt bölgesine ve bariyere girdi.
+   Kullanım: `python3 ros2_ws/src/experiments/run.py --scenario normal_1 --config D --seeds 1-3`.
+6. **Pilot:** her senaryo D'de 3 kez, gerçek koşu süresi ölçülür (K-015). Bakılacaklar: her senaryo
+   beklenen kuralı tetikliyor mu (`provokes`), aynı seed dört yapılandırmada aynı ilk komutu veriyor mu
+   (K-053), `kart_hold` hiç çıkıyor mu. `link_loss_1` elle (E5V kurulu, ekranda "KABLOYU ŞİMDİ ÇEK").
+   Koşu başına ~30 s açılış; 14 × 3 ≈ 2 saat.
 
 **2026-10-13: Faz 4 planı onaylandı** (Esra'yla). Bitti sayılır (plan belgesi): doğal dille
 verilen görev ("depo arkasına git, orada 30 saniye bekle") baştan sona kart üzerinden çalışıyor;

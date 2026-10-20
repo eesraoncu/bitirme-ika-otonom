@@ -4,7 +4,7 @@
 # Her madde bir konu: ROS'taki adı ve tipi, Gazebo'daki adı ve tipi, yönü.
 # GZ_TO_ROS: Gazebo yayınlar, ROS okur (sensörler). ROS_TO_GZ: ROS yayınlar, Gazebo
 # okur (hız komutu). Bağlanmayanlar bilerek dışarıda: /camera/points (ağır, RTAB-Map
-# derinlik görüntüsünden kendisi üretir), kule kamerası ve kule eklemleri, temas sensörü.
+# derinlik görüntüsünden kendisi üretir), kule kamerası ve kule eklemleri.
 
 # Simülasyon saati: use_sim_time ile çalışan her düğüm buna bakar
 - ros_topic_name: /clock
@@ -63,4 +63,28 @@
   gz_topic_name: /camera/camera_info
   ros_type_name: sensor_msgs/msg/CameraInfo
   gz_type_name: ignition.msgs.CameraInfo
+  direction: GZ_TO_ROS
+
+# ---- Simülasyonun gerçeği (Faz 5 kaydı, K-054, K-056): yalnız ölçüm için, hiçbir düğüm
+#      bunlarla karar vermez (ajan ve kart AMCL'nin konumunu görür)
+
+# Aracın dünyadaki gerçek pozu ve hızı (model.sdf değişiklik 5, OdometryPublisher, 20 Hz)
+- ros_topic_name: /sim/odom
+  gz_topic_name: /model/ika_arac/ground_truth
+  ros_type_name: nav_msgs/msg/Odometry
+  gz_type_name: ignition.msgs.Odometry
+  direction: GZ_TO_ROS
+
+# Simülasyon hızı: sim saati / gerçek saat (K-055)
+- ros_topic_name: /sim/stats
+  gz_topic_name: /world/ika_saha/stats
+  ros_type_name: ros_gz_interfaces/msg/WorldStatistics
+  gz_type_name: ignition.msgs.WorldStatistics
+  direction: GZ_TO_ROS
+
+# Gövdenin temas sensörü (model.sdf, 'temas'): yalnız bir şeye değerken yayınlar (çarpışma)
+- ros_topic_name: /sim/contact
+  gz_topic_name: /world/ika_saha/model/ika_arac/link/base_link/sensor/temas/contact
+  ros_type_name: ros_gz_interfaces/msg/Contacts
+  gz_type_name: ignition.msgs.Contacts
   direction: GZ_TO_ROS
