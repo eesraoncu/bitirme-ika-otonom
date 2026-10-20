@@ -1225,3 +1225,123 @@ koşu, K-015'teki 4 × 10 yerine. A/B'nin altyapı karşılığı donma senaryos
 A/B'de "köprü süreci öldürülür" gibi bir karşılık kurmak C/D'dekiyle aynı olay olmazdı. Donmanın
 A/B'de ölçülebilir sonuç verdiği denendi: Gazebo'nun DiffDrive'ı son hız komutunu süresiz tutuyor
 (komut kesildikten 10 s sonra hâlâ 0,300 m/s), yani A/B'de köprü donunca araç durmadan gider.
+
+## K-059 · Bağımsız bekçi zamanlayıcısı (IWDG) eklenmez (K-025'e ek)
+**Tarih:** 2026-10-20 · **Durum:** Yürürlükte
+
+Kartın ana döngüsü takılırsa diye IWDG eklenmez. K-025'te açık bırakılan soru kapanır.
+
+**Neden:** Esra'nın kararı (2026-10-20), kapsam kuralı: Faz 5'te "kart yazılımı takıldı" diye bir
+senaryo yok, sonuç tablosuna satır eklemiyor. Sınamak için kartı kasıtlı takan bir test kancası
+gerekirdi, kanca da güvenlik kartının koduna girerdi.
+
+**Bedeli (sınırlılık):** Ana döngü takılırsa kart HOLD'a geçer ama araca sıfır hız gönderemez.
+Simülasyonda aracı `vehicle_bridge`'in bekçi köpeği durdurur (DRIVE 0,5 s gelmezse `/cmd_vel`'e
+sıfır); bunu kart değil bilgisayar yapar. Tezde bilinen sınır ve gelecek çalışma olarak yazılır.
+
+## K-060 · Kartın STATUS sayaçları her koşuda kaydedilir (K-055'e ek)
+**Tarih:** 2026-10-20 · **Durum:** Yürürlükte
+
+Ajan köprüsü kartın STATUS mesajını (saniyede bir: durum, `err_framing`, `err_crc`, `err_type`,
+`err_auth`, `err_replay`, `err_fresh`, `clipped`, telemetri yaşı) bir ROS konusu olarak yayımlar,
+konu koşunun rosbag'ine girer. Koşu sırasında hata sayaçlarından biri artarsa koşu
+`results.csv`'de işaretlenir. Uygulaması Faz 5'in kayıt adımında. Araç kanalındaki 97 hat
+hatası tek seferlik bir kurulum olayı sayılır, açık soru kapanır.
+
+**Neden:** Esra'nın kararı (2026-10-20). Hat hatası yeniden üretilemedi (beş yol denendi), veri
+akarken kayıp görülmedi, bozuk çerçeve atılır ve sayılır: güvenliği etkilemez. Ama bir koşunun
+ortasında olursa bir kalp atışı kaçabilir, kart sebepsiz HOLD'a geçer ve koşunun sonucu bozulur.
+Bugün STATUS yalnız 10 s'de bir günlüğe yazılıyor, koşudan sonra bunu görmenin yolu yok.
+
+## K-061 · Kablo geri takılınca reset JP3'süz de var: bilinen sınır (K-029'a ek)
+**Tarih:** 2026-10-20 · **Durum:** Yürürlükte
+
+K-029'daki "JP3'süz kısım temiz ölçümle doğrulanmadı" belirsizliği ölçüldü. Düzen: E5V (JP5 [5-6],
+CP2102 +5V → CN7 pin 6), bütün okuma ve yazmalar `mode=HOTPLUG` (karta reset atmadan),
+her turdan önce bayraklar `RMVF` ile temizlendi ve ayrı okumayla `0x00000010` görüldü.
+
+| Durum | Tur | `RCC_CSR` | Reset nedeni |
+|---|---|---|---|
+| JP3 takılı, CN1 çekilip takıldı | 1 | `0x04000010` | PINRSTF (reset pini) |
+| JP3 çıkarılırken | – | değişmedi | yok |
+| JP3'süz, CN1 çekilip takıldı | 3/3 | `0x14000010` | SFTRSTF (yazılım) + PINRSTF |
+
+Hiçbir turda BORRSTF yok, LD3 sönmedi: besleme kesilmedi. ST-LINK açılırken işlemciyi her
+durumda resetliyor: JP3 takılıyken reset pininden, JP3'süz SWD üzerinden yazılım resetiyle
+(yazılım reseti PINRSTF'i de kaldırır). JP3 yalnız yolu değiştiriyor, resetten kaçınılamıyor.
+
+Karar: JP3 takılı kalır (varsayılan). Faz 5'teki `link_loss_1` koşularında her geri takmada kartın
+yeniden başlaması beklenir: kart HOLD'da açılır, düzenek köprülerin yeni oturuma bağlanmasını
+bekleyip SIFIRLA ile sonraki koşuya geçer. E5V düzeni pilota kadar kurulu kalır.
+
+**Neden:** Esra'nın kararı (2026-10-20). Resetten kaçmanın kalan yolu ajan kanalını ST-LINK'ten
+ayrı bir USB-UART'a taşımak (ikinci CP2102, CubeMX değişikliği, yükleme); sonuç tablosuna satır
+eklemiyor. Gerçek araçta ajan karta ST-LINK üzerinden bağlanmaz.
+
+**Bedeli (sınırlılık):** Geri takmadan sonra HOLD mandalı ("kablo gelse de SIFIRLA olmadan NORMAL'e
+dönülmez") fiziksel testte gösterilemez, yazılımda `decision_test` ile gösterilir. Kopma sırasındaki
+hata sayaçları yeniden başlamayla silinir. Tezde yazılır.
+
+## K-062 · Planlayıcı NavFn kalır; Smac Hybrid-A* ve State Lattice denendi (K-038'e ek)
+**Tarih:** 2026-10-20 · **Durum:** Yürürlükte
+
+Kazının güneyindeki takılma (NavFn yalnız merkeze bakıyor, dönen iz boğazda keepout'a giriyor;
+STATUS 2026-10-14) için izin tamamını denetleyen iki planlayıcı denendi. Ölçüt önceden konuldu:
+`nav2_accel_bench` 5/5, `tools/nav2_route_bench.py` ile her yere 3/3 varış ve plan ortancası < 1 s,
+yasak noktalara yol yok; tutmazsa NavFn. İkisi de tutmadı, NavFn kalır, kazının güneyi bilinen sınır.
+
+| Planlayıcı | Yasak noktalar | baslangic → kuzeybati | Sorun |
+|---|---|---|---|
+| Hybrid-A* (`DUBIN`, yarıçap 0,5 m, global şişirme 1,6 m) | 0/5 yol ✓ | vardı (11,1 m döngü, plan 1350 ms) | Dönüşte yol yok: hedefin yönüne araba gibi varmak zorunda, baslangic'a 0°'de varacak yer yok (batı sınırı); 0°'de yol yok, 180°'de 12 ms |
+| State Lattice (`diff`, 16 yön, yerinde dönüş) | 0/5 yol ✓ | vazgeçti, 0,56 m kala | Plan 3 ms; hedefte yerinde dönerken RPP "collision ahead" (108) |
+| NavFn (taban) | 0/5 yol ✓ | vazgeçti, başlangıçtan ayrılamadı | Başlangıçta yerinde dönerken RPP "collision ahead" (130) |
+
+**Neden:** Esra'nın kararı (2026-10-20), önceden konulan ölçüt. Geri vitesli Hybrid-A* (REEDS_SHEPP)
+RPP'de yerinde dönmeyi kapatmayı gerektirirdi, araç deneylerde geri giderdi; seçilmedi.
+
+**Bulgu (açık, STATUS):** Lattice ve NavFn'in takıldığı yer planlayıcı değil, RPP'nin yerinde
+dönüşü: baslangic ve kuzeybati'de dönen iz `test_safe_points`'e göre temiz, RPP çarpışma sayıyor.
+Faz 4'te görünmedi, başlangıçtan gidilen hedefler doğudaydı (dönüş gerekmedi).
+
+## K-063 · Nav2'nin iz payı 0,3 → 0,2 m; güvenli noktalarda dönüş için 10 cm pay (K-038'e ek)
+**Tarih:** 2026-10-20 · **Durum:** Yürürlükte
+
+Global ve yerel costmap'te `footprint_padding` 0,2 (önce 0,3). Yerinde dönen izin yarıçapı
+1,559 → 1,42 m. `test_safe_points` güvenli noktalar ve başlangıç için dönüş yarıçapı + 10 cm
+(`MARGIN`), yerler için kendi yönünde 10 cm boşluk ister. K-062'deki "kazının güneyi bilinen
+sınır" bu maddeyle kalkar: boğaz artık geçiliyor.
+
+**Bulgu (K-062'deki açık):** NavFn'le araç başlangıçtan kuzeybati'ye çıkamadı. RPP yerinde
+dönerken "collision ahead" dedi: 34°'de izin sol arka köşesi (−1,56; 0,01) yerel costmap'te
+ölümcül hücreye değiyordu. Başlangıç izinli alanın batı sınırına (x −1,59) dönüş yarıçapından
+yalnız 1 cm uzak; kapi_onu 0,1 cm, konteyner_arkasi 3 cm, yakit_kuzeyi −7 cm. `test_safe_points`
+sürekli geometriyle ölçtüğü için bunları temiz sayıyordu; RPP ise yerel costmap'in 5 cm'lik
+ve haritayla hizalı olmayan ızgarasına bakıyor. Global costmap'te 72 yönün (5°) kaçında ölümcül
+hücreye değdiği:
+
+| Nokta | Pay 0,3 | Pay 0,3 + 5 cm kayma | Pay 0,2 + 5 cm kayma |
+|---|---|---|---|
+| baslangic | 0 | 10 | 0 |
+| kapi_onu | 0 | 10 | 0 |
+| konteyner_arkasi | 0 | 6 | 0 |
+| yakit_kuzeyi | 12 | – | 0 |
+
+Faz 4'te görünmedi: başlangıçtan gidilen hedefler doğudaydı, dönüş gerekmedi.
+
+**Doğrulama (simülasyon, kart, köprü; NavFn):**
+- `tools/nav2_route_bench.py` (yeni): yasak 5 noktaya kartı atlayarak yol 0/5; 8 yerin her birine
+  başlangıçtan gidiş-dönüş × 3 = **48/48 vardı**, plan ortancası 3 ms; 21 kurtarma (çoğu
+  "Failed to make progress", hemen hep başlangıca dönen bacaklarda), 7 "collision ahead" (tek bacak).
+- `nav2_accel_bench.py` × 5: **20/20**, kazının güneyindeki boğaz bacağı 32–34 s (önce 4 denemenin
+  2'si takılıyordu). Kartın gördüğü hız adımları %99 0,025 m/s · 0,050 rad/s (K-046 ile aynı);
+  80 117 hız komutunda 1 kırpma, bozuk çerçeve 0.
+- `test_safe_points` eski payla (0,3) çalıştırılınca home, baslangic, kapi_onu yakalandı.
+
+**Neden:** Esra'nın kararı (2026-10-20). Tek ayar, karta yükleme yok. Yasak bölgeler için pay
+zaten iki kez sayılıyordu (kartın 1 m'si K-036 + Nav2'nin 0,3'ü aynı harita hatası için). Diğer
+seçenek, payı tutup başlangıç dahil 4 noktayı taşımaktı: saha, `site_data.c` + yükleme, simülasyonun
+ve AMCL'nin başlangıç pozu, senaryolar.
+
+**Bedeli:** Gerçek engellere (konteyner, bariyerler) 10 cm daha az pay; K-038'in gerekçesi (harita
+~0,5 m kaymış, AMCL ~0,3 m yanılıyor, lidar katmanı yok) orada hâlâ geçerli. Konteyner–kazı
+darboğazı (1,24 m) yine kapalı: paylı iz 1,55 m.

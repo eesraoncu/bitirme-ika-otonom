@@ -303,8 +303,8 @@ engel riski yüzünden kullanılmaz.
 
 - **Başlangıç noktası** ve **güvenli noktalar** (≤ 8) harita çerçevesinde
   kayıtlıdır (`shared/site/ika_saha.yaml`). **Seçim ölçütü:** araç noktada her yönde durup
-  dönebilmeli: Nav2'nin izi + payının dönüş yarıçapı (1,56 m) içinde harita engeli ya da
-  keepout hücresi yok. Böylece kartın gönderdiği varış yönü (0) önemsiz. Denetim:
+  dönebilmeli: Nav2'nin izi + payının dönüş yarıçapı (1,42 m) + 10 cm içinde harita engeli ya
+  da keepout hücresi yok (10 cm: yerel costmap'in ızgarası haritayla hizalı değil, K-063). Böylece kartın gönderdiği varış yönü (0) önemsiz. Denetim:
   `shared/site/tests/test_safe_points.py` (iz ve pay Nav2 ayarından okunur). İlk seçim bu
   ölçütü karşılamıyordu: Nav2 iki noktaya ulaşamıyordu (2026-10-14, STATUS).
 - **En yakın:** mevcut telemetri konumuna düz çizgi (Öklid) uzaklığı en küçük olan. Eşitlikte

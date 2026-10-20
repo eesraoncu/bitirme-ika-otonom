@@ -3,8 +3,8 @@
 > Bu dosya her çalışma oturumunun **başında okunur**, **sonunda güncellenir**.
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
-**Son güncelleme:** 2026-10-15
-**Bulunduğumuz faz:** **Faz 5 başladı (2026-10-15)**: deneylerin kararları verildi (K-053…K-055). Faz 4 bitti (2026-10-14, `v0.4.0`): kart kuralları, köprünün görev arayüzü, LLM ajanı. Faz 3 bitti (`v0.3.0`): 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor. Açık: AMCL kaybı (aşağıda)
+**Son güncelleme:** 2026-10-20
+**Bulunduğumuz faz:** **Faz 5 (2026-10-20):** karar bekleyen işler kapandı (K-059…K-063), sırada `config:=A|B|C|D`. **Faz 5 başladı (2026-10-15)**: deneylerin kararları verildi (K-053…K-055). Faz 4 bitti (2026-10-14, `v0.4.0`): kart kuralları, köprünün görev arayüzü, LLM ajanı. Faz 3 bitti (`v0.3.0`): 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor.
 
 ---
 
@@ -69,6 +69,20 @@
    kesildikten 10 s sonra hâlâ 0,300 m/s (x 0,94 → 3,96 m), açık sıfır komutla durdu. Donmada
    dondurulan `agent_bridge`; C/D'de `vehicle_bridge` kartın sıfır hızını iletmeye devam eder.
    **Pilotta bakılacak:** her senaryo beklenen kuralı gerçekten tetikliyor mu (`provokes`).
+3b. ✅ **Karar bekleyen işler kapandı (2026-10-20, Esra'yla):**
+   - IWDG eklenmez (K-059). 97 hat hatası kapandı, kartın STATUS sayaçları her koşuda kaydedilecek
+     (K-060, uygulaması madde 5'te).
+   - Kablo geri takılınca reset ölçüldü (K-061): E5V düzeni, `mode=HOTPLUG`, bayraklar her turdan önce
+     `RMVF` ile temiz. JP3 takılı: PINRSTF; JP3'süz 3/3 SFTRSTF. ST-LINK her durumda resetliyor,
+     bilinen sınır. **E5V düzeni kurulu, pilota kadar kalıyor** (açarken önce CP2102, sonra CN1). JP3 takılı.
+   - Planlayıcı NavFn kalır (K-062): Smac Hybrid-A* (hedefin yönüne araba gibi varmak zorunda,
+     başlangıca 0°'de yol yok) ve State Lattice (hedefte yerinde dönerken takıldı) olmadı.
+   - **Asıl bulgu ve çözüm (K-063):** NavFn'le araç başlangıçtan kuzeydoğuya hiç çıkamıyordu: RPP
+     yerinde dönüşü "collision ahead" saydı. Güvenli noktalar dönüş yarıçapına 0–3 cm payla
+     seçilmişti, yerel costmap'in hizasız ızgarası bunu yiyor. İz payı 0,3 → 0,2; `test_safe_points`
+     10 cm pay istiyor. `nav2_route_bench` 48/48, `nav2_accel_bench` 20/20 (kazının güneyi dahil).
+   - Yeni araç: `tools/nav2_route_bench.py` (yasak noktalara yol yok mu + her yere başlangıçtan
+     gidiş-dönüş, plan süresi, kurtarma, collision ahead). Pilottan önce de koşulabilir.
 4. **`config:=A|B|C|D`** başlatma argümanı (K-054).
 5. **Kayıt** (K-055).
 6. **Pilot:** her senaryo D'de 3 kez, gerçek koşu süresi ölçülür (K-015).
@@ -1059,12 +1073,20 @@ other.
 | Gazebo: Fortress + TurtleBot 4 mü, mevcut Harmonic'te kendi modelimiz mi | ✅ K-027: Fortress + TurtleBot 4 | — |
 | LLM model seçimi (araç çağırma şart) | ✅ K-045: `granite4.1:3b` | — |
 | Senaryo başına tekrar sayısı | ✅ K-015: LLM senaryolarında 20, arızada 10 | — |
-| Araç kanalındaki 97 hat hatasının sebebi | **Açık**, yeniden üretilemedi | Tekrar görülürse, tür sayaçlarına bakılarak |
-| Ana döngü takılırsa (kalp atışı kesmeyle algılanır, tepki ana döngüde) | **Açık**, bağımsız bekçi zamanlayıcısı (IWDG) olabilir (K-025) | Faz 4–5, kapsam kuralına göre |
+| Araç kanalındaki 97 hat hatasının sebebi | ✅ K-060: tek seferlik sayıldı, Faz 5'te kartın STATUS sayaçları her koşuda kaydedilir | — |
+| Ana döngü takılırsa (kalp atışı kesmeyle algılanır, tepki ana döngüde) | ✅ K-059: IWDG eklenmez, tezde bilinen sınır | — |
 | PA8 hangi sokette | ✅ UM2505 Tablo 15–16: CN9 pin 8 (Arduino D7), ayrıca CN10 pin 23 | — |
-| Kablo geri takılınca ST-LINK kartı resetliyor, JP3'süz yol | **Açık**, birikmiş bayraklarda `SFTRSTF` (K-029) | Gerekirse, Faz 5 tekrarlarından önce |
+| Kablo geri takılınca ST-LINK kartı resetliyor, JP3'süz yol | ✅ K-061: JP3'süz de reset var (SFTRSTF, 3/3), bilinen sınır | — |
+| Yerinde dönüşte RPP "collision ahead": baslangic → kuzeybati NavFn'le başlangıçtan ayrılamıyor, `test_safe_points` dönüşü temiz sayıyor | ✅ K-063: noktalarda dönüş payı 0–3 cm'ydi, iz payı 0,3 → 0,2, test 10 cm pay istiyor | — |
 
 ## Bilinen engeller
+
+- **Başlangıca dönerken ara sıra kurtarma** (2026-10-20, `nav2_route_bench`): "→ baslangic" bacaklarında
+  "Failed to make progress" ve 1–3 kurtarma; hepsi vardı. Tahmin (doğrulanmadı): başlangıç batı sınırına
+  yakın pahalı bölgede, RPP orada yavaşlıyor. Senaryolar başlangıçtan çıkıyor; kurtarma (RECOVERY_HOME)
+  başlangıca gidiyor.
+- **Gazebo penceresinde salıncaklar görünmüyor:** `MR_salıncak.STL` gibi altı dosya `[GUI] Unable to find
+  file`; dosyalar yerinde, adlarındaki "ı" büyük olasılıkla. Yalnız görüntü, fizik ve sensörler etkilenmiyor.
 
 - **Simülasyon hızı (engel değil artık):** tam düzen araç yoldayken %93,8–99,9 (2026-10-15, Faz 5
   bloğu madde 2). Eski "%28–33" notu TurtleBot 4 zamanından ve ekrandan okunmuştu, bugünkü düzende

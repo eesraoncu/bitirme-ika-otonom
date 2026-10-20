@@ -4,8 +4,8 @@
 
 Kart kurtarmada aracı en yakın güvenli noktaya (ya da başlangıca) gönderir. Nav2
 oraya varamazsa kart RECOVERY'de kalır. Ölçüt: araç noktada her yönde durup
-dönebilmeli, yani Nav2'nin izi + payının dönüş yarıçapı içinde ne harita engeli ne
-keepout hücresi olmalı. Böylece kartın gönderdiği varış yönü önemsiz olur.
+dönebilmeli, yani Nav2'nin izi + payının dönüş yarıçapı + MARGIN içinde ne harita engeli
+ne keepout hücresi olmalı. Böylece kartın gönderdiği varış yönü önemsiz olur.
 
 İz ve pay Nav2'nin ayarından, harita ve maske ika_nav/maps'ten okunur; burada
 kopyası yok. Bilinmeyen (gri) hücre boş sayılır: yerel costmap'te
@@ -27,6 +27,10 @@ sys.path.insert(0, str(ROOT / "tools"))
 import gen_site as gs  # noqa: E402
 
 NAV2_PARAMS = ROOT / "ros2_ws" / "src" / "ika_nav" / "config" / "nav2_params.yaml"
+# Burada sürekli geometriyle ölçülüyor, RPP ise yerel costmap'in 5 cm'lik hücrelerine bakıyor ve
+# o ızgara haritayla hizalı değil. 2026-10-20: başlangıçta pay 1 cm'ydi, RPP yerinde dönüşü
+# çarpışma saydı (5 cm kaydırınca 72 yönün 10'u değiyordu). K-063
+MARGIN = 0.10
 
 
 def rotation_radius() -> float:
@@ -60,17 +64,17 @@ def clearance(obstacles: np.ndarray, x: float, y: float) -> float:
 
 
 def test_rotation_radius_from_nav2():
-    # iz 1,78 × 1,15 m, base_link'ten arkası 0,99; pay 0,3 (K-038)
-    assert rotation_radius() == pytest.approx(math.hypot(0.99 + 0.3, 0.575 + 0.3))
+    # iz 1,78 × 1,15 m, base_link'ten arkası 0,99; pay 0,2 (K-038, K-063)
+    assert rotation_radius() == pytest.approx(math.hypot(0.99 + 0.2, 0.575 + 0.2))
 
 
 def test_safe_points_and_home_rotation_clear(obstacles):
     site = gs.load_site()
-    r = rotation_radius()
+    r = rotation_radius() + MARGIN
     points = {"home": site["home"], **site["safe"]}
     short = {name: round(clearance(obstacles, x / 100, y / 100), 3)
              for name, (x, y) in points.items() if clearance(obstacles, x / 100, y / 100) < r}
-    assert not short, f"dönüş yarıçapı {r:.3f} m, yetmeyen noktalar (boşluk, m): {short}"
+    assert not short, f"dönüş yarıçapı + pay {r:.3f} m, yetmeyen noktalar (boşluk, m): {short}"
 
 
 @pytest.mark.parametrize("name, x, y", [
@@ -79,7 +83,7 @@ def test_safe_points_and_home_rotation_clear(obstacles):
 ])
 def test_detects_blocked_point(obstacles, name, x, y):
     # denetimin kendisi çalışıyor mu: 2026-10-14'te Nav2'nin ulaşamadığı noktalar yakalanmalı
-    assert clearance(obstacles, x, y) < rotation_radius(), name
+    assert clearance(obstacles, x, y) < rotation_radius() + MARGIN, name
 
 
 # ---- Ajanın yer adları (places, K-044, Faz 4.3) ---------------------------------
@@ -109,8 +113,8 @@ def test_places_footprint_clear_at_heading(obstacles):
     assert places, "places boş"
     short = {name: round(footprint_margin(obstacles, x / 100, y / 100, yaw / 1000), 3)
              for name, (x, y, yaw) in places.items()
-             if footprint_margin(obstacles, x / 100, y / 100, yaw / 1000) <= 0}
-    assert not short, f"izi engele/keepout'a değen yerler (boşluk, m): {short}"
+             if footprint_margin(obstacles, x / 100, y / 100, yaw / 1000) < MARGIN}
+    assert not short, f"izi engele/keepout'a {MARGIN} m'den yakın yerler (boşluk, m): {short}"
 
 
 def test_places_check_catches_bad_heading(obstacles):
