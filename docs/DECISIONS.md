@@ -1472,3 +1472,25 @@ retten sonra model ipucundaki güvenli noktaya gidip asıl hedefe gitmedi.
 
 **Neden:** Esra'nın kararları. Kartın katkısı (S1, S2) ancak güvensiz komut üreten senaryolarda
 ölçülebilir; 20 yerine 15 tekrar deneyi 2–3 geceden ~1 güne indiriyor.
+
+## K-067 · Tam deney parça parça: geceleri ve hafif kullanımda, kaldığı yerden devam (K-066'ya ek)
+**Tarih:** 2026-10-20 · **Durum:** Yürürlükte
+
+Deney tek bilgisayarda, Esra'nın günlük kullandığı bilgisayarda koşar: geceleri ve hafif kullanımda
+(tarayıcı, belge, editör). `run.py`'ye (`schedule.py`, ROS'suz, 15 test, kasıtlı 4 hatanın 4'ü yakalandı):
+- **Tekrar öncelikli sıra:** önce 1. tekrarın bütün senaryo × yapılandırmaları, sonra 2. Nerede
+  durulursa durulsun biten tekrarlar dört yapılandırmada eşleşmiş (K-053). Altyapı senaryoları
+  tekrar 10'da durur (K-015): `--seeds 1-15` tek komutta 760 + kablo 20 = 780 koşu.
+- **`--skip-done`:** results.csv'deki koşular atlanır. Ctrl-C yalnız o anki koşuyu kaybettirir.
+- **`--until SS:DD`:** o saatten sonra yeni koşu başlamaz.
+- **`--invalid` / `--drop-invalid`:** geçersiz koşu = kurtarma olmadan `kart_hold`, `sim_hiz_orani`
+  < 0,9 ya da altyapı olayı gerçekleşmedi. Çıkarılan koşunun kaydı kalır, `--skip-done` yeniden koşar.
+
+**Koşu sırasında:** bilgisayar açık ve şarjda (şarjda boşta uyumuyor; ama kapak kapanınca uyuyor:
+kapak açık ya da `lid-close-ac-action 'nothing'`), kart ve kablolar (E5V) yerinde, başka
+Gazebo/ROS yok. İşlemciyi ya da GPU'yu zorlayan işler (oyun, video düzenleme, derleme) koşuyu
+bozabilir: kaydedilir, `--invalid` yakalar. Kablo koşuları (C/D × 10) ayrıca, Esra'nın elinde.
+
+**Neden:** Esra'nın kararı (2026-10-20): başka bilgisayar yok, bilgisayarı kullanması gerekiyor.
+12 çekirdek, 23 GB bellek; tam düzen ~2,5 çekirdek (Gazebo) + GPU (model). Bozulmayı önlemek
+yerine ölçüp tekrarlamak: sim hızı ve kart durumu her koşuda zaten kayıtlı (K-055, K-065).

@@ -101,10 +101,17 @@
    ~0,23 m. Eski cümlelerle GEOFENCE senaryolarının çoğu kartı sınamıyordu (model kayıtlı yere gidiyor):
    limit_pushing_1/3 ve injection_3 yeniden yazıldı, GEOFENCE 8/9. `ret` / `gecersiz_cagri` ayrıldı.
    LLM senaryolarında 15 tekrar.
-7. **Tam deney:** 780 koşu, ~22 saat (12 LLM senaryosu × 4 × 15, donma 4 × 10, kablo C/D × 10 elle).
-   Gece koşusu: `python3 ros2_ws/src/experiments/run.py --scenario <12 LLM + agent_freeze_1> --seeds 1-15`
-   (donma için `--seeds 1-10` ayrı); kablo koşuları Esra'nın terminalinde. Sonra analiz betiği
-   (`analysis/`, plan Faz 5'in bitti ölçütü).
+7. **Tam deney (K-067):** 780 koşu, ~22 saat, geceleri ve hafif kullanımda, kaldığı yerden devam.
+   Her akşam aynı komut (depo kökünden, terminal açık kalır, **kapak kapanmaz**):
+   ```bash
+   python3 ros2_ws/src/experiments/run.py \
+     --scenario normal_1 normal_2 normal_3 ambiguous_1 ambiguous_2 ambiguous_3 \
+                limit_pushing_1 limit_pushing_2 limit_pushing_3 injection_1 injection_2 injection_3 agent_freeze_1 \
+     --seeds 1-15 --skip-done --until 08:00
+   ```
+   Sabah: `python3 ros2_ws/src/experiments/run.py --invalid` (varsa `--drop-invalid`).
+   Kablo (Esra'nın elinde, ~20 dk): `python3 ros2_ws/src/experiments/run.py --scenario link_loss_1 --config C D --seeds 1-10 --skip-done`.
+   Sonra analiz betiği (`analysis/`, plan Faz 5'in bitti ölçütü).
 
 **2026-10-13: Faz 4 planı onaylandı** (Esra'yla). Bitti sayılır (plan belgesi): doğal dille
 verilen görev ("depo arkasına git, orada 30 saniye bekle") baştan sona kart üzerinden çalışıyor;

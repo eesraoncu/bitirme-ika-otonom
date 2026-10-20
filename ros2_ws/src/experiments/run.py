@@ -6,6 +6,12 @@ Kullanım (depo kökünden; kart bağlı ve E5V'de (K-061), Ollama çalışıyor
     python3 ros2_ws/src/experiments/run.py --scenario normal_1 normal_2 --config A B C D --seeds 1-3
     python3 ros2_ws/src/experiments/run.py --scenario normal_1 --config D --seeds 1 --gui    # pencereli
 
+Tam deney parça parça (K-067): tekrar öncelikli sıra; --skip-done kaldığı yerden devam eder (Ctrl-C
+yalnız o anki koşuyu kaybettirir); --until 08:00 o saatten sonra yeni koşu başlatmaz:
+    python3 ros2_ws/src/experiments/run.py --scenario <...> --seeds 1-15 --skip-done --until 08:00
+    python3 ros2_ws/src/experiments/run.py --invalid        # geçersiz koşuları listele
+    python3 ros2_ws/src/experiments/run.py --drop-invalid   # CSV'den çıkar (kayıtlar kalır), sonra --skip-done
+
 Her koşu (K-065): düzeni baştan aç (experiment.launch.py; simülasyon dahil, araç başlangıçta) →
 hazır olmasını bekle → modeli ısıt → SIFIRLA → kaydı başlat (rosbag) → görevi ver (/agent/task) → ajan bitirene
 ya da süre dolana kadar bekle → aracın durmasını bekle → kaydı kapat → değerlendir (evaluate.py),
@@ -54,6 +60,7 @@ ROOT = HERE.parents[2]
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(ROOT / "shared" / "protocol" / "python"))
 import evaluate as ev  # noqa: E402
+import schedule as sch  # noqa: E402
 ac = ev.ac
 from ika_protocol.link import AGENT_PORT  # noqa: E402
 
@@ -75,14 +82,6 @@ def launch_constant(name: str):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return getattr(mod, name)
-
-
-def seeds(text: str) -> List[int]:
-    out = []
-    for part in text.split(","):
-        a, _, b = part.partition("-")
-        out += list(range(int(a), int(b or a) + 1))
-    return out
 
 
 def alive() -> List[str]:
@@ -282,34 +281,61 @@ def run_one(node: Runner, spec: Dict, config: str, seed: int, gui: bool, out: Pa
     return row
 
 
+def report_invalid(path: Path, drop: bool) -> int:
+    rows = sch.read_rows(path)
+    bad = [(r, sch.invalid(r)) for r in rows if sch.invalid(r)]
+    for r, why in bad:
+        print(f"  {r['kayit']}: {why}")
+    print(f"{len(bad)} geçersiz koşu / {len(rows)}")
+    if drop and bad:
+        sch.write_rows(path, [r for r in rows if not sch.invalid(r)], ev.FIELDS)
+        print(f"{path.name}'den çıkarıldı (kayıtları duruyor); --skip-done ile yeniden koşulur")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--scenario", nargs="+", required=True, help="scenarios.yaml'daki id'ler")
+    ap.add_argument("--scenario", nargs="+", help="scenarios.yaml'daki id'ler")
     ap.add_argument("--config", nargs="+", default=list("ABCD"), choices=list("ABCD"))
-    ap.add_argument("--seeds", default="1", help="ör. 1, 1-3, 1,4 (seed = tekrar numarası, K-053)")
+    ap.add_argument("--seeds", default="1", help="ör. 1, 1-3, 1,4 (seed = tekrar numarası, K-053; "
+                                                 f"altyapıda en çok {sch.INFRA_REPS}, K-015)")
     ap.add_argument("--gui", action="store_true", help="Gazebo penceresi açık")
     ap.add_argument("--out", type=Path, default=Path.home() / "ika_kosular", help="koşu klasörleri")
     ap.add_argument("--results", type=Path, default=ev.RESULTS)
+    ap.add_argument("--skip-done", action="store_true", help="results'ta olan koşuları atla")
+    ap.add_argument("--until", metavar="SS:DD", help="bu saatten sonra yeni koşu başlatma")
+    ap.add_argument("--invalid", action="store_true", help="geçersiz koşuları listele ve çık")
+    ap.add_argument("--drop-invalid", action="store_true", help="geçersiz koşuları CSV'den çıkar ve çık")
     a = ap.parse_args()
+    if a.invalid or a.drop_invalid:
+        return report_invalid(a.results, a.drop_invalid)
+    if not a.scenario:
+        ap.error("--scenario gerekli")
     if alive():
         print("Önce açık simülasyonu ve köprüleri kapat:", *alive(), sep="\n  ")
         return 1
-    specs = [ev.scenario(s) for s in a.scenario]
+    order = sch.run_order([ev.scenario(s) for s in a.scenario], a.config, sch.seeds(a.seeds))
+    done = sch.done_keys(sch.read_rows(a.results)) if a.skip_done else set()
+    todo = [o for o in order if (o[0]["id"], o[1], str(o[2])) not in done]
+    stop_at = sch.deadline(a.until, dt.datetime.now()) if a.until else None
+    print(f"{len(todo)} koşu ({len(order) - len(todo)} zaten yapılmış)"
+          + (f", yeni koşu {stop_at:%d.%m %H:%M}'e kadar" if stop_at else ""), flush=True)
     temperature = launch_constant("TEMPERATURE")
     rclpy.init()
     node = Runner()
     try:
-        for spec in specs:
-            for config in [c for c in a.config if c in spec.get("configs", list("ABCD"))]:
-                for seed in seeds(a.seeds):
-                    run_one(node, spec, config, seed, a.gui, a.out.expanduser(), a.results, temperature)
+        for k, (spec, config, seed) in enumerate(todo, 1):
+            if stop_at and dt.datetime.now() >= stop_at:
+                print(f"\nsaat {a.until}: duruldu, {len(todo) - k + 1} koşu kaldı (--skip-done ile devam)")
+                break
+            print(f"[{k}/{len(todo)}]", end="", flush=True)
+            run_one(node, spec, config, seed, a.gui, a.out.expanduser(), a.results, temperature)
     except KeyboardInterrupt:
-        print("\nyarıda kesildi")
+        print("\nyarıda kesildi: o anki koşu yazılmadı, --skip-done ile devam")
     finally:
         node.destroy_node()
         rclpy.try_shutdown()
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
