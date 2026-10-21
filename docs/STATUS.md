@@ -133,9 +133,20 @@
    kart_hata / kart_hold / kurtarma 0. Toplam 780 koşu, geçersiz 0. Komut: `python3 ros2_ws/src/experiments/run.py --scenario link_loss_1 --config C D --seeds 1-10 --skip-done`.
    `analysis/out/` 780 koşuyla üretildi, `results.csv` ile commit'lendi → **Faz 5 bitti (`v0.5.0`)**.
 
-**Sırada: Faz 6** (plan belgesi, hafta 13–14: analiz, tez, demo). Tezde verilecekler STATUS madde 7–9 ve
-K-068/K-069'da (S2: LLM senaryolarında Nav2 de güvensiz sonuç 0, kartın farkı arızada; süre yalnız
-arrive_at senaryolarıyla; karar süresi Faz 2.6'nın DWT ölçümünden).
+**Sırada: Faz 6** (plan belgesi, hafta 13–14: analiz, tez, demo). Plan belgesi baştan sona denetlendi
+(2026-10-21): Faz 0–5 bitti, sapmalar kararlarda (K-009, K-011, K-033, K-034, K-037, K-066). Kalanlar:
+1. ✅ **Karar süresi deneydeki yazılımla (2026-10-21, K-070):** deney kartta **Debug** derlemesiyle
+   koşuldu (flash okunup karşılaştırıldı). `decision_test` × 3 + `goto_timing` salt okuma: 47 karar,
+   **853,4–909,2 µs** (Faz 2.6 Debug 853–886). Tezde bu verilir; Release 169–177 µs Faz 2.6'nın
+   yazılımı. Mantık analizörü alınmadı (K-009 kapandı), DWT'nin sınırları K-070'te.
+   1. `decision_test` çalıştırmasında 72 denetimin 1'i kaldı (hangisi kaydedilmedi), 2. ve 3. hepsi geçti.
+2. **Sonuç bölümü:** S1–S3'e birebir (`analysis/out/tablolar.md`, K-068, K-069). Tezde: S2'de LLM
+   senaryolarında Nav2 de güvensiz sonuç 0, kartın farkı arızada; süre yalnız arrive_at senaryolarıyla;
+   plandan sapmalar gerekçeleriyle.
+3. **Demo:** doğal dil görevi, sahte komutun reddi (bozuk imza / tekrar çerçevesi, gösterilecek adım
+   henüz yok), kablo çekilince güvenli mod, gerekçeyle kendini düzelten ajan. Akış hazırlanmadı.
+4. **Demo videosu:** demo günü için önceden kaydedilir.
+- Depoda görünmeyen, Esra'da: hocaya haftalık rapor; K-015'te hocayla netleşmesi ertelenen tekrar sayısı.
 
 **2026-10-13: Faz 4 planı onaylandı** (Esra'yla). Bitti sayılır (plan belgesi): doğal dille
 verilen görev ("depo arkasına git, orada 30 saniye bekle") baştan sona kart üzerinden çalışıyor;

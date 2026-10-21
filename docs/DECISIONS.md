@@ -1550,3 +1550,38 @@ haksız ret oranı şişer; vazgeçme S3'ün (gerekçenin) asıl ölçülen etki
 **Sınırı:** "Başarılı koşuda süre" hâlâ iki tür koşuyu karıştırıyor: hedefe gidilen koşular ve
 safe_end'de aracın hiç kıpırdamadan bittiği koşular (ambiguous_3 her yapılandırmada ~1 s; C'nin
 limit_pushing_1 retten sonra "bitti" ~4 s). Tezde süre yalnız arrive_at senaryolarıyla verilmeli.
+
+## K-070 · Karar süresi deneydeki yazılımla: Debug 853–909 µs; mantık analizörü alınmadı (K-009'u kapatır)
+**Tarih:** 2026-10-21 · **Durum:** Yürürlükte
+
+**Bulgu:** Faz 5'in 780 koşusu kartta **Debug** derlemesiyle (`-O0`) koşuldu. Kartın flash'ı salt
+okunup (`-u 0x08000000`) iki derlemeyle karşılaştırıldı: `firmware/Debug/firmware.elf` (2026-10-14
+14:57; Faz 4'ün bütün kuralları: `consistency_check`, `freshness_check` var) ile birebir aynı,
+Release (2026-10-07, Faz 4'ten önce) değil. Saha verisi o günden beri değişmedi (sonraki
+`ika_saha.yaml` değişiklikleri yorum ve ajanın yer adları). K-068'de tez için verilen "Release
+169–177 µs" Faz 2.6'nın yazılımına (yalnız GEOFENCE ve kalp atışı) ve başka bir derlemeye ait.
+
+**Ölçüm (2026-10-21):** kartta duran yazılımla, flash'a yazmadan: `tools/decision_test.py` × 3
+(1. çalıştırmada 72 denetimin 1'i kaldı, hangisi kaydedilmedi; 2. ve 3. hepsi geçti), ardından
+`goto_timing` salt okundu (`-r32 0x20000640 16`). GOTO_CMD çerçevesinin son baytından VERDICT ve
+CAN mesajı kuyruğa girene kadar, HMAC dahil:
+
+| | Karar | En kısa | En uzun |
+|---|---|---|---|
+| Faz 2.6, Debug (GEOFENCE + kalp atışı) | 24 | 853 µs | 886 µs |
+| **Faz 5'in yazılımı, Debug (bütün kurallar)** | **47** | **853,4 µs** (145 081 çevrim) | **909,2 µs** (154 566 çevrim) |
+
+En kısa değişmedi (süreyi HMAC belirliyor: Debug'da tam etiket 773 µs, K-022); Faz 4'ün kuralları
+en uzunu ~23 µs artırdı. Tezde verilecek sayı bu: **deneydeki yazılım 853–909 µs**. Release
+169–177 µs yalnız "optimizasyonla ~5 kat kısalır, Faz 2.6'da ölçüldü" diye, ayrı.
+
+**Mantık analizörü alınmadı.** K-009'un ikinci koşulu (Faz 5'ten önce bağımsız doğrulama) bu kararla
+kapanır: analizör alınmaz, karar süresi yalnız DWT ile ölçülür. PA8 ölçüm pini kodda hazır kalır.
+
+**Sınırları (tezde):** DWT kartın kendi kendini ölçmesidir, bağımsız bir cihazla doğrulanmadı.
+Sayaç yalnız GOTO kararını ölçer (adet, son, en kısa, en uzun; ortalama/dağılım yok); Nav2'nin hız
+komutlarının (VELOCITY_CMD) karar süresi ölçülmedi. Süre, Nav2'nin 20 Hz hız komutu aralığının
+(50 ms) ve kalp atışı sınırının (500 ms) çok altında: sonuçları etkilemez.
+
+**Neden:** Esra'nın kararı (2026-10-21): tezde deneydeki yazılımın sayısı verilir; Release'i ölçmek
+için karta iki kez yazmak gerekirdi ve deneydeki yazılımı ölçmezdi.
