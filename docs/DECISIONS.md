@@ -1651,3 +1651,19 @@ Kartsız (A) denendi: "Kapı önüne git." canlı; ret görünümü ekran görü
 yapay ret dizisiyle (ROS'a yayımlanmadan) denendi. Kartlı (C/D) deneme hâlâ kaldı.
 
 **Neden:** Esra'nın kararı (2026-10-21): demo ve video için görsel olarak zengin, tek pencere.
+
+## K-073 · E5V beslemesi kalıcı: kart varsayılana döndürülmez (K-029'a ek)
+**Tarih:** 2026-10-21 · **Durum:** Yürürlükte
+
+K-029 "testten sonra JP5 varsayılana (5V_STLK) döner, E5V teli çıkarılır" diyordu; bu teknik bir
+zorunluluk değil, tercihti. Kart bundan sonra hep E5V düzeninde kalır: JP5 [5-6], CP2102'nin +5V
+pini → CN7 pin 6. JP3 takılı.
+
+- **Takma sırası:** önce CP2102 (LD3 yeşil), sonra CN1 (K-029). Söküş için belgelenmiş sıra yok.
+- Kart yalnız CP2102 takılıyken çalışır: yalnız CN1 takılıysa kartın beslemesi yoktur (arıza değil).
+- E5V teli gevşek bir atlama kablosu: taşırken yerinde mi bakılır; çıkarsa kart beslemesiz kalır.
+
+**Neden:** Esra'nın kararı (2026-10-21): her seferinde JP5'i ve teli değiştirmek zor. Düzen
+kanıtlı: Faz 5'in 780 koşusu (~21 saat) bu düzende koştu, kartlı 380 koşuda `kart_hata`,
+`kart_hold` ve kurtarma 0; K-070'teki ölçümde ST-LINK kartı bu düzende okudu (3,29 V). Demonun
+kablo çekme anı da bu düzeni gerektirir (K-029: varsayılan beslemede kablo çekilince kart kapanır).

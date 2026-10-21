@@ -153,7 +153,7 @@
    balonları. Testler 23, kasıtlı 13/13. Bulgu: Nav2 haritalanmamışı (205) boş sayıyor (K-072).
    Not: deneme düzeni Ctrl-C ile kapatılınca `ign gazebo` sunucusu iki kez geride kaldı (elle kapatıldı). **Kalan:** kartlı (C/D)
    deneme (rozet, ret ✗, kablo çekince "BAĞLANTI YOK"), demo akışı (sıra, cümleler), sahte komut.
-   **Kart 2026-10-21'de çıkarıldı** (Esra; demo öncesi E5V düzeni yeniden kurulacak, K-029).
+   **E5V düzeni kalıcı (K-073):** kart JP5 [5-6] + E5V teliyle kalır; takarken önce CP2102 (LD3 yeşil), sonra CN1.
 4. **Demo videosu:** demo günü için önceden kaydedilir.
 - Depoda görünmeyen, Esra'da: hocaya haftalık rapor; K-015'te hocayla netleşmesi ertelenen tekrar sayısı.
 
