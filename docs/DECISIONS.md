@@ -1620,3 +1620,34 @@ sınanacak. "Sahte komutun reddi" panelde yok, ayrı karar (köprüye dokunur).
 
 **Neden:** Esra'nın kararı (2026-10-21). Kapsam: plan belgesinin Faz 6 demosu; sonuç tablosuna
 satır eklemez ama demo planda var, ayrı klasörde ve başka hiçbir klasöre dokunmuyor.
+
+## K-072 · Demo paneli yeniden tasarlandı: koyu "kontrol merkezi" (K-071'e ek)
+**Tarih:** 2026-10-21 · **Durum:** Yürürlükte
+
+İlk panel (K-071) Esra'ya sade geldi (varsayılan Qt, gri ham harita, düz metin). Seçilen: koyu
+"kontrol merkezi" teması, hepsi aynı klasörde (`ros2_ws/src/demo_panel/`), yeni bağımlılık yok.
+
+- **Üst şerit:** başlık, yapılandırma rozeti (`-p config:=D`; yalnız yazı, davranışı değiştirmez),
+  dört ışık (Sim: /odom geliyor mu · Nav2: navigate_to_pose'un yayımcısı · Ajan: /agent/task'ın
+  dinleyicisi · Kart: /guard/status), sim saati (/odom damgası).
+- **Harita** (`site_view.py`, ekran pikselinde): haritanın sınıfları (`map_style.py`: asfalt zemin,
+  engel, haritalanmamış), 5 m ızgara, bariyer sınırı, taralı yasak bölgeler (ad üst kenarda),
+  güvenli noktalar, yer adları; canlı: araç (footprint + far konisi), solan iz, lidar (/scan, TF ile),
+  akan Nav2 yolu, hedefler (kabulde nabız atan bayrak; retde ✗, yayılan halka, güvenli noktaya ok),
+  pusula, ölçek, lejant. 20 Hz yeniden çizim.
+- **Sağ sütun:** Bekçi kartı (rozet, açıklama, bu görevdeki retler kurala göre), Araç (yay göstergesi;
+  kartın sınırı `firmware/app/rules/limits/limits.h`'deki `LIMIT_V_MAX_MM_S`'ten), Ön kamera
+  ("● CANLI"), Ajan ↔ kart (mesajlaşma balonları: operatör sağda, ajan/kart solda, renk türüne göre).
+- `theme.py`: renkler ve stil tek yerde.
+
+**Bulgu: Nav2 haritalanmamış alanı boş sayıyor.** Harita `trinary`; map_saver haritalanmamışı 205
+yazıyor (haritada 0: 5 346, 205: 85 359, 254: 223 917 piksel). p = 50/255 = 0,196 < `free_thresh`
+0,25: map_server bu hücreleri BOŞ yükler. Panel haritanın kaydettiğini gösterir (205 →
+haritalanmamış); Nav2'ye dokunulmadı. Haritalanmamışların çoğu engellerin gölgesi ve saha dışı;
+yasak bölgeler keepout ve kartla korunuyor. Tezde bilinen sınır olarak yazılabilir.
+
+**Doğrulama:** testler 23 (`panel_text` 15, `map_style` 8), kasıtlı 13 hatanın 13'ü yakalandı.
+Kartsız (A) denendi: "Kapı önüne git." canlı; ret görünümü ekran görüntüsü için panelin kuyruğuna
+yapay ret dizisiyle (ROS'a yayımlanmadan) denendi. Kartlı (C/D) deneme hâlâ kaldı.
+
+**Neden:** Esra'nın kararı (2026-10-21): demo ve video için görsel olarak zengin, tek pencere.

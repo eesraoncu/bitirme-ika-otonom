@@ -1,4 +1,4 @@
-"""Demo panelinin metinleri ve harita dönüşümü (Faz 6, demo).
+"""Demo panelinin metinleri, durumları ve küçük hesapları (Faz 6, demo, K-071).
 
 ROS'a ve Qt'ye bağlı değildir: düz sözlük/sayı alır, düz metin/sayı döndürür,
 PC'de pytest ile sınanır (tests/test_panel_text.py). Panel (demo_panel.py) bu
@@ -7,21 +7,35 @@ fonksiyonları ROS mesajlarının JSON'una uygular.
 Kaynak konular: /guard/task ve /guard/feedback (K-050), /guard/verdict (köprü,
 convert.verdict_text), /guard/status (STATUS, K-060), /agent/log (agent_core olayları).
 Ondalık virgül ve "(x; y)" m, kartın gerekçe metinleriyle aynı (protocol §7.3).
+Konuşma balonu: (tür, başlık, gövde); tür rengi seçer (theme.BUBBLE).
 """
 from __future__ import annotations
 
+import re
 from typing import Optional, Tuple
 
 STATUS_STALE_S = 2.5     # STATUS saniyede bir gelir: 2,5 s gelmezse kartla bağlantı yok sayılır
+LIVE_STALE_S = 2.0       # sim (odom) için aynı ölçüt
 
-# Rozet renkleri: kartın durumu (NORMAL / RECOVERY / HOLD), bağlantı yok, kart hiç görülmedi
+CONFIG_NAME = {"A": "bekçi yok", "B": "yalnız Nav2", "C": "kart, gerekçesiz", "D": "kart, gerekçeli"}
+
+# Kart rozeti: durum → (renk anahtarı, metin). Renkler theme.py'de.
 BADGE = {
-    "NORMAL": ("#1f9d55", "NORMAL"),
-    "RECOVERY": ("#e07b00", "KURTARMA"),
-    "HOLD": ("#c62828", "HOLD (beklemede)"),
-    "stale": ("#6b6b6b", "BAĞLANTI YOK"),
-    "none": ("#6b6b6b", "KART YOK"),
+    "NORMAL": ("green", "NORMAL"),
+    "RECOVERY": ("amber", "KURTARMA"),
+    "HOLD": ("red", "HOLD"),
+    "stale": ("muted", "BAĞLANTI YOK"),
+    "none": ("muted", "KART YOK"),
 }
+BADGE_HINT = {
+    "NORMAL": "komutlar denetleniyor",
+    "KURTARMA": "araç güvenli noktaya götürülüyor",
+    "HOLD": "araç duruyor · SIFIRLA bekleniyor",
+    "BAĞLANTI YOK": "karttan 2,5 s'dir haber yok",
+    "KART YOK": "bu yapılandırmada kart yok",
+}
+
+Bubble = Tuple[str, str, str]
 
 
 def num(v: float, nd: int = 1) -> str:
@@ -34,8 +48,12 @@ def point(x: float, y: float) -> str:
     return f"({num(x)}; {num(y)})"
 
 
+def config_label(config: str) -> str:
+    return f"{config} · {CONFIG_NAME[config]}" if config in CONFIG_NAME else ""
+
+
 def task_line(task: dict) -> str:
-    """/guard/task JSON'u → 'Ajan → kart' satırı."""
+    """/guard/task JSON'u → komutun okunur hâli."""
     cmd = task.get("cmd")
     if cmd == "git":
         where = point(task.get("x", 0.0), task.get("y", 0.0))
@@ -50,49 +68,86 @@ def task_line(task: dict) -> str:
     return f"bilinmeyen komut: {cmd}"
 
 
-def feedback_line(fb: dict, verdict: Optional[dict] = None) -> Tuple[str, str]:
-    """/guard/feedback (+ eşleşen ret kararı) → (satır, tür). Tür: 'kabul' ya da 'ret'.
-    verdict yalnız ret kararıysa verilir; C'de ajan gerekçeyi görmez ama izleyici kuralı görür."""
+def task_bubble(task: dict) -> Bubble:
+    return "komut", "Ajan → kart", task_line(task)
+
+
+def feedback_bubble(fb: dict, verdict: Optional[dict] = None) -> Bubble:
+    """/guard/feedback (+ eşleşen ret kararı) → balon. verdict yalnız ret kararıysa verilir;
+    C'de ajan gerekçeyi görmez ama izleyici kuralı başlıkta görür."""
     text = fb.get("text", "")
     if fb.get("accepted"):
-        return "✓ KABUL", "kabul"
+        return "kabul", "Kart · KABUL", text
     rule = f" · {verdict['rule']}" if verdict and verdict.get("rule") else ""
-    return f"✗ RET{rule} — {text}", "ret"
+    return "ret", f"Kart · RET{rule}", text
 
 
 def is_rejection(verdict: dict) -> bool:
     return verdict.get("result") not in (None, "ACCEPTED")
 
 
-def log_line(event: dict) -> Optional[Tuple[str, str]]:
-    """/agent/log olayı → (satır, tür) ya da None (panelde gösterilmeyen olay).
+def log_bubble(event: dict) -> Optional[Bubble]:
+    """/agent/log olayı → balon ya da None (panelde gösterilmeyen olay).
     'adım' yalnız karta gitmeyen (geçersiz) çağrıda gösterilir: karta giden komut zaten
     /guard/task ve /guard/feedback'ten canlı geliyor (adım olayı Nav2 vardıktan sonra yazılır)."""
     kind = event.get("event")
     if kind == "görev":
-        return f"Görev: “{event.get('text', '')}”", "gorev"
+        return "gorev", "Operatör", event.get("text", "")
     if kind == "adım" and event.get("task") is None:
-        return f"Geçersiz çağrı ({event.get('tool', '?')}) — {event.get('result', '')}", "gecersiz"
+        return "gecersiz", f"Ajan · geçersiz çağrı ({event.get('tool', '?')})", event.get("result", "")
     if kind == "bitti":
-        return f"Ajan bitirdi: {event.get('summary', '')}", "son"
+        return "son", "Ajan · bitti", event.get("summary", "")
     if kind == "vazgeçti":
-        return f"Ajan vazgeçti ({event.get('rejections', '?')} ret)", "son"
+        return "son", "Ajan · vazgeçti", f"{event.get('rejections', '?')} ret sonra görev bırakıldı."
     if kind == "adım sınırı":
-        return f"Ajan adım sınırına ulaştı ({event.get('steps', '?')} adım)", "son"
+        return "son", "Ajan · adım sınırı", f"{event.get('steps', '?')} adımda bitirilemedi."
     if kind == "meşgul":
-        return f"Ajan meşgul, görev alınmadı: “{event.get('text', '')}”", "uyari"
+        return "uyari", "Ajan · meşgul", f"Görev alınmadı: “{event.get('text', '')}”"
     if kind == "hata":
-        return f"Ajan hatası: {event.get('error', '')}", "uyari"
+        return "uyari", "Ajan · hata", event.get("error", "")
     return None
 
 
 def badge(status: Optional[dict], age_s: Optional[float]) -> Tuple[str, str]:
-    """Kart rozeti → (renk, metin). status None: kart hiç görülmedi (A/B ya da köprü yok)."""
+    """Kart rozeti → (renk anahtarı, metin). status None: kart hiç görülmedi (A/B ya da köprü yok)."""
     if status is None:
         return BADGE["none"]
     if age_s is None or age_s > STATUS_STALE_S:
         return BADGE["stale"]
-    return BADGE.get(status.get("state"), ("#6b6b6b", str(status.get("state"))))
+    return BADGE.get(status.get("state"), ("muted", str(status.get("state"))))
+
+
+def light(age_s: Optional[float], stale_s: float = LIVE_STALE_S) -> str:
+    """Üst şeritteki ışık: 'none' (hiç gelmedi), 'ok' (canlı), 'stale' (kesildi)."""
+    if age_s is None:
+        return "none"
+    return "ok" if age_s <= stale_s else "stale"
+
+
+def ring(t: float, duration: float) -> Optional[Tuple[float, float]]:
+    """Yayılan halka animasyonu: olaydan t s sonra (büyüklük 0→1, saydamlık 1→0); bitince None."""
+    if t < 0 or t > duration:
+        return None
+    f = t / duration
+    return f, 1.0 - f
+
+
+def gauge_fraction(v: float, vmax: float) -> float:
+    """Hız göstergesinin dolu oranı (0–1); geri gitme de büyüklüğüyle gösterilir."""
+    return 0.0 if vmax <= 0 else min(1.0, abs(v) / vmax)
+
+
+def clock(seconds: float) -> str:
+    """Simülasyon saati: 134,7 → '02:14'."""
+    s = max(0, int(seconds))
+    return f"{s // 60:02d}:{s % 60:02d}"
+
+
+def speed_limit_from_header(text: str) -> Optional[float]:
+    """Kartın hız sınırı (m/s), firmware/app/rules/limits/limits.h'deki LIMIT_V_MAX_MM_S'ten
+    (tek kaynak; RULES §1). Bulunamazsa None: gösterge sınır çizgisiz çizilir."""
+    m = re.search(r"#define\s+LIMIT_V_MAX_MM_S\s+(\d+)", text)
+    return int(m.group(1)) / 1000 if m else None
 
 
 def world_to_px(x: float, y: float, origin: Tuple[float, float], resolution: float,

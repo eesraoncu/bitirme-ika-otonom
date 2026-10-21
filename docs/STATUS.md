@@ -146,8 +146,12 @@
 3. **Demo:** doğal dil görevi, sahte komutun reddi (bozuk imza / tekrar çerçevesi, gösterilecek adım
    henüz yok, ayrı karar), kablo çekilince güvenli mod, gerekçeyle kendini düzelten ajan.
    ✅ **Demo paneli (2026-10-21, K-071):** `python3 ros2_ws/src/demo_panel/demo_panel.py` (deney düzeni
-   ve ajan açıkken). Görev kutusu, SIFIRLA, canlı kuşbakışı saha (araç, yol, kabul/ret işaretleri),
-   ajan ↔ kart akışı, kart rozeti, kamera. Kartsız (A) denendi, çalışıyor. **Kalan:** kartlı (C/D)
+   ve ajan açıkken; `--ros-args -p config:=D` rozete yazılır). Görev kutusu, SIFIRLA, canlı kuşbakışı saha
+   (araç, yol, kabul/ret işaretleri), ajan ↔ kart akışı, kart rozeti, kamera. Kartsız (A) denendi.
+   **Yeniden tasarım (2026-10-21, K-072):** koyu "kontrol merkezi": sistem ışıkları, sim saati,
+   stilize harita (lidar, iz, akan yol, ret halkası, pusula, ölçek, lejant), hız göstergesi, mesaj
+   balonları. Testler 23, kasıtlı 13/13. Bulgu: Nav2 haritalanmamışı (205) boş sayıyor (K-072).
+   Not: deneme düzeni Ctrl-C ile kapatılınca `ign gazebo` sunucusu iki kez geride kaldı (elle kapatıldı). **Kalan:** kartlı (C/D)
    deneme (rozet, ret ✗, kablo çekince "BAĞLANTI YOK"), demo akışı (sıra, cümleler), sahte komut.
    **Kart 2026-10-21'de çıkarıldı** (Esra; demo öncesi E5V düzeni yeniden kurulacak, K-029).
 4. **Demo videosu:** demo günü için önceden kaydedilir.
