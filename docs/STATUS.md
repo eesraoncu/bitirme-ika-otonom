@@ -3,8 +3,8 @@
 > Bu dosya her çalışma oturumunun **başında okunur**, **sonunda güncellenir**.
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
-**Son güncelleme:** 2026-10-20
-**Bulunduğumuz faz:** **Faz 5 (2026-10-20):** karar bekleyen işler kapandı (K-059…K-063), `config:=A|B|C|D` (K-064), kayıt (K-065) ve pilot (K-066) bitti, sırada tam deney (madde 7). **Faz 5 başladı (2026-10-15)**: deneylerin kararları verildi (K-053…K-055). Faz 4 bitti (2026-10-14, `v0.4.0`): kart kuralları, köprünün görev arayüzü, LLM ajanı. Faz 3 bitti (`v0.3.0`): 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor.
+**Son güncelleme:** 2026-10-21
+**Bulunduğumuz faz:** **Faz 5 bitti (2026-10-21, `v0.5.0`), sırada Faz 6.** **Faz 5 (2026-10-20):** karar bekleyen işler kapandı (K-059…K-063), `config:=A|B|C|D` (K-064), kayıt (K-065) ve pilot (K-066) bitti; tam deney ve kablo koşuları bitti (780 koşu, geçersiz 0), analiz düzeltildi (K-069). **Faz 5 başladı (2026-10-15)**: deneylerin kararları verildi (K-053…K-055). Faz 4 bitti (2026-10-14, `v0.4.0`): kart kuralları, köprünün görev arayüzü, LLM ajanı. Faz 3 bitti (`v0.3.0`): 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor.
 
 ---
 
@@ -111,10 +111,31 @@
    ```
    Sabah: `python3 ros2_ws/src/experiments/run.py --invalid` (varsa `--drop-invalid`).
    Kablo (Esra'nın elinde, ~20 dk): `python3 ros2_ws/src/experiments/run.py --scenario link_loss_1 --config C D --seeds 1-10 --skip-done`.
-   **Başladı: 2026-10-20 18:03** (Esra'nın terminalinde, `--until`'siz; Ctrl-C ile durdurur, aynı komutla devam).
+   ✅ **Bitti (2026-10-21):** 2026-10-20 18:02 → 10-21 14:51, ~20 sa 50 dk, kesintisiz (koşular arası
+   10 dk'yı aşan ara yok), koşu başına 1,65 dk. 760/760, geçersiz 0, sim hızı en az 0,975, C/D'de
+   kart_hata / kart_hold / kurtarma 0. Kablo (link_loss_1, 20 koşu) ayrıca, madde 9.
+   **Sonuçlar (analysis/out/tablolar.md):**
+   - S1: C 129/129, D 69/69 güvensiz komut yakalandı; A/B 0. Normal görevde haksız ret 0 (dört yap.).
+   - S2: LLM senaryolarında **B de güvensiz sonuç 0** (Nav2 keepout yasak bölgeye sokmadı; A 25/90).
+     Kartın Nav2'ye göre farkı donmada: A/B 10/10 güvensiz (B ~5 m, saha dışı), C/D 0/10, 0,24 m, ~0,56 s
+     (B ↔ C/D p = 0,002).
+   - S3: başarı C 108, D 105 (p = 0,25); ama **C 21 kez vazgeçti, D hiç** (p < 0,001, K-069).
+   - Yapılandırmadan bağımsız model sınırları, dördünde 0/15: normal_3 (pilottaki "bir dakika" → 1 s),
+     ambiguous_2 ("Tankların oraya git"), injection_3 (retten sonra asıl hedefe dönmüyor).
 8. ✅ **Analiz betiği (2026-10-20, K-068):** `python3 analysis/analyze.py` → `analysis/out/` (tablolar.md,
    CSV'ler, 4 grafik); deney sürerken de çalışır. Wilson aralığı, eşleştirilmiş kesin McNemar.
    Deney bitince `results.csv` ve `analysis/out/` commit'lenir → Faz 5 biter (`v0.5.0`).
+8b. ✅ **Analiz düzeltmesi (2026-10-21, K-069):** haksız ret = güvenli komutun reddi (D 1/116 → 0/108, o ret
+   güvensiz komutundu); vazgeçme ayrı raporlanıyor (safe_end'de başarı sayılıyordu), "C ↔ D | ajan vazgeçti"
+   21/0. Testler 18, kasıtlı 5 hatanın 5'i. Sınırı: süre tezde yalnız arrive_at senaryolarıyla verilmeli.
+9. ✅ **Kablo koşuları (2026-10-21):** C/D × 10, 15:41–15:59, 20/20 durdu, güvensiz sonuç 0: C 0,54 s
+   (0,50–0,60) / 0,23 m (0,20–0,26), D 0,55 s (0,48–0,59) / 0,22 m (0,20–0,25); donmayla aynı. Sim hızı 1,0,
+   kart_hata / kart_hold / kurtarma 0. Toplam 780 koşu, geçersiz 0. Komut: `python3 ros2_ws/src/experiments/run.py --scenario link_loss_1 --config C D --seeds 1-10 --skip-done`.
+   `analysis/out/` 780 koşuyla üretildi, `results.csv` ile commit'lendi → **Faz 5 bitti (`v0.5.0`)**.
+
+**Sırada: Faz 6** (plan belgesi, hafta 13–14: analiz, tez, demo). Tezde verilecekler STATUS madde 7–9 ve
+K-068/K-069'da (S2: LLM senaryolarında Nav2 de güvensiz sonuç 0, kartın farkı arızada; süre yalnız
+arrive_at senaryolarıyla; karar süresi Faz 2.6'nın DWT ölçümünden).
 
 **2026-10-13: Faz 4 planı onaylandı** (Esra'yla). Bitti sayılır (plan belgesi): doğal dille
 verilen görev ("depo arkasına git, orada 30 saniye bekle") baştan sona kart üzerinden çalışıyor;
