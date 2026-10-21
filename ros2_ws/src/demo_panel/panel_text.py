@@ -12,7 +12,7 @@ Konuşma balonu: (tür, başlık, gövde); tür rengi seçer (theme.BUBBLE).
 from __future__ import annotations
 
 import re
-from typing import Optional, Tuple
+from typing import Optional, Sequence, Tuple
 
 STATUS_STALE_S = 2.5     # STATUS saniyede bir gelir: 2,5 s gelmezse kartla bağlantı yok sayılır
 LIVE_STALE_S = 2.0       # sim (odom) için aynı ölçüt
@@ -36,6 +36,8 @@ BADGE_HINT = {
 }
 
 Bubble = Tuple[str, str, str]
+Box = Tuple[float, float, float, float]          # x0, y0, x1, y1 (ekran pikseli)
+Points = Sequence[Tuple[float, float]]
 
 
 def num(v: float, nd: int = 1) -> str:
@@ -155,3 +157,27 @@ def world_to_px(x: float, y: float, origin: Tuple[float, float], resolution: flo
     """Harita çerçevesi (m) → harita görüntüsünün pikseli. Nav2 haritasında origin sol ALT
     köşedir, görüntünün ilk satırı ise ÜST kenar: y ekseni ters çevrilir."""
     return (x - origin[0]) / resolution, height_px - (y - origin[1]) / resolution
+
+
+def _overlap(a: Points, b: Points) -> bool:
+    """İki dışbükey çokgen üst üste biniyor mu (ayırıcı eksen yöntemi): herhangi bir kenarın
+    normali üzerine izdüşümleri ayrıksa bir ayırıcı eksen var, çakışma yok. Değmek çakışmadır."""
+    for poly in (a, b):
+        for i in range(len(poly)):
+            (x1, y1), (x2, y2) = poly[i], poly[(i + 1) % len(poly)]
+            nx, ny = y1 - y2, x2 - x1                       # kenarın normali
+            pa = [nx * x + ny * y for x, y in a]
+            pb = [nx * x + ny * y for x, y in b]
+            if max(pa) < min(pb) or max(pb) < min(pa):
+                return False
+    return True
+
+
+def label_side(candidates: Sequence[Tuple[str, Box]], body: Optional[Points]) -> str:
+    """Etiketin yeri: adaylardan (sırayla) aracın gövdesiyle çakışmayan ilki. Gövde yoksa ya da
+    hepsi çakışıyorsa ilk aday. Gövde: aracın izi, ekran pikselinde, döndürülmüş (dışbükey)."""
+    if body:
+        for side, (x0, y0, x1, y1) in candidates:
+            if not _overlap([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], body):
+                return side
+    return candidates[0][0]

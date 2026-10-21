@@ -101,3 +101,29 @@ def test_world_to_px():
     assert pt.world_to_px(0.0, 0.0, o, r, h) == pytest.approx((87.6, 214.0))
     assert pt.world_to_px(-4.38, -12.0, o, r, h) == pytest.approx((0.0, 454.0))   # origin: sol alt
     assert pt.world_to_px(0.0, 1.0, o, r, h)[1] == pytest.approx(194.0)           # kuzey yukarı
+
+
+SQUARE = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]
+
+
+def test_overlap():
+    assert pt._overlap(SQUARE, [(0.5, 0.5), (2, 0.5), (2, 2), (0.5, 2)])          # iç içe geçiyor
+    assert not pt._overlap(SQUARE, [(2, 0), (3, 0), (3, 1), (2, 1)])              # yan yana, ayrık
+    assert pt._overlap(SQUARE, [(1, 0), (2, 0), (2, 1), (1, 1)])                  # değmek çakışmadır
+    # merkez (1,4; 1,4), yarıçap 0,7 eşkenar dörtgen: dış kutuları kesişir ama şekiller değmez
+    # (karenin (1; 1) köşesi: |−0,4| + |−0,4| = 0,8 > 0,7). Yalnız eksenlere bakan test bunu kaçırır.
+    diamond = [(2.1, 1.4), (1.4, 2.1), (0.7, 1.4), (1.4, 0.7)]
+    assert not pt._overlap(SQUARE, diamond)
+
+
+def test_label_side():
+    boxes = [("right", (12, -6, 52, 6)), ("left", (-52, -6, -12, 6)),
+             ("above", (-20, -24, 20, -12)), ("below", (-20, 12, 20, 24))]
+    assert pt.label_side(boxes, None) == "right"                                 # araç yok
+    assert pt.label_side(boxes, [(100, 100), (110, 100), (110, 110), (100, 110)]) == "right"   # uzakta
+    right_only = [(10, -8), (60, -8), (60, 8), (10, 8)]                          # sağdaki etiketi örter
+    assert pt.label_side(boxes, right_only) == "left"
+    # araç noktanın üstünde, doğuya bakıyor: sağı ve solu örter, üst ve alt boş
+    assert pt.label_side(boxes, [(-60, -8), (60, -8), (60, 8), (-60, 8)]) == "above"
+    everywhere = [(-100, -100), (100, -100), (100, 100), (-100, 100)]
+    assert pt.label_side(boxes, everywhere) == "right"                           # hepsi örtülü: ilk aday

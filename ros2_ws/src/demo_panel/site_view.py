@@ -160,12 +160,20 @@ class SiteView(QWidget):
         f.setBold(bold)
         return f
 
+    def _pill_size(self, p: QPainter, text: str, size: float = 12, bold: bool = True) -> Tuple[float, float]:
+        p.setFont(self._font(size, bold))
+        r = p.fontMetrics().boundingRect(text)
+        return r.width() + 14, r.height() + 6
+
     def _pill(self, p: QPainter, at: QPointF, text: str, fg: QColor, bg: QColor,
               size: float = 12, bold: bool = True) -> None:
         """Yazıyı yarı saydam, yuvarlak köşeli bir zeminle; at = yazının sol orta noktası."""
+        w, h = self._pill_size(p, text, size, bold)
+        self._pill_box(p, QRectF(at.x(), at.y() - h / 2, w, h), text, fg, bg, size, bold)
+
+    def _pill_box(self, p: QPainter, box: QRectF, text: str, fg: QColor, bg: QColor,
+                  size: float = 12, bold: bool = True) -> None:
         p.setFont(self._font(size, bold))
-        r = p.fontMetrics().boundingRect(text)
-        box = QRectF(at.x(), at.y() - r.height() / 2 - 3, r.width() + 14, r.height() + 6)
         p.setPen(Qt.NoPen)
         p.setBrush(bg)
         p.drawRoundedRect(box, box.height() / 2, box.height() / 2)
@@ -209,6 +217,7 @@ class SiteView(QWidget):
             tw = p.fontMetrics().horizontalAdvance(label) + 14
             self._pill(p, QPointF(box.center().x() - tw / 2, box.top()), label, QColor("white"),
                        _qc("forbidden", 0.85))
+        body = self._body_screen()
         for name, (x, y) in self.site["safe_points"].items():
             at = self.to_screen(x, y)
             p.setPen(QPen(_qc("safe"), 2.5))
@@ -217,13 +226,44 @@ class SiteView(QWidget):
             p.setPen(Qt.NoPen)
             p.setBrush(_qc("safe"))
             p.drawEllipse(at, 3.5, 3.5)
-            self._pill(p, at + QPointF(12, 0), name, _qc("safe"), _qc("outside", 0.7), 11)
+            self._point_label(p, at, 12, name, _qc("safe"), _qc("outside", 0.7), True, body)
         for name, xyd in self.site.get("places", {}).items():     # [x, y, varış yönü (derece)]
             at = self.to_screen(xyd[0], xyd[1])
             p.setPen(QPen(_qc("place"), 1.5))
             p.setBrush(_qc("place", 0.35))
             p.drawEllipse(at, 5, 5)
-            self._pill(p, at + QPointF(8, 0), name, _qc("place"), _qc("outside", 0.6), 11, False)
+            self._point_label(p, at, 8, name, _qc("place"), _qc("outside", 0.6), False, body)
+
+    def _body_screen(self) -> Optional[List[Tuple[float, float]]]:
+        """Aracın izi, ekran pikselinde (döndürülmüş); araç yoksa None."""
+        if self.vehicle is None:
+            return None
+        x, y, yaw = self.vehicle
+        c, s = math.cos(yaw), math.sin(yaw)
+        pts = [self.to_screen(x + fx * c - fy * s, y + fx * s + fy * c) for fx, fy in self.footprint]
+        return [(q.x(), q.y()) for q in pts]
+
+    def _point_label(self, p: QPainter, at: QPointF, gap: float, text: str, fg: QColor, bg: QColor,
+                     bold: bool, body) -> None:
+        """Noktanın etiketi: sağ, sol, üst, alt adaylarından aracın gövdesine değmeyen ilki
+        (panel_text.label_side). Araç noktanın tam üstündeyse yakın dördü de örtülür: ikinci
+        halka gövdenin en uzak köşesinin ötesinde (gövde o çemberin içinde, değemez)."""
+        w, h = self._pill_size(p, text, 11, bold)
+        x, y = at.x(), at.y()
+
+        def ring(d: float, tag: str = "") -> list:
+            return [("right" + tag, (x + d, y - h / 2, x + d + w, y + h / 2)),
+                    ("left" + tag, (x - d - w, y - h / 2, x - d, y + h / 2)),
+                    ("above" + tag, (x - w / 2, y - d - h, x + w / 2, y - d)),
+                    ("below" + tag, (x - w / 2, y + d, x + w / 2, y + d + h))]
+
+        boxes = ring(gap)
+        if body:
+            far = max(math.hypot(bx - x, by - y) for bx, by in body) + 4
+            if far > gap:
+                boxes += ring(far, "_far")
+        x0, y0, x1, y1 = dict(boxes)[pt.label_side(boxes, body)]
+        self._pill_box(p, QRectF(x0, y0, x1 - x0, y1 - y0), text, fg, bg, 11, bold)
 
     def _trail(self, p: QPainter) -> None:
         n = len(self.trail)

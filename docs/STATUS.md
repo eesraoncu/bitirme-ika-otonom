@@ -160,7 +160,8 @@
    panel gerçeği gösteriyor). Kablo (CN1) 0,50 m/s'de çekildi: araç 50 ms'de 0'a indi; çekme anı
    STATUS 1 Hz olduğu için ölçülmedi, 500 ms kuralıyla tahmini ~0,2 m (Faz 5: 0,22). Kopukken ajanın
    2 komutu köprüden "Kartla bağlantı yok" döndü. Geri takınca kart yeniden başladı (K-061), HOLD →
-   SIFIRLA → NORMAL, hata sayaçları 0. Panel küçük kusur: araç başlangıçtayken `baslangic` etiketini örtüyor.
+   SIFIRLA → NORMAL, hata sayaçları 0. Panel kusuru düzeltildi: araç bir noktanın üstündeyken etiket gövdeye değmeyen yere
+   (sağ/sol/üst/alt, gerekirse gövdenin ötesi) yazılıyor (`panel_text.label_side`, ayırıcı eksen; 25 test, kasıtlı 4/4).
    **E5V düzeni kalıcı (K-073):** kart JP5 [5-6] + E5V teliyle kalır; takarken önce CP2102 (LD3 yeşil), sonra CN1.
 4. **Demo videosu:** demo günü için önceden kaydedilir.
 - Depoda görünmeyen, Esra'da: hocaya haftalık rapor; K-015'te hocayla netleşmesi ertelenen tekrar sayısı.
