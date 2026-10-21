@@ -144,7 +144,12 @@
    senaryolarında Nav2 de güvensiz sonuç 0, kartın farkı arızada; süre yalnız arrive_at senaryolarıyla;
    plandan sapmalar gerekçeleriyle.
 3. **Demo:** doğal dil görevi, sahte komutun reddi (bozuk imza / tekrar çerçevesi, gösterilecek adım
-   henüz yok), kablo çekilince güvenli mod, gerekçeyle kendini düzelten ajan. Akış hazırlanmadı.
+   henüz yok, ayrı karar), kablo çekilince güvenli mod, gerekçeyle kendini düzelten ajan.
+   ✅ **Demo paneli (2026-10-21, K-071):** `python3 ros2_ws/src/demo_panel/demo_panel.py` (deney düzeni
+   ve ajan açıkken). Görev kutusu, SIFIRLA, canlı kuşbakışı saha (araç, yol, kabul/ret işaretleri),
+   ajan ↔ kart akışı, kart rozeti, kamera. Kartsız (A) denendi, çalışıyor. **Kalan:** kartlı (C/D)
+   deneme (rozet, ret ✗, kablo çekince "BAĞLANTI YOK"), demo akışı (sıra, cümleler), sahte komut.
+   **Kart 2026-10-21'de çıkarıldı** (Esra; demo öncesi E5V düzeni yeniden kurulacak, K-029).
 4. **Demo videosu:** demo günü için önceden kaydedilir.
 - Depoda görünmeyen, Esra'da: hocaya haftalık rapor; K-015'te hocayla netleşmesi ertelenen tekrar sayısı.
 

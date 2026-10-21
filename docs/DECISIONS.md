@@ -1585,3 +1585,38 @@ komutlarının (VELOCITY_CMD) karar süresi ölçülmedi. Süre, Nav2'nin 20 Hz 
 
 **Neden:** Esra'nın kararı (2026-10-21): tezde deneydeki yazılımın sayısı verilir; Release'i ölçmek
 için karta iki kez yazmak gerekirdi ve deneydeki yazılımı ölçmezdi.
+
+## K-071 · Demo paneli: tek pencere, yalnız dinler, `ros2_ws/src/demo_panel/` (Faz 6)
+**Tarih:** 2026-10-21 · **Durum:** Yürürlükte
+
+Plandaki demo (doğal dil görevi, ret, kablo çekme, gerekçeyle düzelme) önce yalnız terminalde ve
+JSON satırlarında görünüyordu; projede arayüz, `.rviz` ayarı ya da panel yoktu. Esra tek pencere,
+görsel olarak zengin bir panel istedi: `python3 ros2_ws/src/demo_panel/demo_panel.py` (PyQt5,
+ROS ile kurulu; yeni bağımlılık yok).
+
+- **Görev kutusu** → `/agent/task`; **SIFIRLA** → `/guard/reset`. Panelin yazdığı yalnız bunlar.
+- **Kuşbakışı saha** (`site_view.py`): Nav2 haritası (`ika_nav/maps/ika_saha`), üstünde
+  `shared/site/ika_saha.yaml`'dan sınır, yasak bölgeler (gerçek, paysız), güvenli noktalar, yer
+  adları; aracın izi Nav2'nin footprint'inden. Hiçbir koordinat ya da ölçü elle yazılmadı.
+  Canlı: araç (TF `map → base_link`, 10 Hz), Nav2'nin yolu (`/plan`), ajanın hedefleri:
+  bekliyor (gri bayrak), kabul (yeşil bayrak), ret (kırmızı ✗; GEOFENCE'te en yakın güvenli
+  noktaya kesik çizgi).
+- **Ajan ↔ kart akışı:** `/guard/task` ve `/guard/feedback` canlı; ret kuralı `/guard/verdict`'ten.
+  C'de ajan yalnız "Komut reddedildi." görür, izleyici kuralı da görür. `/agent/log`'dan görev,
+  geçersiz çağrı, bitti / vazgeçti.
+- **Kart rozeti:** `/guard/status` → NORMAL / KURTARMA / HOLD; 2,5 s gelmezse "BAĞLANTI YOK"
+  (kablo çekme anı), hiç gelmediyse "KART YOK" (A/B). Hız (`/odom`), konum, kamera (`/camera/image`).
+
+**Tasarım:** `panel_text.py` ROS'suz ve Qt'siz (metinler, rozet, harita dönüşümü): 12 test,
+kasıtlı 6 hatanın 6'sı yakalandı. ROS arka plan iş parçacığında, mesajlar kuyrukta, pencere
+10 Hz'de boşaltır. Gazebo'nun 3B görüntüsü gömülemez, yan pencerede kalır; RViz'e gerek yok.
+
+**Bulgular (kartsız deneme, A):** `/amcl_pose` yalnız araç hareket edince yayımlanıyor: duran
+aracı panel görmüyordu → konum TF'den. Yer adları `[x, y, yön]`, güvenli noktalar `[x, y]`.
+
+**Sınırları:** Karar `ref_seq` taşır, görev id'si değil: cevaptan en çok 1 s önceki ret kararı o
+cevabın kararı sayılır. Kartlı (C/D) deneme yapılmadı: rozet, ret ✗ ve "BAĞLANTI YOK" kart takılınca
+sınanacak. "Sahte komutun reddi" panelde yok, ayrı karar (köprüye dokunur).
+
+**Neden:** Esra'nın kararı (2026-10-21). Kapsam: plan belgesinin Faz 6 demosu; sonuç tablosuna
+satır eklemez ama demo planda var, ayrı klasörde ve başka hiçbir klasöre dokunmuyor.
