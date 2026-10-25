@@ -35,6 +35,28 @@ Kalıcı bir karar verildiyse `docs/DECISIONS.md`'ye **yeni madde olarak ekle** 
   Yazar ve commit eden: `Esra Öncü <eesraoncu@icloud.com>`. (Esra'nın kararı, 2026-09-24.
   Geçmişteki bütün commit'lerden de temizlendi.)
 
+## Çalışma biçimi
+
+- **Öğretir gibi anlat.** Her adımda önce "neden böyle, alternatifi neydi". Yeni kavram
+  (COBS, HMAC, PLL…) ilk geçtiğinde sade Türkçe ve somut örnekle. Büyük işi küçük adımlara
+  böl, her adımdan sonra kısa özet ver.
+- **Kararlar seçenekli sorulur.** 2–4 seçenek, her birinin kısa artı/eksisi, önerilen ilk
+  sırada "(Önerilen)". Kod/dosya onayları da böyle. Düz metinle "ne dersin?" diye bitirilmez.
+- **CubeMX ekran adlarını uydurma.** Önce `~/STM32CubeMX/db/mcu/IP/<IP>-<sürüm>_Modes.xml`
+  (`Group=` ekrandaki başlık); sürüm `db/mcu/STM32G474R*.xml` içindeki `<IP ... Version=>`.
+  Üretimden sonra `.ioc` ve üretilen `.c`'den doğrula.
+- **Kart terimlerini açıkla.** Esra'da yalnız NUCLEO-G474RE var, Arduino yok. Pini önce
+  fiziksel yeriyle (USB yukarıdayken hangi taraf, hangi soket, kaçıncı delik), sonra kılavuz
+  adıyla ver. "Arduino connector" (CN5/6/8/9), "morpho" (CN7/CN10), SB, VCP ilk geçişte
+  açıklanır.
+- **Dışarıya giden belgelerde takma isim yok.** Rapor, tez, sunum, hoca belgesinde
+  "LLM Komutan", "Gömülü Bekçi", "bekçi/komutan" yazılmaz; "gömülü denetleyici",
+  "denetleyici kart" denir. Proje adı: "Doğal Dille Görev Alan Otonom İKA için Bağımsız,
+  Gerçek Zamanlı Gömülü Komut Denetleyicisi". Depodaki eski geçişlere sormadan dokunulmaz.
+- **Hocanın elinde plan belgesi yok.** Hoca projeyi Esra'nın anlattığı kadar biliyor. Hoca
+  belgelerinde plan haftalarıyla tutarlılık uyarısı yapılmaz; hocanın neyi bildiği Esra'ya
+  sorulur.
+
 ## Dil
 
 Proje belgeleri, yorumlar ve commit mesajları Türkçe. Kod tanımlayıcıları İngilizce.
