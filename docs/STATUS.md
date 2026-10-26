@@ -3,7 +3,7 @@
 > Bu dosya her çalışma oturumunun **başında okunur**, **sonunda güncellenir**.
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
-**Son güncelleme:** 2026-10-21 (akşam)
+**Son güncelleme:** 2026-10-26 (rapor iskeleti)
 **Bulunduğumuz faz:** **Faz 5 bitti (2026-10-21, `v0.5.0`), sırada Faz 6.** **Faz 5 (2026-10-20):** karar bekleyen işler kapandı (K-059…K-063), `config:=A|B|C|D` (K-064), kayıt (K-065) ve pilot (K-066) bitti; tam deney ve kablo koşuları bitti (780 koşu, geçersiz 0), analiz düzeltildi (K-069). **Faz 5 başladı (2026-10-15)**: deneylerin kararları verildi (K-053…K-055). Faz 4 bitti (2026-10-14, `v0.4.0`): kart kuralları, köprünün görev arayüzü, LLM ajanı. Faz 3 bitti (`v0.3.0`): 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor.
 
 ---
@@ -145,6 +145,11 @@
    oturuma şablonla başlanır. Sonuç bölümü bunun içinde: S1–S3'e birebir (`analysis/out/tablolar.md`, K-068, K-069). Tezde: S2'de LLM
    senaryolarında Nav2 de güvensiz sonuç 0, kartın farkı arızada; süre yalnız arrive_at senaryolarıyla;
    plandan sapmalar gerekçeleriyle.
+   **Rapor iskeleti (2026-10-26):** Bilgisayar ve Bilişim Fakültesi şablonundan
+   `~/Documents/Bitirme_Raporu_Esra_Oncu.docx` hazırlandı (depo dışı, Esra'nın kararı). Bölümler: Giriş,
+   Genel Bilgiler, Materyal ve Yöntem, Araştırma Bulguları ve Tartışma, Sonuç, Kaynaklar; Ekler çıkarıldı.
+   Yazım Windows + Word'de; ana metin hedefi ~15 sayfa. Sarı yer tutucular: danışman, tarih, teşekkür,
+   özet, abstract, anahtar kelimeler.
 3. **Demo (en son):** doğal dil görevi, sahte komutun reddi (bozuk imza / tekrar çerçevesi, gösterilecek adım
    henüz yok, ayrı karar), kablo çekilince güvenli mod, gerekçeyle kendini düzelten ajan.
    ✅ **Demo paneli (2026-10-21, K-071):** `python3 ros2_ws/src/demo_panel/demo_panel.py` (deney düzeni
@@ -167,6 +172,14 @@
    **E5V düzeni kalıcı (K-073):** kart JP5 [5-6] + E5V teliyle kalır; takarken önce CP2102 (LD3 yeşil), sonra CN1.
 4. **Demo videosu (en son, demo akışından sonra):** demo günü için önceden kaydedilir.
 - Depoda görünmeyen, Esra'da: hocaya haftalık rapor; K-015'te hocayla netleşmesi ertelenen tekrar sayısı.
+- **Hocaya verilen formlar (2026-10-25):** başlama formu ve haftalık ilerleme raporu dolduruldu
+  (`~/Downloads/OneDrive_1_10-25-2026/baslamaEsraOncu.docx`, `ilerlemeEsraOncu.docx`). Hoca projeyi
+  bu raporlarda anlatılan noktada biliyor (Esra'nın tercihi): **Ekim-H3** kart tarafı (imza, coğrafi
+  sınır, kalp atışı, karar süresi Release 169–177 µs, kablo çekme), **Ekim-H4** saha + İKA modeli +
+  harita + Nav2; **sıradaki hafta köprü** (hedef ve hızlar karttan geçsin, yasak hedef reddi, kablo
+  çekince durma). Kanıtlar depo bağlantısı ve o işlerin commit'leri. Rapor bölümüne "yazıma
+  başlanmadı" yazıldı. Kasım haftaları boş; sonraki raporlar bu noktadan devam etmeli. Başlama
+  formunda hocadan beklenen karar: senaryo başına tekrar sayısı (öneri 20/10, en az 15).
 
 **2026-10-13: Faz 4 planı onaylandı** (Esra'yla). Bitti sayılır (plan belgesi): doğal dille
 verilen görev ("depo arkasına git, orada 30 saniye bekle") baştan sona kart üzerinden çalışıyor;
