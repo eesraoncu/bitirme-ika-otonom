@@ -1667,3 +1667,19 @@ pini → CN7 pin 6. JP3 takılı.
 kanıtlı: Faz 5'in 780 koşusu (~21 saat) bu düzende koştu, kartlı 380 koşuda `kart_hata`,
 `kart_hold` ve kurtarma 0; K-070'teki ölçümde ST-LINK kartı bu düzende okudu (3,29 V). Demonun
 kablo çekme anı da bu düzeni gerektirir (K-029: varsayılan beslemede kablo çekilince kart kapanır).
+
+---
+
+## K-074 · Raporda "denetleyici"nin İngilizcesi: supervisor
+**Tarih:** 2026-10-26 · **Durum:** Yürürlükte
+
+Raporun bütün İngilizce yerlerinde (Abstract, başlık, şekil/çizelge adları, sunum) "gömülü
+denetleyici" → **embedded supervisor**, "denetleyici kart" → **supervisor board**. İngilizce
+başlık: *An Independent, Real-Time Embedded Command Supervisor for an Autonomous UGV Tasked in
+Natural Language*.
+
+**Neden:** Esra'nın kararı (2026-10-26). Simplex literatüründe başka bir bileşeni izleyip
+gerektiğinde araya giren birime bu ad verilir; kartın işi (süzmek, reddetmek, durdurmak) budur.
+- *controller:* sözlük karşılığı, ama kontrol mühendisliğinde aracı süren birimi (ör. Nav2
+  controller) çağrıştırır; kart aracı sürmüyor.
+- *safety monitor:* yalnız izleyen bir birim gibi okunur; kart komutu reddediyor ve aracı durduruyor.

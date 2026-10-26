@@ -3,7 +3,7 @@
 > Bu dosya her çalışma oturumunun **başında okunur**, **sonunda güncellenir**.
 > Claude Code ile çalışırken ilk iş: bu dosyayı ve `docs/DECISIONS.md`'yi okut.
 
-**Son güncelleme:** 2026-10-26 (rapor iskeleti)
+**Son güncelleme:** 2026-10-26 (rapor: Özet ve Abstract)
 **Bulunduğumuz faz:** **Faz 5 bitti (2026-10-21, `v0.5.0`), sırada Faz 6.** **Faz 5 (2026-10-20):** karar bekleyen işler kapandı (K-059…K-063), `config:=A|B|C|D` (K-064), kayıt (K-065) ve pilot (K-066) bitti; tam deney ve kablo koşuları bitti (780 koşu, geçersiz 0), analiz düzeltildi (K-069). **Faz 5 başladı (2026-10-15)**: deneylerin kararları verildi (K-053…K-055). Faz 4 bitti (2026-10-14, `v0.4.0`): kart kuralları, köprünün görev arayüzü, LLM ajanı. Faz 3 bitti (`v0.3.0`): 3.0–3.2 bitti (K-032…K-038). Hız limitleri İKA'ya göre (K-039). **3.3 köprü bitti** (K-040): RViz hedefi ve Nav2 hızları karttan geçiyor, yasak hedef reddediliyor, kablo çekilince araç duruyor, köprü yeniden bağlanıyor.
 
 ---
@@ -150,6 +150,27 @@
    Genel Bilgiler, Materyal ve Yöntem, Araştırma Bulguları ve Tartışma, Sonuç, Kaynaklar; Ekler çıkarıldı.
    Yazım Windows + Word'de; ana metin hedefi ~15 sayfa. Sarı yer tutucular: danışman, tarih, teşekkür,
    özet, abstract, anahtar kelimeler.
+   Rapor Windows'ta: `C:\Users\eesra\OneDrive\Belgeler\4.sınıf\BİTİRME PROJESİ\Bitirme_Raporu_Esra_Oncu.docx`
+   (Word açıkken dosya kilitli, Claude içini okuyamıyor; metin sohbette yazılıp Esra aktarıyor).
+   **Özet ve Abstract yazıldı (2026-10-26):** yöntem: Claude taslağı sohbete yazar, Esra Word'e kendi
+   üslubuyla aktarır. Satır aralığı 1,5 zorunlu → başlık bloğuyla bir sayfaya ~200 kelime sığıyor;
+   Esra kısa cümle yerine bağlaçlı uzun cümle istedi. Özet'teki sayılar `analysis/out/tablolar.md`'den:
+   198 güvensiz komut (C 129 + D 69) hepsi reddedildi, haksız ret 0; LLM senaryolarında Nav2 de güvensiz
+   sonucu önledi; donmada Nav2'li araç her koşuda güvensiz, kartlı araç **"en geç 0,61 saniyede"**
+   durdu (C 0,53–0,61, D 0,53–0,59; "ortanca 0,56" Özet okuyucusu için yadırgatıcı bulundu, en kötü
+   durum verildi); gerekçe başarıyı değiştirmedi, vazgeçmeyi 21 → 0 indirdi. Çıkarılanlar (yer yok):
+   kablo çekme, karar süresi, yapılandırma adları, 0,24 m. Anahtar kelimeler: büyük dil modeli, insansız
+   kara aracı, gömülü sistemler, güvenlik denetleyicisi. Abstract aynı içerik; **"denetleyici" →
+   "supervisor"** (Esra; "controller" araç süren birimi çağrıştırıyor, "monitor" yalnız izleyen gibi),
+   İngilizce başlık: *An Independent, Real-Time Embedded Command Supervisor for an Autonomous UGV Tasked
+   in Natural Language*. Kısaltmalar dizinine girecekler: UGV, LLM, İKA, CAN, HMAC.
+   **Sırada: Giriş** (Esra seçti: paragraf paragraf; sonuçlar Giriş'te verilmez, yalnız Özet ve
+   Sonuç'ta). Giriş ~2 sayfa, 7 paragraf: bağlam · sorun · yaklaşım (Simplex) · amaç ve S1–S3 · katkılar
+   (K-004, 780 koşu, gerçek donanım) · kapsam ve sınırlar (simülasyon + HIL) · raporun düzeni. Literatür
+   Genel Bilgiler'e. 1. paragraf taslağı sohbette yazıldı (LLM'ler robotikte → tek cümleyle görev →
+   İKA; örnek "kapı önüne git, orada 30 saniye bekle"), Esra henüz aktarmadı. Önerilen kaynaklar,
+   künyeleri doğrulanacak: Ahn vd. 2022 (SayCan), Liang vd. 2023 (Code as Policies), Vemprala vd. 2023
+   (ChatGPT for Robotics).
 3. **Demo (en son):** doğal dil görevi, sahte komutun reddi (bozuk imza / tekrar çerçevesi, gösterilecek adım
    henüz yok, ayrı karar), kablo çekilince güvenli mod, gerekçeyle kendini düzelten ajan.
    ✅ **Demo paneli (2026-10-21, K-071):** `python3 ros2_ws/src/demo_panel/demo_panel.py` (deney düzeni
